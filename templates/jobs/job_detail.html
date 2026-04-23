@@ -17,6 +17,11 @@
                     <button type="submit" class="button">Gerar lote completo</button>
                 </form>
             {% endif %}
+            <form method="post" action="{% url 'jobs:rerun' job.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="button button-secondary">Reprocessar</button>
+            </form>
+            <a class="button button-secondary" href="{% url 'jobs:delete' job.pk %}">Excluir</a>
             <a class="button button-secondary" href="{% url 'jobs:list' %}">Voltar</a>
         </div>
     </div>
@@ -46,7 +51,7 @@
             <dd id="job-failed-text">{{ job.failed_rows }}</dd>
             <dt id="job-zip-dt" {% if not job.zip_file %}style="display:none;"{% endif %}>ZIP</dt>
             <dd id="job-zip-dd" {% if not job.zip_file %}style="display:none;"{% endif %}>
-                <a class="link-action" id="job-zip-link" href="{{ job.zip_file.url|default:'#' }}">Baixar ZIP</a>
+                <a class="link-action" id="job-zip-link" href="{% if job.zip_file %}{% url 'jobs:download-zip' job.pk %}{% else %}#{% endif %}">Baixar ZIP</a>
             </dd>
         </dl>
     </div>
@@ -62,7 +67,7 @@
                     <strong>Linha {{ item.row_number }}</strong><br>
                     <span class="muted">{{ item.get_status_display }}</span><br>
                     {% if item.output_pdf %}
-                        <a class="link-action" href="{{ item.output_pdf.url }}">Baixar PDF</a>
+                        <a class="link-action" href="{% url 'jobs:download-item' item.pk %}">Baixar PDF</a>
                     {% elif item.error_message %}
                         <span class="muted">{{ item.error_message }}</span>
                     {% endif %}
@@ -87,19 +92,44 @@
   const zipDd = document.getElementById("job-zip-dd");
   const zipLink = document.getElementById("job-zip-link");
 
+  const createItemNode = (item) => {
+    const li = document.createElement("li");
+    const strong = document.createElement("strong");
+    strong.textContent = `Linha ${item.row_number}`;
+    li.appendChild(strong);
+    li.appendChild(document.createElement("br"));
+
+    const status = document.createElement("span");
+    status.className = "muted";
+    status.textContent = item.status_display;
+    li.appendChild(status);
+    li.appendChild(document.createElement("br"));
+
+    if (item.output_url) {
+      const link = document.createElement("a");
+      link.className = "link-action";
+      link.href = item.output_url;
+      link.textContent = "Baixar PDF";
+      li.appendChild(link);
+    } else if (item.error_message) {
+      const error = document.createElement("span");
+      error.className = "muted";
+      error.textContent = item.error_message;
+      li.appendChild(error);
+    }
+    return li;
+  };
+
   const renderItems = (items) => {
     if (!items.length) {
-      itemsList.innerHTML = '<li class="muted">Nenhum item processado ainda.</li>';
+      itemsList.replaceChildren();
+      const li = document.createElement("li");
+      li.className = "muted";
+      li.textContent = "Nenhum item processado ainda.";
+      itemsList.appendChild(li);
       return;
     }
-    itemsList.innerHTML = items.map((item) => `
-      <li>
-        <strong>Linha ${item.row_number}</strong><br>
-        <span class="muted">${item.status_display}</span><br>
-        ${item.output_url ? `<a class="link-action" href="${item.output_url}">Baixar PDF</a>` : ""}
-        ${!item.output_url && item.error_message ? `<span class="muted">${item.error_message}</span>` : ""}
-      </li>
-    `).join("");
+    itemsList.replaceChildren(...items.map(createItemNode));
   };
 
   const refresh = async () => {

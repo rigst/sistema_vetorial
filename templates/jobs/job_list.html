@@ -36,7 +36,14 @@
                             <td><span class="status-pill status-{{ job.status }}">{{ job.get_status_display }}</span></td>
                             <td>{{ job.processed_rows }}/{{ job.total_rows }}</td>
                             <td>{{ job.updated_at|date:"d/m/Y H:i" }}</td>
-                            <td><a class="link-action" href="{% url 'jobs:detail' job.pk %}">Abrir</a></td>
+                            <td class="inline-actions">
+                                <a class="link-action" href="{% url 'jobs:detail' job.pk %}">Abrir</a>
+                                <form method="post" action="{% url 'jobs:rerun' job.pk %}" style="display:inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="link-action" style="background:none;border:0;padding:0;box-shadow:none;color:var(--accent);">Reprocessar</button>
+                                </form>
+                                <a class="link-action" href="{% url 'jobs:delete' job.pk %}">Excluir</a>
+                            </td>
                         </tr>
                     {% endfor %}
                 </tbody>

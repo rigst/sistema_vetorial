@@ -4,6 +4,7 @@ from copy import deepcopy
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
 from django.core.files.base import ContentFile
+from django.http import FileResponse
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.utils.text import slugify
@@ -14,7 +15,7 @@ from django.views.generic import CreateView, DeleteView, DetailView, ListView, U
 from core.mixins import UserOwnedQuerysetMixin
 
 from .forms import DocumentTemplateForm, TemplateFieldForm
-from .models import DocumentTemplate, TemplateField
+from .models import DocumentTemplate, TemplateField, TemplatePreviewPage
 from .services import update_template_pdf_metadata
 
 
@@ -204,3 +205,14 @@ class TemplateLayoutUpdateView(LoginRequiredMixin, View):
             field.save(update_fields=["x", "y", "width", "height", "updated_at"])
 
         return JsonResponse({"ok": True, "updated": len(updates)})
+
+
+class TemplatePreviewPageImageView(LoginRequiredMixin, View):
+    def get(self, request, *args, **kwargs):
+        preview_page = get_object_or_404(
+            TemplatePreviewPage,
+            template_id=kwargs["pk"],
+            page_number=kwargs["page_number"],
+            template__user=request.user,
+        )
+        return FileResponse(preview_page.image.open("rb"), content_type="image/png")

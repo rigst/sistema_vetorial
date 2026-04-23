@@ -13,6 +13,9 @@
             {{ form.as_p }}
             <button type="submit">Entrar</button>
         </form>
+        <p class="muted" style="margin-top: 1rem;">
+            <a class="link-action" href="{% url 'password_reset' %}">Esqueci minha senha</a>
+        </p>
     </div>
 </section>
 {% endblock %}

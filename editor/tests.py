@@ -7,6 +7,7 @@ from pathlib import Path
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
+from django.urls import reverse
 from reportlab.pdfgen import canvas
 
 from fonts.models import FontAsset
@@ -100,3 +101,18 @@ class EditorServiceTests(TestCase):
         duplicate = DocumentTemplate.objects.exclude(pk=template.pk).get()
         self.assertEqual(duplicate.fields.count(), 1)
         self.assertEqual(duplicate.fields.first().label, "Nome")
+
+    def test_preview_page_requires_owner(self):
+        other_user = get_user_model().objects.create_user(username="outro-editor", password="senha123")
+        template = DocumentTemplate.objects.create(
+            user=self.user,
+            name="Template Preview Protegido",
+            slug="template-preview-protegido",
+            background_pdf=self._build_pdf_upload(pages=2),
+        )
+        update_template_pdf_metadata(template)
+
+        self.client.force_login(other_user)
+        response = self.client.get(reverse("editor:preview-page", kwargs={"pk": template.pk, "page_number": 1}))
+
+        self.assertEqual(response.status_code, 404)

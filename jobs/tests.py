@@ -7,6 +7,7 @@ from pathlib import Path
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
+from django.urls import reverse
 from openpyxl import Workbook
 from reportlab.pdfgen import canvas
 
@@ -218,3 +219,43 @@ class JobServiceTests(TestCase):
         self.assertEqual(job.success_rows, 4)
         self.assertTrue(bool(job.zip_file))
         self.assertEqual(job.items.count(), 4)
+
+    def test_job_status_and_downloads_are_protected_by_owner(self):
+        font = self._build_font()
+        template = self._build_template()
+        TemplateField.objects.create(
+            template=template,
+            name="nome",
+            label="Nome",
+            excel_column="nome",
+            order_index=1,
+            page_number=1,
+            x=30,
+            y=170,
+            width=180,
+            height=20,
+            font=font,
+            font_size=14,
+        )
+        job = GenerationJob.objects.create(
+            user=self.user,
+            template=template,
+            name="Protected Job",
+            kind=GenerationJob.Kind.FULL,
+            source_excel=self._build_excel_upload(),
+            status=GenerationJob.Status.QUEUED,
+        )
+        process_job(job)
+        job.refresh_from_db()
+        item = job.items.first()
+        other_user = get_user_model().objects.create_user(username="jobs-other", password="senha123")
+
+        self.client.force_login(other_user)
+
+        status_response = self.client.get(reverse("jobs:status", kwargs={"pk": job.pk}))
+        zip_response = self.client.get(reverse("jobs:download-zip", kwargs={"pk": job.pk}))
+        item_response = self.client.get(reverse("jobs:download-item", kwargs={"pk": item.pk}))
+
+        self.assertEqual(status_response.status_code, 404)
+        self.assertEqual(zip_response.status_code, 404)
+        self.assertEqual(item_response.status_code, 404)

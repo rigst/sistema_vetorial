@@ -97,7 +97,7 @@
                         type="button"
                         class="page-tab {% if forloop.first %}is-active{% endif %}"
                         data-page-number="{{ preview_page.page_number }}"
-                        data-image-url="{{ preview_page.image.url }}"
+                        data-image-url="{% url 'editor:preview-page' template_obj.pk preview_page.page_number %}"
                     >
                         Página {{ preview_page.page_number }}
                     </button>

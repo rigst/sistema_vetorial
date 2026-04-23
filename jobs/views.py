@@ -1,17 +1,18 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
+from django.core.files.base import ContentFile
+from django.http import FileResponse
 from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.views import View
-from django.views.generic import CreateView, DetailView, ListView
-from django.core.files.base import ContentFile
+from django.views.generic import CreateView, DeleteView, DetailView, ListView
 
 from core.mixins import UserOwnedQuerysetMixin
 from django.conf import settings
 
 from .forms import GenerationJobForm
-from .models import GenerationJob
+from .models import GenerationItem, GenerationJob
 from .runner import spawn_job_process
 
 
@@ -54,6 +55,16 @@ class GenerationJobDetailView(UserOwnedQuerysetMixin, DetailView):
     context_object_name = "job"
 
 
+class GenerationJobDeleteView(UserOwnedQuerysetMixin, DeleteView):
+    model = GenerationJob
+    template_name = "jobs/job_confirm_delete.html"
+    success_url = reverse_lazy("jobs:list")
+
+    def delete(self, request, *args, **kwargs):
+        messages.success(request, "Job removido com sucesso.")
+        return super().delete(request, *args, **kwargs)
+
+
 class PromotePreviewJobView(LoginRequiredMixin, View):
     def post(self, request, *args, **kwargs):
         preview_job = GenerationJob.objects.filter(
@@ -80,6 +91,30 @@ class PromotePreviewJobView(LoginRequiredMixin, View):
         return redirect("jobs:detail", pk=full_job.pk)
 
 
+class RerunJobView(LoginRequiredMixin, View):
+    def post(self, request, *args, **kwargs):
+        source_job = GenerationJob.objects.filter(pk=kwargs["pk"], user=request.user).select_related("template").first()
+        if not source_job:
+            messages.error(request, "Job não encontrado.")
+            return redirect("jobs:list")
+
+        with source_job.source_excel.open("rb") as source_file:
+            new_job = GenerationJob.objects.create(
+                user=request.user,
+                template=source_job.template,
+                name=f"{source_job.name} - reprocessado",
+                source_excel=ContentFile(
+                    source_file.read(),
+                    name=source_job.source_excel.name.split("/")[-1],
+                ),
+                kind=source_job.kind,
+                status=GenerationJob.Status.QUEUED,
+            )
+        spawn_job_process(settings.BASE_DIR, new_job.pk)
+        messages.success(request, "Job reenviado para processamento.")
+        return redirect("jobs:detail", pk=new_job.pk)
+
+
 class GenerationJobStatusView(LoginRequiredMixin, View):
     def get(self, request, *args, **kwargs):
         job = GenerationJob.objects.filter(pk=kwargs["pk"], user=request.user).first()
@@ -96,16 +131,32 @@ class GenerationJobStatusView(LoginRequiredMixin, View):
                 "success_rows": job.success_rows,
                 "failed_rows": job.failed_rows,
                 "last_error": job.last_error,
-                "zip_url": job.zip_file.url if job.zip_file else "",
+                "zip_url": reverse("jobs:download-zip", kwargs={"pk": job.pk}) if job.zip_file else "",
                 "items": [
                     {
                         "row_number": item.row_number,
                         "status": item.status,
                         "status_display": item.get_status_display(),
                         "error_message": item.error_message,
-                        "output_url": item.output_pdf.url if item.output_pdf else "",
+                        "output_url": reverse("jobs:download-item", kwargs={"pk": item.pk}) if item.output_pdf else "",
                     }
                     for item in job.items.order_by("row_number")
                 ],
             }
         )
+
+
+class GenerationJobZipDownloadView(LoginRequiredMixin, View):
+    def get(self, request, *args, **kwargs):
+        job = GenerationJob.objects.filter(pk=kwargs["pk"], user=request.user).first()
+        if not job or not job.zip_file:
+            return JsonResponse({"error": "not_found"}, status=404)
+        return FileResponse(job.zip_file.open("rb"), as_attachment=True, filename=job.zip_file.name.split("/")[-1])
+
+
+class GenerationItemDownloadView(LoginRequiredMixin, View):
+    def get(self, request, *args, **kwargs):
+        item = GenerationItem.objects.filter(pk=kwargs["pk"], job__user=request.user).select_related("job").first()
+        if not item or not item.output_pdf:
+            return JsonResponse({"error": "not_found"}, status=404)
+        return FileResponse(item.output_pdf.open("rb"), as_attachment=True, filename=item.output_pdf.name.split("/")[-1])

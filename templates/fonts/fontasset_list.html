@@ -38,7 +38,10 @@
                                     {% if font.is_active %}Ativa{% else %}Inativa{% endif %}
                                 </span>
                             </td>
-                            <td><a class="link-action" href="{% url 'fonts:update' font.pk %}">Editar</a></td>
+                            <td class="inline-actions">
+                                <a class="link-action" href="{% url 'fonts:update' font.pk %}">Editar</a>
+                                <a class="link-action" href="{% url 'fonts:delete' font.pk %}">Excluir</a>
+                            </td>
                         </tr>
                     {% endfor %}
                 </tbody>

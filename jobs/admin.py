@@ -1,5 +1,8 @@
 from django.contrib import admin
 
+from core.admin_mixins import OwnedAdminMixin
+from editor.models import DocumentTemplate
+
 from .models import GenerationItem, GenerationJob
 
 
@@ -10,7 +13,8 @@ class GenerationItemInline(admin.TabularInline):
 
 
 @admin.register(GenerationJob)
-class GenerationJobAdmin(admin.ModelAdmin):
+class GenerationJobAdmin(OwnedAdminMixin, admin.ModelAdmin):
+    owner_related_fields = {"template": DocumentTemplate}
     list_display = ("name", "user", "template", "status", "processed_rows", "total_rows", "updated_at")
     list_filter = ("status",)
     search_fields = ("name", "user__username", "template__name")
