@@ -43,10 +43,21 @@ class DocumentTemplate(OwnedModel):
 
 
 class TemplateField(TimeStampedModel):
+    class ValueType(models.TextChoices):
+        TEXT = "text", "Texto"
+        INTEGER = "integer", "Inteiro"
+
     class TextAlign(models.TextChoices):
         LEFT = "left", "Esquerda"
         CENTER = "center", "Centro"
         RIGHT = "right", "Direita"
+
+    class TextTransform(models.TextChoices):
+        NONE = "none", "Sem transformação"
+        LOWER = "lower", "Minúsculas"
+        UPPER = "upper", "Maiúsculas"
+        TITLE = "title", "Iniciais maiúsculas"
+        TITLE_SMART = "title_smart", "Palavras principais"
 
     class OverflowMode(models.TextChoices):
         TRUNCATE = "truncate", "Cortar"
@@ -60,6 +71,7 @@ class TemplateField(TimeStampedModel):
     excel_column = models.CharField(max_length=255, blank=True)
     order_index = models.PositiveIntegerField(default=0)
     page_number = models.PositiveIntegerField(default=1)
+    value_type = models.CharField(max_length=20, choices=ValueType.choices, default=ValueType.TEXT)
     x = models.DecimalField(max_digits=8, decimal_places=2)
     y = models.DecimalField(max_digits=8, decimal_places=2)
     width = models.DecimalField(max_digits=8, decimal_places=2, default=0)
@@ -69,10 +81,18 @@ class TemplateField(TimeStampedModel):
     is_bold = models.BooleanField(default=False)
     is_italic = models.BooleanField(default=False)
     text_align = models.CharField(max_length=10, choices=TextAlign.choices, default=TextAlign.LEFT)
+    text_transform = models.CharField(max_length=20, choices=TextTransform.choices, default=TextTransform.NONE)
+    transform_exceptions = models.CharField(max_length=255, blank=True)
     color = models.CharField(max_length=20, default="#000000")
     letter_spacing = models.DecimalField(max_digits=6, decimal_places=2, default=0)
     line_height = models.DecimalField(max_digits=6, decimal_places=2, default=1.2)
     max_lines = models.PositiveIntegerField(default=1)
+    integer_min_digits = models.PositiveIntegerField(default=0)
+    integer_keep_sign = models.BooleanField(default=True)
+    prefix = models.CharField(max_length=50, blank=True)
+    suffix = models.CharField(max_length=50, blank=True)
+    empty_value = models.CharField(max_length=255, blank=True)
+    trim_whitespace = models.BooleanField(default=True)
     overflow_mode = models.CharField(
         max_length=20,
         choices=OverflowMode.choices,

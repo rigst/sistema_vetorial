@@ -15,7 +15,7 @@ from editor.services import update_template_pdf_metadata
 from fonts.models import FontAsset
 
 from .models import GenerationJob
-from .services import process_job
+from .services import format_field_value, process_job
 
 
 TEST_MEDIA_ROOT = tempfile.mkdtemp(prefix="sistema_vetorial_jobs_tests_")
@@ -84,6 +84,56 @@ class JobServiceTests(TestCase):
         update_template_pdf_metadata(template)
         return template
 
+    def test_format_field_value_supports_text_transformations(self):
+        font = self._build_font()
+        template = self._build_template()
+        field = TemplateField.objects.create(
+            template=template,
+            name="nome",
+            label="Nome",
+            excel_column="nome",
+            order_index=1,
+            page_number=1,
+            value_type=TemplateField.ValueType.TEXT,
+            x=30,
+            y=170,
+            width=180,
+            height=20,
+            font=font,
+            font_size=14,
+            text_transform=TemplateField.TextTransform.TITLE_SMART,
+            transform_exceptions="de, da, do, dos, e, com",
+            prefix="Sr. ",
+            suffix=" Filho",
+        )
+
+        formatted = format_field_value(field, "  joao da silva e costa  ")
+        self.assertEqual(formatted, "Sr. Joao da Silva e Costa Filho")
+
+    def test_format_field_value_supports_integer_padding(self):
+        font = self._build_font()
+        template = self._build_template()
+        field = TemplateField.objects.create(
+            template=template,
+            name="numero",
+            label="Numero",
+            excel_column="numero",
+            order_index=1,
+            page_number=1,
+            value_type=TemplateField.ValueType.INTEGER,
+            x=30,
+            y=170,
+            width=180,
+            height=20,
+            font=font,
+            font_size=14,
+            integer_min_digits=5,
+            prefix="Nº ",
+        )
+
+        formatted = format_field_value(field, "42")
+        self.assertEqual(formatted, "Nº 00042")
+
     def test_process_preview_job_uses_first_three_valid_rows(self):
         font = self._build_font()
         template = self._build_template()
@@ -100,6 +150,7 @@ class JobServiceTests(TestCase):
             height=20,
             font=font,
             font_size=14,
+            text_transform=TemplateField.TextTransform.UPPER,
         )
         job = GenerationJob.objects.create(
             user=self.user,

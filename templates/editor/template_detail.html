@@ -56,7 +56,12 @@
                 {% for field in template_obj.fields.all %}
                     <li>
                         <strong>{{ field.label }}</strong><br>
-                        <span class="muted">{{ field.excel_column|default:"Sem coluna" }} · p. {{ field.page_number }} · x {{ field.x }} · y {{ field.y }}</span><br>
+                        <span class="muted">
+                            {{ field.excel_column|default:"Sem coluna" }} ·
+                            {{ field.get_value_type_display }} ·
+                            {{ field.get_text_transform_display }} ·
+                            p. {{ field.page_number }} · x {{ field.x }} · y {{ field.y }}
+                        </span><br>
                         <a class="link-action" href="{% url 'editor:field-update' field.pk %}">Editar campo</a>
                         <a class="link-action" href="{% url 'editor:field-delete' field.pk %}">Excluir campo</a>
                     </li>

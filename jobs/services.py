@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import re
 import zipfile
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -32,6 +33,60 @@ def _normalize_value(value) -> str:
     if value is None:
         return ""
     return str(value).strip()
+
+
+DEFAULT_TITLE_EXCEPTIONS = {"a", "as", "o", "os", "de", "da", "das", "do", "dos", "e", "em", "com", "para", "por"}
+
+
+def _smart_title(text: str, exceptions_raw: str) -> str:
+    words = text.lower().split()
+    if not words:
+        return ""
+    exceptions = {
+        item.strip().lower()
+        for item in (exceptions_raw or "").split(",")
+        if item.strip()
+    } or DEFAULT_TITLE_EXCEPTIONS
+    titled = []
+    for index, word in enumerate(words):
+        if index not in {0, len(words) - 1} and word in exceptions:
+            titled.append(word)
+        else:
+            titled.append(word[:1].upper() + word[1:])
+    return " ".join(titled)
+
+
+def format_field_value(field: TemplateField, raw_value: str) -> str:
+    value = "" if raw_value is None else str(raw_value)
+    if field.trim_whitespace:
+        value = value.strip()
+
+    if not value:
+        value = field.empty_value or ""
+
+    if field.value_type == TemplateField.ValueType.INTEGER and value:
+        stripped = value.strip()
+        negative = stripped.startswith("-")
+        digits = re.sub(r"\D", "", stripped)
+        if digits:
+            number = str(int(digits))
+            if field.integer_min_digits:
+                number = number.zfill(field.integer_min_digits)
+            if negative and field.integer_keep_sign:
+                value = f"-{number}"
+            else:
+                value = number
+
+    if field.text_transform == TemplateField.TextTransform.LOWER:
+        value = value.lower()
+    elif field.text_transform == TemplateField.TextTransform.UPPER:
+        value = value.upper()
+    elif field.text_transform == TemplateField.TextTransform.TITLE:
+        value = value.title()
+    elif field.text_transform == TemplateField.TextTransform.TITLE_SMART:
+        value = _smart_title(value, field.transform_exceptions)
+
+    return f"{field.prefix or ''}{value}{field.suffix or ''}"
 
 
 def _load_excel_rows(excel_path: str):
@@ -153,7 +208,8 @@ def _build_overlay_pdf(job: GenerationJob, payload: dict) -> bytes:
         for field in fields:
             if field.page_number != page_number:
                 continue
-            value = payload.get(field.excel_column) or payload.get(field.label) or payload.get(field.name) or ""
+            raw_value = payload.get(field.excel_column) or payload.get(field.label) or payload.get(field.name) or ""
+            value = format_field_value(field, raw_value)
             _draw_field(pdf_canvas, field, value)
         pdf_canvas.showPage()
     pdf_canvas.save()
