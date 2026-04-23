@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Templates | Sistema Vetorial{% endblock %}
+
+{% block content %}
+<section class="hero-shell">
+    <div class="eyebrow">Templates vetoriais</div>
+    <div class="section-header">
+        <div>
+            <h1 class="hero-title">Modelos prontos para edição visual.</h1>
+            <p class="hero-copy">Cada template armazena o PDF de fundo, as dimensões da página e as regras tipográficas que serão reaplicadas em lote.</p>
+        </div>
+        <a class="button" href="{% url 'editor:create' %}">Novo template</a>
+    </div>
+</section>
+
+<section class="table-card">
+    {% if templates %}
+        <div class="table-scroll">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Status</th>
+                        <th>Páginas</th>
+                        <th>Versão</th>
+                        <th>Atualizado</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for template in templates %}
+                        <tr>
+                            <td>{{ template.name }}</td>
+                            <td><span class="status-pill status-{{ template.status }}">{{ template.get_status_display }}</span></td>
+                            <td>{{ template.page_count }}</td>
+                            <td>v{{ template.version }}</td>
+                            <td>{{ template.updated_at|date:"d/m/Y H:i" }}</td>
+                            <td class="inline-actions">
+                                <a class="link-action" href="{% url 'editor:detail' template.pk %}">Abrir</a>
+                                <a class="link-action" href="{% url 'editor:update' template.pk %}">Editar</a>
+                                <form method="post" action="{% url 'editor:duplicate' template.pk %}" style="display:inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="link-action" style="background:none;border:0;padding:0;box-shadow:none;color:var(--accent);">Duplicar</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <h2 class="section-title">Nenhum template criado</h2>
+            <p class="muted">Comece carregando um PDF vetorial de fundo e definindo o primeiro template.</p>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}

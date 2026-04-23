@@ -1,0 +1,275 @@
+from __future__ import annotations
+
+import io
+import zipfile
+from pathlib import Path
+from tempfile import NamedTemporaryFile
+
+import pikepdf
+from django.core.files.base import ContentFile
+from django.db import transaction
+from openpyxl import load_workbook
+from pikepdf import Page, Pdf, Rectangle
+from reportlab.lib.colors import HexColor
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen import canvas
+
+from editor.models import TemplateField
+
+from .models import GenerationItem, GenerationJob
+
+
+def _register_font(field: TemplateField) -> str:
+    font_name = f"font_{field.font_id}"
+    registered = pdfmetrics.getRegisteredFontNames()
+    if font_name not in registered:
+        pdfmetrics.registerFont(TTFont(font_name, field.font.file.path))
+    return font_name
+
+
+def _normalize_value(value) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _load_excel_rows(excel_path: str):
+    workbook = load_workbook(excel_path, read_only=True, data_only=True)
+    sheet = workbook.active
+    rows = list(sheet.iter_rows(values_only=True))
+    workbook.close()
+    if not rows:
+        return [], []
+    headers = [_normalize_value(value) for value in rows[0]]
+    data_rows = []
+    for row_index, row in enumerate(rows[1:], start=2):
+        payload = {}
+        has_value = False
+        for idx, header in enumerate(headers):
+            key = header or f"coluna_{idx + 1}"
+            value = _normalize_value(row[idx] if idx < len(row) else "")
+            payload[key] = value
+            has_value = has_value or bool(value)
+        if has_value:
+            data_rows.append((row_index, payload))
+    return headers, data_rows
+
+
+def _fit_text_lines(text: str, font_name: str, font_size: float, max_width: float, mode: str, max_lines: int):
+    if not text:
+        return [""], font_size
+
+    if max_width <= 0:
+        return text.splitlines()[:max_lines], font_size
+
+    def wrap(current_size: float):
+        words = text.split()
+        if not words:
+            return [""]
+        lines = []
+        current = words[0]
+        for word in words[1:]:
+            candidate = f"{current} {word}"
+            if pdfmetrics.stringWidth(candidate, font_name, current_size) <= max_width:
+                current = candidate
+            else:
+                lines.append(current)
+                current = word
+        lines.append(current)
+        return lines
+
+    if mode == TemplateField.OverflowMode.WRAP:
+        lines = wrap(font_size)
+        return lines[:max_lines], font_size
+
+    if mode == TemplateField.OverflowMode.SHRINK:
+        size = font_size
+        while size >= 4:
+            lines = wrap(size)
+            if len(lines) <= max_lines and max(
+                pdfmetrics.stringWidth(line, font_name, size) for line in lines if line is not None
+            ) <= max_width:
+                return lines, size
+            size -= 0.5
+        return wrap(max(4, size)), max(4, size)
+
+    if mode == TemplateField.OverflowMode.ERROR:
+        if pdfmetrics.stringWidth(text, font_name, font_size) > max_width:
+            raise ValueError("Texto excede a largura configurada para o campo.")
+        return [text], font_size
+
+    trimmed = text
+    while trimmed and pdfmetrics.stringWidth(trimmed, font_name, font_size) > max_width:
+        trimmed = trimmed[:-1]
+    return [trimmed], font_size
+
+
+def _draw_field(pdf_canvas, field: TemplateField, value: str):
+    font_name = _register_font(field)
+    font_size = float(field.font_size)
+    max_width = float(field.width)
+    max_lines = max(field.max_lines, 1)
+    lines, adjusted_size = _fit_text_lines(
+        value,
+        font_name,
+        font_size,
+        max_width,
+        field.overflow_mode,
+        max_lines,
+    )
+
+    pdf_canvas.saveState()
+    pdf_canvas.setFillColor(HexColor(field.color or "#000000"))
+    pdf_canvas.setFont(font_name, adjusted_size)
+
+    line_height = max(adjusted_size * float(field.line_height), adjusted_size)
+    top_y = float(field.y)
+
+    for index, line in enumerate(lines[:max_lines]):
+        baseline_y = top_y - adjusted_size - (index * line_height)
+        x = float(field.x)
+        if field.text_align == TemplateField.TextAlign.CENTER and max_width > 0:
+            x = x + max_width / 2
+            pdf_canvas.drawCentredString(x, baseline_y, line)
+        elif field.text_align == TemplateField.TextAlign.RIGHT and max_width > 0:
+            x = x + max_width
+            pdf_canvas.drawRightString(x, baseline_y, line)
+        else:
+            pdf_canvas.drawString(x, baseline_y, line)
+    pdf_canvas.restoreState()
+
+
+def _build_overlay_pdf(job: GenerationJob, payload: dict) -> bytes:
+    buffer = io.BytesIO()
+    page_width = float(job.template.page_width or 0)
+    page_height = float(job.template.page_height or 0)
+    pdf_canvas = canvas.Canvas(buffer, pagesize=(page_width, page_height))
+
+    fields = list(job.template.fields.select_related("font").order_by("page_number", "order_index"))
+    total_pages = max(job.template.page_count, 1)
+
+    for page_number in range(1, total_pages + 1):
+        for field in fields:
+            if field.page_number != page_number:
+                continue
+            value = payload.get(field.excel_column) or payload.get(field.label) or payload.get(field.name) or ""
+            _draw_field(pdf_canvas, field, value)
+        pdf_canvas.showPage()
+    pdf_canvas.save()
+    return buffer.getvalue()
+
+
+def _merge_overlay(background_pdf_path: str, overlay_bytes: bytes) -> bytes:
+    with NamedTemporaryFile(suffix=".pdf") as overlay_temp:
+        overlay_temp.write(overlay_bytes)
+        overlay_temp.flush()
+
+        with Pdf.open(background_pdf_path) as base_pdf, Pdf.open(overlay_temp.name) as overlay_pdf:
+            for index, destination in enumerate(base_pdf.pages):
+                if index >= len(overlay_pdf.pages):
+                    break
+                destination_page = Page(destination)
+                overlay_page = Page(overlay_pdf.pages[index])
+                mediabox = [float(value) for value in destination_page.obj.MediaBox]
+                destination_page.add_overlay(
+                    overlay_page,
+                    Rectangle(mediabox[0], mediabox[1], mediabox[2], mediabox[3]),
+                )
+
+            output = io.BytesIO()
+            base_pdf.save(output)
+            return output.getvalue()
+
+
+def _create_item_pdf(job: GenerationJob, row_number: int, payload: dict) -> GenerationItem:
+    item = GenerationItem.objects.create(job=job, row_number=row_number, payload=payload, status=GenerationItem.Status.PROCESSING)
+    try:
+        overlay_bytes = _build_overlay_pdf(job, payload)
+        output_bytes = _merge_overlay(job.template.background_pdf.path, overlay_bytes)
+        filename = f"{job.name.lower().replace(' ', '_')}-linha-{row_number}.pdf"
+        item.output_pdf.save(filename, ContentFile(output_bytes), save=False)
+        item.status = GenerationItem.Status.COMPLETED
+        item.error_message = ""
+    except Exception as exc:
+        item.status = GenerationItem.Status.FAILED
+        item.error_message = str(exc)
+    item.save()
+    return item
+
+
+def _build_zip_for_job(job: GenerationJob) -> None:
+    completed_items = job.items.filter(status=GenerationItem.Status.COMPLETED, output_pdf__gt="")
+    if not completed_items.exists():
+        return
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        for item in completed_items:
+            with item.output_pdf.open("rb") as generated:
+                archive.writestr(Path(item.output_pdf.name).name, generated.read())
+    job.zip_file.save(f"{job.name.lower().replace(' ', '_')}.zip", ContentFile(buffer.getvalue()), save=False)
+
+
+@transaction.atomic
+def process_job(job: GenerationJob) -> GenerationJob:
+    headers, data_rows = _load_excel_rows(job.source_excel.path)
+    if not job.template.fields.exists():
+        job.status = GenerationJob.Status.FAILED
+        job.last_error = "O template precisa ter ao menos um campo configurado."
+        job.save(update_fields=["status", "last_error", "updated_at"])
+        return job
+
+    limit = 3 if job.kind == GenerationJob.Kind.PREVIEW else len(data_rows)
+    selected_rows = data_rows[:limit]
+
+    job.status = GenerationJob.Status.PROCESSING
+    job.total_rows = len(selected_rows)
+    job.processed_rows = 0
+    job.success_rows = 0
+    job.failed_rows = 0
+    job.last_error = ""
+    job.column_map = {"headers": headers}
+    job.save(
+        update_fields=[
+            "status",
+            "total_rows",
+            "processed_rows",
+            "success_rows",
+            "failed_rows",
+            "last_error",
+            "column_map",
+            "updated_at",
+        ]
+    )
+    job.items.all().delete()
+
+    for row_number, payload in selected_rows:
+        item = _create_item_pdf(job, row_number, payload)
+        job.processed_rows += 1
+        if item.status == GenerationItem.Status.COMPLETED:
+            job.success_rows += 1
+        else:
+            job.failed_rows += 1
+            job.last_error = item.error_message
+        job.save(update_fields=["processed_rows", "success_rows", "failed_rows", "last_error", "updated_at"])
+
+    if job.kind == GenerationJob.Kind.FULL:
+        _build_zip_for_job(job)
+
+    job.status = GenerationJob.Status.COMPLETED if job.failed_rows == 0 else GenerationJob.Status.FAILED
+    job.save(update_fields=["status", "zip_file", "updated_at"])
+    return job
+
+
+def clone_preview_to_full(preview_job: GenerationJob) -> GenerationJob:
+    with preview_job.source_excel.open("rb") as source_file:
+        full_job = GenerationJob.objects.create(
+            user=preview_job.user,
+            template=preview_job.template,
+            name=f"{preview_job.name} - lote completo",
+            source_excel=ContentFile(source_file.read(), name=Path(preview_job.source_excel.name).name),
+            kind=GenerationJob.Kind.FULL,
+            status=GenerationJob.Status.QUEUED,
+        )
+    return process_job(full_job)

@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+
+{% block title %}{{ template_obj.name }} | Sistema Vetorial{% endblock %}
+
+{% block content %}
+<section class="hero-shell">
+    <div class="eyebrow">Editor do template</div>
+    <div class="section-header">
+        <div>
+            <h1 class="hero-title">{{ template_obj.name }}</h1>
+            <p class="hero-copy">Tela base do editor. O próximo passo aqui é renderizar o PDF de fundo e posicionar campos editáveis sobre a área de preview.</p>
+        </div>
+        <div class="inline-actions">
+            <a class="button" href="{% url 'editor:field-create' template_obj.pk %}">Novo campo</a>
+            <form method="post" action="{% url 'editor:duplicate' template_obj.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="button button-secondary">Duplicar template</button>
+            </form>
+            <a class="button button-secondary" href="{% url 'editor:update' template_obj.pk %}">Editar metadados</a>
+            <a class="button button-secondary" href="{% url 'editor:delete' template_obj.pk %}">Excluir</a>
+            <a class="button button-secondary" href="{% url 'jobs:create' %}?template={{ template_obj.pk }}">Novo job</a>
+        </div>
+    </div>
+</section>
+
+<section class="editor-shell">
+    <aside class="sidebar-stack">
+        <div class="panel template-meta">
+            <h2 class="section-title">Resumo</h2>
+            <dl>
+                <dt>Status</dt>
+                <dd><span class="status-pill status-{{ template_obj.status }}">{{ template_obj.get_status_display }}</span></dd>
+                <dt>Versão</dt>
+                <dd>v{{ template_obj.version }}</dd>
+                <dt>Páginas</dt>
+                <dd>{{ template_obj.page_count }}</dd>
+                <dt>Tamanho</dt>
+                <dd>
+                    {% if template_obj.page_width and template_obj.page_height %}
+                        {{ template_obj.page_width }} × {{ template_obj.page_height }} pt
+                    {% else %}
+                        Ainda não medido
+                    {% endif %}
+                </dd>
+                <dt>Campos</dt>
+                <dd>{{ template_obj.fields.count }}</dd>
+            </dl>
+        </div>
+
+        <div class="panel">
+            <div class="section-header">
+                <h2 class="section-title">Campos configurados</h2>
+                <a class="link-action" href="{% url 'editor:field-create' template_obj.pk %}">Adicionar</a>
+            </div>
+            <ul class="list">
+                {% for field in template_obj.fields.all %}
+                    <li>
+                        <strong>{{ field.label }}</strong><br>
+                        <span class="muted">{{ field.excel_column|default:"Sem coluna" }} · p. {{ field.page_number }} · x {{ field.x }} · y {{ field.y }}</span><br>
+                        <a class="link-action" href="{% url 'editor:field-update' field.pk %}">Editar campo</a>
+                        <a class="link-action" href="{% url 'editor:field-delete' field.pk %}">Excluir campo</a>
+                    </li>
+                {% empty %}
+                    <li class="muted">Nenhum campo cadastrado ainda.</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="panel">
+            <h2 class="section-title">Gerar amostra</h2>
+            <p class="muted">Envie o Excel para testar as 3 primeiras linhas válidas usando exatamente o template atual.</p>
+            <div class="inline-actions">
+                <a class="button" href="{% url 'jobs:create' %}?template={{ template_obj.pk }}">Criar prévia</a>
+            </div>
+        </div>
+    </aside>
+
+    <div class="panel">
+        <div class="section-header">
+            <div>
+                <h2 class="section-title">Editor visual</h2>
+                <p class="muted">Arraste e redimensione os campos sobre o preview da página ativa e depois salve o layout.</p>
+            </div>
+            <div class="inline-actions">
+                <button type="button" class="button" id="save-layout-button">Salvar layout visual</button>
+            </div>
+        </div>
+        {% if preview_pages %}
+            <div class="page-tabs" id="page-tabs">
+                {% for preview_page in preview_pages %}
+                    <button
+                        type="button"
+                        class="page-tab {% if forloop.first %}is-active{% endif %}"
+                        data-page-number="{{ preview_page.page_number }}"
+                        data-image-url="{{ preview_page.image.url }}"
+                    >
+                        Página {{ preview_page.page_number }}
+                    </button>
+                {% endfor %}
+            </div>
+        {% endif %}
+        <div
+            class="preview-stage"
+            id="layout-stage"
+            data-page-width="{{ template_obj.page_width|default:0 }}"
+            data-page-height="{{ template_obj.page_height|default:0 }}"
+            data-layout-url="{% url 'editor:layout-update' template_obj.pk %}"
+            data-csrf-token="{{ csrf_token }}"
+        >
+            {% if preview_pages %}
+                {% for field in template_obj.fields.all %}
+                    <div
+                        class="layout-field"
+                        data-id="{{ field.id }}"
+                        data-page-number="{{ field.page_number }}"
+                        data-label="{{ field.label }}"
+                        data-x="{{ field.x }}"
+                        data-y="{{ field.y }}"
+                        data-width="{{ field.width }}"
+                        data-height="{{ field.height }}"
+                        data-font-size="{{ field.font_size }}"
+                    >
+                        <span>{{ field.label }}</span>
+                        <button type="button" class="layout-resize" aria-label="Redimensionar {{ field.label }}"></button>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div>
+                    <strong>Preview ainda não disponível</strong>
+                    <p class="muted">Salve um PDF de fundo válido no template para renderizar a primeira página aqui.</p>
+                </div>
+            {% endif %}
+        </div>
+        <p class="muted" id="layout-feedback" style="margin-top: 0.8rem;"></p>
+    </div>
+</section>
+
+{{ field_layout_json|json_script:"field-layout-data" }}
+<script>
+(() => {
+  const stage = document.getElementById("layout-stage");
+  const saveButton = document.getElementById("save-layout-button");
+  const feedback = document.getElementById("layout-feedback");
+  if (!stage || !saveButton || !document.getElementById("field-layout-data")) return;
+
+  const pageWidth = Number(stage.dataset.pageWidth || 0);
+  const pageHeight = Number(stage.dataset.pageHeight || 0);
+  if (!pageWidth || !pageHeight) return;
+
+  const initialFields = JSON.parse(document.getElementById("field-layout-data").textContent);
+  const renderedFields = new Map();
+  let activeField = null;
+  let activePage = 1;
+
+  const pageTabs = Array.from(document.querySelectorAll(".page-tab"));
+  const setStageBackground = (imageUrl) => {
+    stage.style.backgroundImage = `linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.14)), url('${imageUrl}')`;
+    stage.style.backgroundSize = "contain";
+    stage.style.backgroundRepeat = "no-repeat";
+    stage.style.backgroundPosition = "center top";
+  };
+
+  if (pageTabs.length) {
+    const firstTab = pageTabs[0];
+    activePage = Number(firstTab.dataset.pageNumber || 1);
+    setStageBackground(firstTab.dataset.imageUrl);
+  }
+
+  const stageRect = () => stage.getBoundingClientRect();
+  const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+  const toStageMetrics = (field) => {
+    const rect = stageRect();
+    const scale = rect.width / pageWidth;
+    const width = Math.max((field.width || 160) * scale, 100);
+    const height = Math.max((field.height || field.font_size * 1.8 || 36) * scale, 36);
+    const left = field.x * scale;
+    const top = (pageHeight - field.y - (field.height || field.font_size * 1.8 || 36)) * scale;
+    return { left, top, width, height, scale };
+  };
+
+  const syncFieldElement = (element, field) => {
+    const metrics = toStageMetrics(field);
+    element.style.left = `${metrics.left}px`;
+    element.style.top = `${metrics.top}px`;
+    element.style.width = `${metrics.width}px`;
+    element.style.height = `${metrics.height}px`;
+    element.style.display = Number(field.page_number) === activePage ? "flex" : "none";
+  };
+
+  initialFields.forEach((field) => {
+    const element = stage.querySelector(`.layout-field[data-id="${field.id}"]`);
+    if (!element) return;
+    renderedFields.set(String(field.id), field);
+    syncFieldElement(element, field);
+    element.addEventListener("pointerdown", (event) => {
+      if (event.target.closest(".layout-resize")) return;
+      activeField = { id: String(field.id), startX: event.clientX, startY: event.clientY };
+      element.setPointerCapture(event.pointerId);
+      element.classList.add("is-active");
+    });
+    const resizeHandle = element.querySelector(".layout-resize");
+    resizeHandle?.addEventListener("pointerdown", (event) => {
+      event.stopPropagation();
+      activeField = { id: String(field.id), startX: event.clientX, startY: event.clientY, mode: "resize" };
+      element.setPointerCapture(event.pointerId);
+      element.classList.add("is-active");
+    });
+    element.addEventListener("pointerup", () => {
+      element.classList.remove("is-active");
+      activeField = null;
+    });
+  });
+
+  stage.addEventListener("pointermove", (event) => {
+    if (!activeField) return;
+    const field = renderedFields.get(activeField.id);
+    const element = stage.querySelector(`.layout-field[data-id="${activeField.id}"]`);
+    if (!field || !element) return;
+
+    const rect = stageRect();
+    const scale = rect.width / pageWidth;
+    const deltaX = (event.clientX - activeField.startX) / scale;
+    const deltaY = (event.clientY - activeField.startY) / scale;
+    activeField.startX = event.clientX;
+    activeField.startY = event.clientY;
+
+    if (activeField.mode === "resize") {
+      field.width = clamp((field.width || 160) + deltaX, 20, pageWidth - field.x);
+      field.height = clamp((field.height || field.font_size * 1.8 || 36) + deltaY, 16, pageHeight);
+    } else {
+      field.x = clamp(field.x + deltaX, 0, pageWidth - (field.width || 0));
+      field.y = clamp(field.y - deltaY, field.height || 0, pageHeight);
+    }
+    syncFieldElement(element, field);
+    feedback.textContent = `${field.label}: x ${field.x.toFixed(2)} · y ${field.y.toFixed(2)} · w ${(field.width || 0).toFixed(2)} · h ${(field.height || 0).toFixed(2)}`;
+  });
+
+  pageTabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      activePage = Number(tab.dataset.pageNumber || 1);
+      pageTabs.forEach((item) => item.classList.toggle("is-active", item === tab));
+      setStageBackground(tab.dataset.imageUrl);
+      renderedFields.forEach((field, id) => {
+        const element = stage.querySelector(`.layout-field[data-id="${id}"]`);
+        if (element) syncFieldElement(element, field);
+      });
+    });
+  });
+
+  window.addEventListener("resize", () => {
+    renderedFields.forEach((field, id) => {
+      const element = stage.querySelector(`.layout-field[data-id="${id}"]`);
+      if (element) syncFieldElement(element, field);
+    });
+  });
+
+  saveButton.addEventListener("click", async () => {
+    const payload = {
+      fields: Array.from(renderedFields.values()).map((field) => ({
+        id: field.id,
+        x: Number(field.x.toFixed(2)),
+        y: Number(field.y.toFixed(2)),
+        width: Number(Number(field.width || 0).toFixed(2)),
+        height: Number(Number(field.height || 0).toFixed(2)),
+      })),
+    };
+
+    const response = await fetch(stage.dataset.layoutUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": stage.dataset.csrfToken,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    feedback.textContent = response.ok ? "Layout salvo com sucesso." : "Falha ao salvar o layout.";
+  });
+})();
+</script>
+{% endblock %}

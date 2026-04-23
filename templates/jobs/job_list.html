@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Jobs | Sistema Vetorial{% endblock %}
+
+{% block content %}
+<section class="hero-shell">
+    <div class="eyebrow">Geração por lote</div>
+    <div class="section-header">
+        <div>
+            <h1 class="hero-title">Execuções salvas por usuário.</h1>
+            <p class="hero-copy">Cada job guarda o Excel enviado, o template usado e o histórico de processamento linha a linha.</p>
+        </div>
+        <a class="button" href="{% url 'jobs:create' %}">Novo job</a>
+    </div>
+</section>
+
+<section class="table-card">
+    {% if jobs %}
+        <div class="table-scroll">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Template</th>
+                        <th>Status</th>
+                        <th>Linhas</th>
+                        <th>Atualizado</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for job in jobs %}
+                        <tr>
+                            <td>{{ job.name }}</td>
+                            <td>{{ job.template.name }}</td>
+                            <td><span class="status-pill status-{{ job.status }}">{{ job.get_status_display }}</span></td>
+                            <td>{{ job.processed_rows }}/{{ job.total_rows }}</td>
+                            <td>{{ job.updated_at|date:"d/m/Y H:i" }}</td>
+                            <td><a class="link-action" href="{% url 'jobs:detail' job.pk %}">Abrir</a></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <h2 class="section-title">Nenhum job criado</h2>
+            <p class="muted">Depois do template ficar pronto, os lotes de geração aparecerão aqui.</p>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}

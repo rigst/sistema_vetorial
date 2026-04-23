@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Campo | Sistema Vetorial{% endblock %}
+
+{% block content %}
+<section class="split-grid">
+    <div class="form-shell">
+        <div class="eyebrow">Campo do template</div>
+        <h1 class="section-title" style="margin-top: 0.7rem;">{% if form.instance.pk %}Editar campo{% else %}Novo campo{% endif %}</h1>
+        <p class="muted">Configure a posição, a fonte e a regra de overflow que depois serão reproduzidas na geração vetorial.</p>
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-grid">
+                {% for field in form %}
+                    <div class="field-group">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.help_text %}<p class="form-hint muted">{{ field.help_text }}</p>{% endif %}
+                        {{ field.errors }}
+                    </div>
+                {% endfor %}
+            </div>
+            <div class="inline-actions">
+                <button type="submit">Salvar campo</button>
+                <a class="button button-secondary" href="{% url 'editor:detail' template_obj.pk %}">Voltar ao template</a>
+            </div>
+        </form>
+    </div>
+    <aside class="panel">
+        <h2 class="section-title">Template</h2>
+        <ul class="list">
+            <li><strong>{{ template_obj.name }}</strong></li>
+            <li class="muted">Na próxima etapa este formulário será complementado pelo posicionamento visual sobre o PDF.</li>
+        </ul>
+    </aside>
+</section>
+{% endblock %}

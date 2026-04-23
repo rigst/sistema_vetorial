@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Fontes | Sistema Vetorial{% endblock %}
+
+{% block content %}
+<section class="hero-shell">
+    <div class="eyebrow">Biblioteca tipográfica</div>
+    <div class="section-header">
+        <div>
+            <h1 class="hero-title">Fontes cadastradas para o editor.</h1>
+            <p class="hero-copy">Gerencie famílias e variantes para manter fidelidade entre preview, exemplo e PDF vetorial final.</p>
+        </div>
+        <a class="button" href="{% url 'fonts:create' %}">Nova fonte</a>
+    </div>
+</section>
+
+<section class="table-card">
+    {% if fonts %}
+        <div class="table-scroll">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Família</th>
+                        <th>Nome</th>
+                        <th>Variante</th>
+                        <th>Status</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for font in fonts %}
+                        <tr>
+                            <td>{{ font.family }}</td>
+                            <td>{{ font.name }}</td>
+                            <td>{{ font.get_variant_display }}</td>
+                            <td>
+                                <span class="status-pill {% if font.is_active %}status-ready{% else %}status-archived{% endif %}">
+                                    {% if font.is_active %}Ativa{% else %}Inativa{% endif %}
+                                </span>
+                            </td>
+                            <td><a class="link-action" href="{% url 'fonts:update' font.pk %}">Editar</a></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <h2 class="section-title">Nenhuma fonte cadastrada</h2>
+            <p class="muted">Cadastre fontes TTF ou OTF para alimentar o editor com variantes reais.</p>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}

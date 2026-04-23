@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}{{ job.name }} | Sistema Vetorial{% endblock %}
+
+{% block content %}
+<section class="hero-shell">
+    <div class="eyebrow">Job</div>
+    <div class="section-header">
+        <div>
+            <h1 class="hero-title">{{ job.name }}</h1>
+            <p class="hero-copy">Base do monitoramento de geração. Aqui entra a barra de progresso, prévia e lista de arquivos gerados por linha.</p>
+        </div>
+        <div class="inline-actions">
+            {% if job.kind == 'preview' %}
+                <form method="post" action="{% url 'jobs:promote' job.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="button">Gerar lote completo</button>
+                </form>
+            {% endif %}
+            <a class="button button-secondary" href="{% url 'jobs:list' %}">Voltar</a>
+        </div>
+    </div>
+</section>
+
+<section class="split-grid">
+    <div class="panel template-meta">
+        <h2 class="section-title">Resumo do job</h2>
+        <div class="progress-shell" style="margin-bottom: 1rem;">
+            <div class="progress-bar">
+                <div class="progress-bar-fill" id="job-progress-fill" style="width: 0%;"></div>
+            </div>
+            <p class="muted" id="job-progress-text">Aguardando status...</p>
+        </div>
+        <dl>
+            <dt>Status</dt>
+            <dd><span class="status-pill status-{{ job.status }}" id="job-status-pill">{{ job.get_status_display }}</span></dd>
+            <dt>Template</dt>
+            <dd>{{ job.template.name }}</dd>
+            <dt>Tipo</dt>
+            <dd>{{ job.get_kind_display }}</dd>
+            <dt>Linhas</dt>
+            <dd id="job-rows-text">{{ job.processed_rows }}/{{ job.total_rows }}</dd>
+            <dt>Sucesso</dt>
+            <dd id="job-success-text">{{ job.success_rows }}</dd>
+            <dt>Falhas</dt>
+            <dd id="job-failed-text">{{ job.failed_rows }}</dd>
+            <dt id="job-zip-dt" {% if not job.zip_file %}style="display:none;"{% endif %}>ZIP</dt>
+            <dd id="job-zip-dd" {% if not job.zip_file %}style="display:none;"{% endif %}>
+                <a class="link-action" id="job-zip-link" href="{{ job.zip_file.url|default:'#' }}">Baixar ZIP</a>
+            </dd>
+        </dl>
+    </div>
+
+    <aside class="panel">
+        <h2 class="section-title">Arquivos gerados</h2>
+        {% if job.column_map.headers %}
+            <p class="muted" style="margin-bottom: 0.8rem;">Cabeçalhos detectados: {{ job.column_map.headers|join:", " }}</p>
+        {% endif %}
+        <ul class="list" id="job-items-list">
+            {% for item in job.items.all %}
+                <li>
+                    <strong>Linha {{ item.row_number }}</strong><br>
+                    <span class="muted">{{ item.get_status_display }}</span><br>
+                    {% if item.output_pdf %}
+                        <a class="link-action" href="{{ item.output_pdf.url }}">Baixar PDF</a>
+                    {% elif item.error_message %}
+                        <span class="muted">{{ item.error_message }}</span>
+                    {% endif %}
+                </li>
+            {% empty %}
+                <li class="muted">Nenhum item processado ainda.</li>
+            {% endfor %}
+        </ul>
+    </aside>
+</section>
+<script>
+(() => {
+  const statusUrl = "{% url 'jobs:status' job.pk %}";
+  const fill = document.getElementById("job-progress-fill");
+  const progressText = document.getElementById("job-progress-text");
+  const statusPill = document.getElementById("job-status-pill");
+  const rowsText = document.getElementById("job-rows-text");
+  const successText = document.getElementById("job-success-text");
+  const failedText = document.getElementById("job-failed-text");
+  const itemsList = document.getElementById("job-items-list");
+  const zipDt = document.getElementById("job-zip-dt");
+  const zipDd = document.getElementById("job-zip-dd");
+  const zipLink = document.getElementById("job-zip-link");
+
+  const renderItems = (items) => {
+    if (!items.length) {
+      itemsList.innerHTML = '<li class="muted">Nenhum item processado ainda.</li>';
+      return;
+    }
+    itemsList.innerHTML = items.map((item) => `
+      <li>
+        <strong>Linha ${item.row_number}</strong><br>
+        <span class="muted">${item.status_display}</span><br>
+        ${item.output_url ? `<a class="link-action" href="${item.output_url}">Baixar PDF</a>` : ""}
+        ${!item.output_url && item.error_message ? `<span class="muted">${item.error_message}</span>` : ""}
+      </li>
+    `).join("");
+  };
+
+  const refresh = async () => {
+    const response = await fetch(statusUrl, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+    if (!response.ok) return;
+    const data = await response.json();
+    const progress = data.total_rows ? Math.round((data.processed_rows / data.total_rows) * 100) : 0;
+    fill.style.width = `${progress}%`;
+    progressText.textContent = `${data.processed_rows}/${data.total_rows} linhas processadas`;
+    statusPill.textContent = data.status_display;
+    statusPill.className = `status-pill status-${data.status}`;
+    rowsText.textContent = `${data.processed_rows}/${data.total_rows}`;
+    successText.textContent = data.success_rows;
+    failedText.textContent = data.failed_rows;
+    renderItems(data.items);
+    if (data.zip_url) {
+      zipDt.style.display = "";
+      zipDd.style.display = "";
+      zipLink.href = data.zip_url;
+    }
+    if (!["completed", "failed"].includes(data.status)) {
+      window.setTimeout(refresh, 1500);
+    }
+  };
+
+  refresh();
+})();
+</script>
+{% endblock %}

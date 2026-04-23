@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Painel | Sistema Vetorial{% endblock %}
+
+{% block content %}
+<section class="hero-shell">
+    <div class="eyebrow">Projeto inicial</div>
+    <h1 class="hero-title">Pipeline base para templates vetoriais, preview e geração por lote.</h1>
+    <p class="hero-copy">
+        Esta primeira implementação já deixa o domínio central preparado para fontes, templates editáveis,
+        upload de Excel e jobs de geração com rastreamento por usuário.
+    </p>
+</section>
+
+<section class="stats-grid">
+    <article class="panel">
+        <p class="muted">Templates</p>
+        <h2 class="stat-value">{{ template_count }}</h2>
+        <p class="muted">Modelos vetoriais configurados para o usuário atual.</p>
+    </article>
+    <article class="panel">
+        <p class="muted">Fontes</p>
+        <h2 class="stat-value">{{ font_count }}</h2>
+        <p class="muted">Famílias e variantes prontas para uso no editor.</p>
+    </article>
+    <article class="panel">
+        <p class="muted">Jobs</p>
+        <h2 class="stat-value">{{ job_count }}</h2>
+        <p class="muted">Execuções salvas para reprocessamento e download futuro.</p>
+    </article>
+</section>
+
+<section class="content-grid">
+    <article class="panel">
+        <h2 class="section-title">Templates recentes</h2>
+        <ul class="list">
+            {% for template in recent_templates %}
+                <li>
+                    <strong>{{ template.name }}</strong><br>
+                    <span class="muted">{{ template.get_status_display }} · v{{ template.version }}</span>
+                </li>
+            {% empty %}
+                <li class="muted">Nenhum template cadastrado ainda.</li>
+            {% endfor %}
+        </ul>
+    </article>
+    <article class="panel">
+        <h2 class="section-title">Jobs recentes</h2>
+        <ul class="list">
+            {% for job in recent_jobs %}
+                <li>
+                    <strong>{{ job.name }}</strong><br>
+                    <span class="muted">{{ job.get_status_display }} · {{ job.processed_rows }}/{{ job.total_rows }}</span>
+                </li>
+            {% empty %}
+                <li class="muted">Nenhum job gerado ainda.</li>
+            {% endfor %}
+        </ul>
+    </article>
+    <article class="panel">
+        <h2 class="section-title">Próximos passos</h2>
+        <ul class="list">
+            <li>Construir o editor visual sobre o preview do PDF com grid, snapping e tipografia.</li>
+            <li>Implementar upload de Excel e geração de amostra com 3 linhas válidas.</li>
+            <li>Conectar Celery e Redis para processar os PDFs finais em lote.</li>
+        </ul>
+    </article>
+</section>
+{% endblock %}
