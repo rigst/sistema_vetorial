@@ -1,5 +1,6 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
+from django.db.models import Q
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DeleteView, ListView, UpdateView
 
@@ -13,6 +14,19 @@ class FontAssetListView(UserOwnedQuerysetMixin, ListView):
     model = FontAsset
     template_name = "fonts/fontasset_list.html"
     context_object_name = "fonts"
+    paginate_by = 12
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        query = self.request.GET.get("q", "").strip()
+        if query:
+            queryset = queryset.filter(Q(family__icontains=query) | Q(name__icontains=query))
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["query"] = self.request.GET.get("q", "").strip()
+        return context
 
 
 class FontAssetCreateView(LoginRequiredMixin, CreateView):

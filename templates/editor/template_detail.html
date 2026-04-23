@@ -4,11 +4,11 @@
 
 {% block content %}
 <section class="hero-shell">
-    <div class="eyebrow">Editor do template</div>
+    <div class="eyebrow"><span class="ui-icon" aria-hidden="true">✦</span> Editor do template</div>
     <div class="section-header">
         <div>
             <h1 class="hero-title">{{ template_obj.name }}</h1>
-            <p class="hero-copy">Tela base do editor. O próximo passo aqui é renderizar o PDF de fundo e posicionar campos editáveis sobre a área de preview.</p>
+            <p class="hero-copy">Editor visual do template com prévia do PDF, campos posicionáveis, revisão tipográfica e apoio direto à geração da amostra e do lote final.</p>
         </div>
         <div class="inline-actions">
             <a class="button" href="{% url 'editor:field-create' template_obj.pk %}">Novo campo</a>
@@ -26,7 +26,7 @@
 <section class="editor-shell">
     <aside class="sidebar-stack">
         <div class="panel template-meta">
-            <h2 class="section-title">Resumo</h2>
+            <h2 class="section-title"><span class="ui-icon" aria-hidden="true">•</span> Resumo</h2>
             <dl>
                 <dt>Status</dt>
                 <dd><span class="status-pill status-{{ template_obj.status }}">{{ template_obj.get_status_display }}</span></dd>
@@ -49,7 +49,7 @@
 
         <div class="panel">
             <div class="section-header">
-                <h2 class="section-title">Campos configurados</h2>
+                <h2 class="section-title"><span class="ui-icon" aria-hidden="true">⌘</span> Campos configurados</h2>
                 <a class="link-action" href="{% url 'editor:field-create' template_obj.pk %}">Adicionar</a>
             </div>
             <ul class="list">
@@ -72,8 +72,34 @@
         </div>
 
         <div class="panel">
-            <h2 class="section-title">Gerar amostra</h2>
+            <h2 class="section-title"><span class="ui-icon" aria-hidden="true">Aa</span> Prévia textual</h2>
+            {% if font_warning_count %}
+                <p class="muted">{{ font_warning_count }} campo(s) com alerta de compatibilidade de fonte para o preview atual.</p>
+            {% endif %}
+            <ul class="list">
+                {% for item in field_previews %}
+                    <li>
+                        <strong>{{ item.field.label }}</strong><br>
+                        <span class="muted">Origem: {{ item.sample_source }}</span><br>
+                        <span>{{ item.rendered_preview }}</span><br>
+                        {% if item.missing_chars %}
+                            <span class="muted">Fonte sem suporte para: {{ item.missing_chars|join:", " }}</span>
+                        {% else %}
+                            <span class="muted">Fonte compatível com este preview.</span>
+                        {% endif %}
+                    </li>
+                {% empty %}
+                    <li class="muted">Nenhum campo cadastrado ainda.</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="panel">
+            <h2 class="section-title"><span class="ui-icon" aria-hidden="true">↺</span> Gerar amostra</h2>
             <p class="muted">Envie o Excel para testar as 3 primeiras linhas válidas usando exatamente o template atual.</p>
+            {% if sample_job %}
+                <p class="muted">Última amostra usada como referência: {{ sample_job.name }}.</p>
+            {% endif %}
             <div class="inline-actions">
                 <a class="button" href="{% url 'jobs:create' %}?template={{ template_obj.pk }}">Criar prévia</a>
             </div>
@@ -83,12 +109,28 @@
     <div class="panel">
         <div class="section-header">
             <div>
-                <h2 class="section-title">Editor visual</h2>
-                <p class="muted">Arraste e redimensione os campos sobre o preview da página ativa e depois salve o layout.</p>
+                <h2 class="section-title"><span class="ui-icon" aria-hidden="true">✧</span> Editor visual</h2>
+                <p class="muted">Arraste, redimensione ou ajuste pelo teclado. O layout salvo aqui é o mesmo usado na amostra e na geração final.</p>
             </div>
             <div class="inline-actions">
                 <button type="button" class="button" id="save-layout-button">Salvar layout visual</button>
             </div>
+        </div>
+        <div class="editor-toolbar">
+            <label class="editor-toggle" for="snap-toggle">
+                <input id="snap-toggle" type="checkbox" checked>
+                <span>Snap na grade</span>
+            </label>
+            <label class="editor-toggle" for="snap-size">
+                <span>Grade</span>
+                <select id="snap-size">
+                    <option value="1">1 pt</option>
+                    <option value="2" selected>2 pt</option>
+                    <option value="5">5 pt</option>
+                    <option value="10">10 pt</option>
+                </select>
+            </label>
+            <p class="muted editor-help">Setas movem. `Shift` acelera. `Alt` redimensiona. Clique no campo para selecionar.</p>
         </div>
         {% if preview_pages %}
             <div class="page-tabs" id="page-tabs">
@@ -116,6 +158,7 @@
                 {% for field in template_obj.fields.all %}
                     <div
                         class="layout-field"
+                        tabindex="0"
                         data-id="{{ field.id }}"
                         data-page-number="{{ field.page_number }}"
                         data-label="{{ field.label }}"
@@ -155,7 +198,10 @@
   const initialFields = JSON.parse(document.getElementById("field-layout-data").textContent);
   const renderedFields = new Map();
   let activeField = null;
+  let selectedFieldId = null;
   let activePage = 1;
+  const snapToggle = document.getElementById("snap-toggle");
+  const snapSize = document.getElementById("snap-size");
 
   const pageTabs = Array.from(document.querySelectorAll(".page-tab"));
   const setStageBackground = (imageUrl) => {
@@ -173,6 +219,25 @@
 
   const stageRect = () => stage.getBoundingClientRect();
   const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+  const currentSnap = () => (snapToggle?.checked ? Number(snapSize?.value || 2) : 0);
+  const applySnap = (value) => {
+    const snap = currentSnap();
+    return snap ? Math.round(value / snap) * snap : value;
+  };
+
+  const selectField = (id) => {
+    selectedFieldId = id;
+    renderedFields.forEach((_, fieldId) => {
+      const element = stage.querySelector(`.layout-field[data-id="${fieldId}"]`);
+      if (element) {
+        element.classList.toggle("is-selected", fieldId === id);
+      }
+    });
+  };
+
+  const updateFeedback = (field) => {
+    feedback.textContent = `${field.label}: página ${field.page_number} · x ${field.x.toFixed(2)} · y ${field.y.toFixed(2)} · w ${(field.width || 0).toFixed(2)} · h ${(field.height || 0).toFixed(2)}`;
+  };
 
   const toStageMetrics = (field) => {
     const rect = stageRect();
@@ -200,20 +265,31 @@
     syncFieldElement(element, field);
     element.addEventListener("pointerdown", (event) => {
       if (event.target.closest(".layout-resize")) return;
+      selectField(String(field.id));
       activeField = { id: String(field.id), startX: event.clientX, startY: event.clientY };
       element.setPointerCapture(event.pointerId);
       element.classList.add("is-active");
+      element.focus();
     });
     const resizeHandle = element.querySelector(".layout-resize");
     resizeHandle?.addEventListener("pointerdown", (event) => {
       event.stopPropagation();
+      selectField(String(field.id));
       activeField = { id: String(field.id), startX: event.clientX, startY: event.clientY, mode: "resize" };
       element.setPointerCapture(event.pointerId);
       element.classList.add("is-active");
+      element.focus();
     });
     element.addEventListener("pointerup", () => {
       element.classList.remove("is-active");
       activeField = null;
+    });
+    element.addEventListener("click", () => {
+      selectField(String(field.id));
+      updateFeedback(field);
+    });
+    element.addEventListener("focus", () => {
+      selectField(String(field.id));
     });
   });
 
@@ -231,14 +307,14 @@
     activeField.startY = event.clientY;
 
     if (activeField.mode === "resize") {
-      field.width = clamp((field.width || 160) + deltaX, 20, pageWidth - field.x);
-      field.height = clamp((field.height || field.font_size * 1.8 || 36) + deltaY, 16, pageHeight);
+      field.width = applySnap(clamp((field.width || 160) + deltaX, 20, pageWidth - field.x));
+      field.height = applySnap(clamp((field.height || field.font_size * 1.8 || 36) + deltaY, 16, pageHeight));
     } else {
-      field.x = clamp(field.x + deltaX, 0, pageWidth - (field.width || 0));
-      field.y = clamp(field.y - deltaY, field.height || 0, pageHeight);
+      field.x = applySnap(clamp(field.x + deltaX, 0, pageWidth - (field.width || 0)));
+      field.y = applySnap(clamp(field.y - deltaY, field.height || 0, pageHeight));
     }
     syncFieldElement(element, field);
-    feedback.textContent = `${field.label}: x ${field.x.toFixed(2)} · y ${field.y.toFixed(2)} · w ${(field.width || 0).toFixed(2)} · h ${(field.height || 0).toFixed(2)}`;
+    updateFeedback(field);
   });
 
   pageTabs.forEach((tab) => {
@@ -259,6 +335,59 @@
       if (element) syncFieldElement(element, field);
     });
   });
+
+  window.addEventListener("keydown", (event) => {
+    if (!selectedFieldId) return;
+    if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
+    const field = renderedFields.get(selectedFieldId);
+    const element = stage.querySelector(`.layout-field[data-id="${selectedFieldId}"]`);
+    if (!field || !element || Number(field.page_number) !== activePage) return;
+
+    const step = event.shiftKey ? 10 : currentSnap() || 1;
+    let handled = false;
+
+    if (event.altKey) {
+      if (event.key === "ArrowRight") {
+        field.width = applySnap(clamp((field.width || 160) + step, 20, pageWidth - field.x));
+        handled = true;
+      } else if (event.key === "ArrowLeft") {
+        field.width = applySnap(clamp((field.width || 160) - step, 20, pageWidth - field.x));
+        handled = true;
+      } else if (event.key === "ArrowUp") {
+        field.height = applySnap(clamp((field.height || field.font_size * 1.8 || 36) + step, 16, pageHeight));
+        handled = true;
+      } else if (event.key === "ArrowDown") {
+        field.height = applySnap(clamp((field.height || field.font_size * 1.8 || 36) - step, 16, pageHeight));
+        handled = true;
+      }
+    } else {
+      if (event.key === "ArrowRight") {
+        field.x = applySnap(clamp(field.x + step, 0, pageWidth - (field.width || 0)));
+        handled = true;
+      } else if (event.key === "ArrowLeft") {
+        field.x = applySnap(clamp(field.x - step, 0, pageWidth - (field.width || 0)));
+        handled = true;
+      } else if (event.key === "ArrowUp") {
+        field.y = applySnap(clamp(field.y + step, field.height || 0, pageHeight));
+        handled = true;
+      } else if (event.key === "ArrowDown") {
+        field.y = applySnap(clamp(field.y - step, field.height || 0, pageHeight));
+        handled = true;
+      }
+    }
+
+    if (handled) {
+      event.preventDefault();
+      syncFieldElement(element, field);
+      updateFeedback(field);
+    }
+  });
+
+  if (initialFields.length) {
+    const firstField = initialFields.find((field) => Number(field.page_number) === activePage) || initialFields[0];
+    selectField(String(firstField.id));
+    updateFeedback(firstField);
+  }
 
   saveButton.addEventListener("click", async () => {
     const payload = {

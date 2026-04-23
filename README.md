@@ -10,6 +10,7 @@ Base inicial em Django para um aplicativo web de edição de templates sobre PDF
 - openpyxl para leitura do Excel
 - ReportLab para camada vetorial de texto
 - pikepdf para composição sobre o PDF base
+- retenção automática de 7 dias para arquivos enviados e gerados
 
 ## Estrutura atual
 
@@ -29,9 +30,20 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
+## Retenção de arquivos
+
+- arquivos enviados e gerados são mantidos por 7 dias;
+- após esse prazo, jobs, templates e fontes antigas são removidos automaticamente junto com seus arquivos físicos;
+- em produção, execute `celery worker` e `celery beat` para a limpeza diária automática;
+- como fallback operacional, você pode rodar manualmente:
+
+```bash
+python manage.py cleanup_expired_files
+```
+
 ## Próximos passos
 
-1. Implementar CRUD web de templates e fontes.
-2. Construir o editor visual com preview do PDF e campos arrastáveis.
-3. Ler o Excel, mapear colunas pelo cabeçalho e gerar amostra com 3 linhas.
-4. Executar a geração completa por Celery e consolidar ZIP final.
+1. Refinar o editor visual com snapping e guias.
+2. Ampliar o preview com dados reais e validações tipográficas.
+3. Operar Celery e Beat em produção para processamento e limpeza automática.
+4. Fortalecer observabilidade e testes de interface.

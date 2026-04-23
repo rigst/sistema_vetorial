@@ -4,7 +4,7 @@
 
 {% block content %}
 <section class="hero-shell">
-    <div class="eyebrow">Biblioteca tipográfica</div>
+    <div class="eyebrow"><span class="ui-icon" aria-hidden="true">Aa</span> Biblioteca tipográfica</div>
     <div class="section-header">
         <div>
             <h1 class="hero-title">Fontes cadastradas para o editor.</h1>
@@ -12,6 +12,15 @@
         </div>
         <a class="button" href="{% url 'fonts:create' %}">Nova fonte</a>
     </div>
+    <form method="get" class="form-grid">
+        <div class="field-group">
+            <label for="font-search">Buscar</label>
+            <input id="font-search" type="text" name="q" value="{{ query }}" placeholder="Família ou nome da fonte">
+        </div>
+        <div class="field-group" style="align-self:end;">
+            <button type="submit">Filtrar</button>
+        </div>
+    </form>
 </section>
 
 <section class="table-card">
@@ -23,6 +32,7 @@
                         <th>Família</th>
                         <th>Nome</th>
                         <th>Variante</th>
+                        <th>PT-BR</th>
                         <th>Status</th>
                         <th>Ações</th>
                     </tr>
@@ -33,6 +43,11 @@
                             <td>{{ font.family }}</td>
                             <td>{{ font.name }}</td>
                             <td>{{ font.get_variant_display }}</td>
+                            <td>
+                                <span class="status-pill {% if font.metadata.supports_pt_br_basic %}status-ready{% else %}status-failed{% endif %}">
+                                    {% if font.metadata.supports_pt_br_basic %}Compatível{% else %}Incompleta{% endif %}
+                                </span>
+                            </td>
                             <td>
                                 <span class="status-pill {% if font.is_active %}status-ready{% else %}status-archived{% endif %}">
                                     {% if font.is_active %}Ativa{% else %}Inativa{% endif %}
@@ -54,4 +69,11 @@
         </div>
     {% endif %}
 </section>
+{% include "partials/pagination.html" %}
+{% if fonts %}
+    <section class="panel" style="margin-top: 1rem;">
+        <h2 class="section-title"><span class="ui-icon" aria-hidden="true">◌</span> Compatibilidade PT-BR</h2>
+        <p class="muted">Fontes marcadas como incompletas podem falhar ao renderizar acentos, cedilha ou símbolos comuns em português brasileiro.</p>
+    </section>
+{% endif %}
 {% endblock %}

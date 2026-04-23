@@ -16,7 +16,8 @@ from editor.services import update_template_pdf_metadata
 from fonts.models import FontAsset
 
 from .models import GenerationJob
-from .services import format_field_value, process_job
+from .forms import GenerationJobForm
+from .services import format_field_value, process_job, validate_font_supports_text
 
 
 TEST_MEDIA_ROOT = tempfile.mkdtemp(prefix="sistema_vetorial_jobs_tests_")
@@ -110,6 +111,51 @@ class JobServiceTests(TestCase):
 
         formatted = format_field_value(field, "  joao da silva e costa  ")
         self.assertEqual(formatted, "Sr. Joao da Silva e Costa Filho")
+
+    def test_format_field_value_preserves_portuguese_accents(self):
+        font = self._build_font()
+        template = self._build_template()
+        field = TemplateField.objects.create(
+            template=template,
+            name="cidade",
+            label="Cidade",
+            excel_column="cidade",
+            order_index=1,
+            page_number=1,
+            value_type=TemplateField.ValueType.TEXT,
+            x=30,
+            y=170,
+            width=180,
+            height=20,
+            font=font,
+            font_size=14,
+            text_transform=TemplateField.TextTransform.TITLE_SMART,
+            transform_exceptions="de, da, do, dos, e, com, à, às",
+        )
+
+        formatted = format_field_value(field, "  são josé dos campos à beira-mar  ")
+        self.assertEqual(formatted, "São José dos Campos à Beira-Mar")
+
+    def test_validate_font_supports_text_detects_missing_glyph(self):
+        font = self._build_font()
+        template = self._build_template()
+        field = TemplateField.objects.create(
+            template=template,
+            name="simbolo",
+            label="Simbolo",
+            excel_column="simbolo",
+            order_index=1,
+            page_number=1,
+            x=30,
+            y=170,
+            width=180,
+            height=20,
+            font=font,
+            font_size=14,
+        )
+
+        with self.assertRaises(ValueError):
+            validate_font_supports_text(field, "Texto com caractere raro: \U0001F9EA")
 
     def test_format_field_value_supports_integer_padding(self):
         font = self._build_font()
@@ -253,9 +299,151 @@ class JobServiceTests(TestCase):
         self.client.force_login(other_user)
 
         status_response = self.client.get(reverse("jobs:status", kwargs={"pk": job.pk}))
+        source_response = self.client.get(reverse("jobs:download-source", kwargs={"pk": job.pk}))
         zip_response = self.client.get(reverse("jobs:download-zip", kwargs={"pk": job.pk}))
         item_response = self.client.get(reverse("jobs:download-item", kwargs={"pk": item.pk}))
 
         self.assertEqual(status_response.status_code, 404)
+        self.assertEqual(source_response.status_code, 404)
         self.assertEqual(zip_response.status_code, 404)
         self.assertEqual(item_response.status_code, 404)
+
+    def test_owner_can_download_source_excel(self):
+        font = self._build_font()
+        template = self._build_template()
+        TemplateField.objects.create(
+            template=template,
+            name="nome",
+            label="Nome",
+            excel_column="nome",
+            order_index=1,
+            page_number=1,
+            x=30,
+            y=170,
+            width=180,
+            height=20,
+            font=font,
+            font_size=14,
+        )
+        job = GenerationJob.objects.create(
+            user=self.user,
+            template=template,
+            name="Source Download Job",
+            kind=GenerationJob.Kind.PREVIEW,
+            source_excel=self._build_excel_upload(),
+            status=GenerationJob.Status.QUEUED,
+        )
+
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("jobs:download-source", kwargs={"pk": job.pk}))
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_job_form_rejects_invalid_excel_with_friendly_message(self):
+        template = self._build_template()
+        uploaded = SimpleUploadedFile(
+            "dados.xlsx",
+            b"excel-invalido",
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        form = GenerationJobForm(
+            data={"name": "Job inválido", "template": template.pk},
+            files={"source_excel": uploaded},
+            user=self.user,
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("Não foi possível ler o Excel", form.errors["source_excel"][0])
+
+    def test_job_form_rejects_missing_headers_with_friendly_message(self):
+        font = self._build_font()
+        template = self._build_template()
+        TemplateField.objects.create(
+            template=template,
+            name="nome",
+            label="Nome",
+            excel_column="nome",
+            order_index=1,
+            page_number=1,
+            x=30,
+            y=170,
+            width=180,
+            height=20,
+            font=font,
+            font_size=14,
+        )
+        uploaded = self._build_excel_upload()
+        form = GenerationJobForm(
+            data={"name": "Job cabeçalho", "template": template.pk},
+            files={"source_excel": uploaded},
+            user=self.user,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.append(["empresa"])
+        sheet.append(["Empresa A"])
+        temp_dir = Path(tempfile.mkdtemp(prefix="jobs-xlsx-invalid-"))
+        xlsx_path = temp_dir / "dados_sem_nome.xlsx"
+        workbook.save(xlsx_path)
+        bad_upload = SimpleUploadedFile(
+            "dados_sem_nome.xlsx",
+            xlsx_path.read_bytes(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+        bad_form = GenerationJobForm(
+            data={"name": "Job cabeçalho inválido", "template": template.pk},
+            files={"source_excel": bad_upload},
+            user=self.user,
+        )
+
+        self.assertFalse(bad_form.is_valid())
+        self.assertIn("O Excel não possui todos os cabeçalhos esperados", bad_form.non_field_errors()[0])
+
+    def test_process_job_fails_gracefully_when_excel_has_no_data_rows(self):
+        font = self._build_font()
+        template = self._build_template()
+        TemplateField.objects.create(
+            template=template,
+            name="nome",
+            label="Nome",
+            excel_column="nome",
+            order_index=1,
+            page_number=1,
+            x=30,
+            y=170,
+            width=180,
+            height=20,
+            font=font,
+            font_size=14,
+        )
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.append(["nome"])
+        temp_dir = Path(tempfile.mkdtemp(prefix="jobs-empty-xlsx-"))
+        xlsx_path = temp_dir / "vazio.xlsx"
+        workbook.save(xlsx_path)
+        upload = SimpleUploadedFile(
+            "vazio.xlsx",
+            xlsx_path.read_bytes(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        job = GenerationJob.objects.create(
+            user=self.user,
+            template=template,
+            name="Job sem dados",
+            kind=GenerationJob.Kind.PREVIEW,
+            source_excel=upload,
+            status=GenerationJob.Status.QUEUED,
+        )
+
+        process_job(job)
+        job.refresh_from_db()
+
+        self.assertEqual(job.status, GenerationJob.Status.FAILED)
+        self.assertEqual(job.last_error, "O Excel não possui linhas preenchidas após o cabeçalho.")

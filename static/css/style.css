@@ -212,6 +212,9 @@ main {
 }
 
 .flash-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
   padding: 0.9rem 1rem;
   border-radius: 16px;
   border: 1px solid var(--border);
@@ -256,6 +259,7 @@ main {
 .eyebrow {
   display: inline-flex;
   align-items: center;
+  gap: 0.45rem;
   width: fit-content;
   padding: 0.3rem 0.7rem;
   border-radius: 999px;
@@ -410,6 +414,24 @@ main {
   font-weight: 600;
 }
 
+.ui-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.ui-icon-soft {
+  background: rgba(31, 122, 114, 0.09);
+  border: 1px solid rgba(31, 122, 114, 0.12);
+}
+
 .form-shell form,
 .auth-form {
   display: grid;
@@ -425,6 +447,12 @@ main {
 .field-group {
   display: grid;
   gap: 0.45rem;
+}
+
+.field-group input:has(+ .errorlist),
+.field-group select:has(+ .errorlist),
+.field-group textarea:has(+ .errorlist) {
+  border-color: rgba(201, 74, 74, 0.35);
 }
 
 label {
@@ -466,6 +494,48 @@ textarea:focus {
 .errorlist {
   list-style: none;
   color: var(--danger);
+  display: grid;
+  gap: 0.3rem;
+}
+
+.errorlist li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+}
+
+.errorlist li::before {
+  content: "!";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 999px;
+  background: rgba(201, 74, 74, 0.08);
+  border: 1px solid rgba(201, 74, 74, 0.16);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.form-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  padding: 0.95rem 1rem;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.form-alert strong {
+  display: block;
+  margin-bottom: 0.2rem;
+}
+
+.form-alert-error {
+  border-color: rgba(201, 74, 74, 0.24);
+  background: rgba(255, 248, 248, 0.92);
 }
 
 .auth-shell {
@@ -517,6 +587,42 @@ textarea:focus {
   margin-bottom: 1rem;
 }
 
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+  padding: 0.8rem 0.95rem;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.editor-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--text-soft);
+  font-weight: 600;
+}
+
+.editor-toggle input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--accent);
+}
+
+.editor-toggle select {
+  width: auto;
+  min-width: 86px;
+  padding: 0.5rem 0.7rem;
+}
+
+.editor-help {
+  margin-left: auto;
+}
+
 .page-tab {
   border: 1px solid var(--border-strong);
   background: rgba(255, 255, 255, 0.84);
@@ -557,6 +663,27 @@ textarea:focus {
   border-color: rgba(61, 95, 140, 0.52);
   background: rgba(61, 95, 140, 0.16);
   color: var(--accent-2);
+}
+
+.layout-field.is-selected {
+  border-color: rgba(61, 95, 140, 0.7);
+  background: rgba(61, 95, 140, 0.22);
+  color: var(--accent-2);
+  box-shadow: 0 10px 24px rgba(61, 95, 140, 0.18);
+}
+
+.layout-field.is-selected::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border: 1px dashed rgba(61, 95, 140, 0.35);
+  border-radius: 12px;
+  pointer-events: none;
+}
+
+.layout-field:focus-visible {
+  outline: 3px solid rgba(31, 122, 114, 0.18);
+  outline-offset: 2px;
 }
 
 .layout-resize {
@@ -616,6 +743,10 @@ textarea:focus {
   text-align: center;
 }
 
+.hero-shell .form-alert {
+  max-width: 72ch;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -657,5 +788,10 @@ textarea:focus {
   .split-grid,
   .editor-shell {
     grid-template-columns: 1fr;
+  }
+
+  .editor-help {
+    margin-left: 0;
+    width: 100%;
   }
 }

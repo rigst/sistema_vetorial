@@ -3,6 +3,7 @@ from django.contrib import messages
 from django.core.files.base import ContentFile
 from django.http import FileResponse
 from django.http import JsonResponse
+from django.db.models import Q
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.views import View
@@ -10,6 +11,7 @@ from django.views.generic import CreateView, DeleteView, DetailView, ListView
 
 from core.mixins import UserOwnedQuerysetMixin
 from django.conf import settings
+from editor.models import DocumentTemplate
 
 from .forms import GenerationJobForm
 from .models import GenerationItem, GenerationJob
@@ -20,6 +22,24 @@ class GenerationJobListView(UserOwnedQuerysetMixin, ListView):
     model = GenerationJob
     template_name = "jobs/job_list.html"
     context_object_name = "jobs"
+    paginate_by = 12
+
+    def get_queryset(self):
+        queryset = super().get_queryset().select_related("template")
+        query = self.request.GET.get("q", "").strip()
+        status = self.request.GET.get("status", "").strip()
+        if query:
+            queryset = queryset.filter(Q(name__icontains=query) | Q(template__name__icontains=query))
+        if status:
+            queryset = queryset.filter(status=status)
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["query"] = self.request.GET.get("q", "").strip()
+        context["status_filter"] = self.request.GET.get("status", "").strip()
+        context["status_choices"] = GenerationJob.Status.choices
+        return context
 
 
 class GenerationJobCreateView(LoginRequiredMixin, CreateView):
@@ -41,12 +61,31 @@ class GenerationJobCreateView(LoginRequiredMixin, CreateView):
         )
         form.instance.status = GenerationJob.Status.QUEUED
         response = super().form_valid(form)
-        spawn_job_process(settings.BASE_DIR, self.object.pk)
-        messages.success(self.request, "Job enviado para processamento.")
+        try:
+            spawn_job_process(settings.BASE_DIR, self.object.pk)
+        except Exception:
+            self.object.status = GenerationJob.Status.FAILED
+            self.object.last_error = (
+                "O job foi salvo, mas não foi possível iniciar o processamento automático. Tente reenviar o job."
+            )
+            self.object.save(update_fields=["status", "last_error", "updated_at"])
+            messages.error(self.request, self.object.last_error)
+        else:
+            messages.success(self.request, "Job enviado para processamento.")
         return response
 
     def get_success_url(self):
         return reverse("jobs:detail", kwargs={"pk": self.object.pk})
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        template_id = self.request.GET.get("template") or self.request.POST.get("template")
+        template_obj = None
+        if template_id:
+            template_obj = DocumentTemplate.objects.filter(pk=template_id, user=self.request.user).prefetch_related("fields").first()
+        context["selected_template"] = template_obj
+        context["expected_headers"] = [field.excel_column for field in template_obj.fields.all() if field.excel_column] if template_obj else []
+        return context
 
 
 class GenerationJobDetailView(UserOwnedQuerysetMixin, DetailView):
@@ -86,8 +125,17 @@ class PromotePreviewJobView(LoginRequiredMixin, View):
                 kind=GenerationJob.Kind.FULL,
                 status=GenerationJob.Status.QUEUED,
             )
-        spawn_job_process(settings.BASE_DIR, full_job.pk)
-        messages.success(request, "Lote completo enviado para processamento.")
+        try:
+            spawn_job_process(settings.BASE_DIR, full_job.pk)
+        except Exception:
+            full_job.status = GenerationJob.Status.FAILED
+            full_job.last_error = (
+                "O lote completo foi criado, mas não foi possível iniciar o processamento automático."
+            )
+            full_job.save(update_fields=["status", "last_error", "updated_at"])
+            messages.error(request, full_job.last_error)
+        else:
+            messages.success(request, "Lote completo enviado para processamento.")
         return redirect("jobs:detail", pk=full_job.pk)
 
 
@@ -110,8 +158,15 @@ class RerunJobView(LoginRequiredMixin, View):
                 kind=source_job.kind,
                 status=GenerationJob.Status.QUEUED,
             )
-        spawn_job_process(settings.BASE_DIR, new_job.pk)
-        messages.success(request, "Job reenviado para processamento.")
+        try:
+            spawn_job_process(settings.BASE_DIR, new_job.pk)
+        except Exception:
+            new_job.status = GenerationJob.Status.FAILED
+            new_job.last_error = "O job foi recriado, mas o processamento automático não pôde ser iniciado."
+            new_job.save(update_fields=["status", "last_error", "updated_at"])
+            messages.error(request, new_job.last_error)
+        else:
+            messages.success(request, "Job reenviado para processamento.")
         return redirect("jobs:detail", pk=new_job.pk)
 
 
@@ -152,6 +207,18 @@ class GenerationJobZipDownloadView(LoginRequiredMixin, View):
         if not job or not job.zip_file:
             return JsonResponse({"error": "not_found"}, status=404)
         return FileResponse(job.zip_file.open("rb"), as_attachment=True, filename=job.zip_file.name.split("/")[-1])
+
+
+class GenerationJobSourceExcelDownloadView(LoginRequiredMixin, View):
+    def get(self, request, *args, **kwargs):
+        job = GenerationJob.objects.filter(pk=kwargs["pk"], user=request.user).first()
+        if not job or not job.source_excel:
+            return JsonResponse({"error": "not_found"}, status=404)
+        return FileResponse(
+            job.source_excel.open("rb"),
+            as_attachment=True,
+            filename=job.source_excel.name.split("/")[-1],
+        )
 
 
 class GenerationItemDownloadView(LoginRequiredMixin, View):

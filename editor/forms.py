@@ -1,4 +1,5 @@
 from django import forms
+import pikepdf
 
 from fonts.models import FontAsset
 
@@ -6,6 +7,20 @@ from .models import DocumentTemplate, TemplateField
 
 
 class DocumentTemplateForm(forms.ModelForm):
+    def clean_background_pdf(self):
+        uploaded = self.cleaned_data["background_pdf"]
+        suffix = uploaded.name.lower().rsplit(".", 1)[-1] if "." in uploaded.name else ""
+        if suffix != "pdf":
+            raise forms.ValidationError("Envie um arquivo PDF vetorial válido para o fundo.")
+        uploaded.seek(0)
+        try:
+            pikepdf.Pdf.open(uploaded)
+        except Exception as exc:
+            uploaded.seek(0)
+            raise forms.ValidationError("Não foi possível ler este PDF. Verifique se o arquivo não está corrompido.") from exc
+        uploaded.seek(0)
+        return uploaded
+
     class Meta:
         model = DocumentTemplate
         fields = ["name", "slug", "description", "background_pdf", "status"]

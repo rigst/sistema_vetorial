@@ -56,7 +56,12 @@
             <div class="flash-stack" role="status" aria-live="polite">
                 <ul class="flash-list">
                     {% for message in messages %}
-                        <li class="flash-message {% if message.tags %}flash-{{ message.tags }}{% endif %}">{{ message }}</li>
+                        <li class="flash-message {% if message.tags %}flash-{{ message.tags }}{% endif %}">
+                            <span class="ui-icon ui-icon-soft" aria-hidden="true">
+                                {% if "error" in message.tags %}!{% elif "success" in message.tags %}✓{% elif "warning" in message.tags %}•{% else %}i{% endif %}
+                            </span>
+                            <span>{{ message }}</span>
+                        </li>
                     {% endfor %}
                 </ul>
             </div>

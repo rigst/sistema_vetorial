@@ -10,6 +10,13 @@
         Esta primeira implementação já deixa o domínio central preparado para fontes, templates editáveis,
         upload de Excel e jobs de geração com rastreamento por usuário.
     </p>
+    <div class="form-alert">
+        <span class="ui-icon ui-icon-soft" aria-hidden="true">i</span>
+        <div>
+            <strong>Retenção automática de 7 dias</strong>
+            Arquivos enviados e gerados no sistema são mantidos por até 7 dias e depois removidos automaticamente do servidor para poupar espaço.
+        </div>
+    </div>
 </section>
 
 <section class="stats-grid">
@@ -60,9 +67,9 @@
     <article class="panel">
         <h2 class="section-title">Próximos passos</h2>
         <ul class="list">
-            <li>Construir o editor visual sobre o preview do PDF com grid, snapping e tipografia.</li>
-            <li>Implementar upload de Excel e geração de amostra com 3 linhas válidas.</li>
-            <li>Conectar Celery e Redis para processar os PDFs finais em lote.</li>
+            <li>Refinar o editor visual com grid, snapping e tipografia.</li>
+            <li>Ampliar a revisão visual dos previews com dados reais do Excel.</li>
+            <li>Operar Celery e Celery Beat em produção para processamento e limpeza automática.</li>
         </ul>
     </article>
 </section>

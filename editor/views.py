@@ -6,6 +6,7 @@ from django.contrib import messages
 from django.core.files.base import ContentFile
 from django.http import FileResponse
 from django.http import JsonResponse
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect
 from django.utils.text import slugify
 from django.urls import reverse, reverse_lazy
@@ -17,12 +18,31 @@ from core.mixins import UserOwnedQuerysetMixin
 from .forms import DocumentTemplateForm, TemplateFieldForm
 from .models import DocumentTemplate, TemplateField, TemplatePreviewPage
 from .services import update_template_pdf_metadata
+from jobs.services import format_field_value, get_missing_font_chars, load_excel_rows
 
 
 class DocumentTemplateListView(UserOwnedQuerysetMixin, ListView):
     model = DocumentTemplate
     template_name = "editor/template_list.html"
     context_object_name = "templates"
+    paginate_by = 12
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        query = self.request.GET.get("q", "").strip()
+        status = self.request.GET.get("status", "").strip()
+        if query:
+            queryset = queryset.filter(Q(name__icontains=query) | Q(description__icontains=query) | Q(slug__icontains=query))
+        if status:
+            queryset = queryset.filter(status=status)
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["query"] = self.request.GET.get("q", "").strip()
+        context["status_filter"] = self.request.GET.get("status", "").strip()
+        context["status_choices"] = DocumentTemplate.Status.choices
+        return context
 
 
 class DocumentTemplateCreateView(LoginRequiredMixin, CreateView):
@@ -34,7 +54,13 @@ class DocumentTemplateCreateView(LoginRequiredMixin, CreateView):
     def form_valid(self, form):
         form.instance.user = self.request.user
         response = super().form_valid(form)
-        update_template_pdf_metadata(self.object)
+        try:
+            update_template_pdf_metadata(self.object)
+        except Exception:
+            messages.error(
+                self.request,
+                "O template foi salvo, mas não foi possível gerar a prévia do PDF. Verifique se o arquivo é válido e tente novamente.",
+            )
         return response
 
 
@@ -47,7 +73,13 @@ class DocumentTemplateUpdateView(UserOwnedQuerysetMixin, UpdateView):
     def form_valid(self, form):
         response = super().form_valid(form)
         if self.object.background_pdf:
-            update_template_pdf_metadata(self.object)
+            try:
+                update_template_pdf_metadata(self.object)
+            except Exception:
+                messages.error(
+                    self.request,
+                    "As alterações foram salvas, mas a nova prévia do PDF não pôde ser atualizada. Revise o arquivo enviado.",
+                )
         return response
 
 
@@ -58,6 +90,33 @@ class DocumentTemplateDetailView(UserOwnedQuerysetMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        sample_payload = {}
+        sample_job = self.object.jobs.order_by("-created_at").first()
+        if sample_job and sample_job.source_excel:
+            try:
+                _, data_rows = load_excel_rows(sample_job.source_excel.path)
+            except Exception:
+                data_rows = []
+            if data_rows:
+                sample_payload = data_rows[0][1]
+        field_previews = []
+        for field in self.object.fields.select_related("font").all():
+            sample_source = (
+                sample_payload.get(field.excel_column)
+                or field.preview_text
+                or field.empty_value
+                or field.label
+            )
+            rendered_preview = format_field_value(field, sample_source)
+            missing_chars = get_missing_font_chars(field, rendered_preview)
+            field_previews.append(
+                {
+                    "field": field,
+                    "sample_source": sample_source,
+                    "rendered_preview": rendered_preview,
+                    "missing_chars": missing_chars,
+                }
+            )
         context["field_layout_json"] = [
             {
                 "id": field.id,
@@ -73,6 +132,10 @@ class DocumentTemplateDetailView(UserOwnedQuerysetMixin, DetailView):
             for field in self.object.fields.all()
         ]
         context["preview_pages"] = self.object.preview_pages.all()
+        context["field_previews"] = field_previews
+        context["font_warning_count"] = sum(1 for item in field_previews if item["missing_chars"])
+        context["sample_job"] = sample_job
+        context["sample_payload"] = sample_payload
         return context
 
 
@@ -104,7 +167,13 @@ class DocumentTemplateDuplicateView(LoginRequiredMixin, View):
                 editor_state=deepcopy(source.editor_state),
             )
 
-        update_template_pdf_metadata(duplicated)
+        try:
+            update_template_pdf_metadata(duplicated)
+        except Exception:
+            messages.warning(
+                request,
+                "O template foi duplicado, mas a prévia visual não pôde ser regenerada agora.",
+            )
         for field in source.fields.all():
             field.pk = None
             field.template = duplicated

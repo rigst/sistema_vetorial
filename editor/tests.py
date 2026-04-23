@@ -12,6 +12,7 @@ from reportlab.pdfgen import canvas
 
 from fonts.models import FontAsset
 
+from .forms import DocumentTemplateForm
 from .models import DocumentTemplate, TemplateField
 from .services import update_template_pdf_metadata
 
@@ -116,3 +117,22 @@ class EditorServiceTests(TestCase):
         response = self.client.get(reverse("editor:preview-page", kwargs={"pk": template.pk, "page_number": 1}))
 
         self.assertEqual(response.status_code, 404)
+
+    def test_template_form_rejects_invalid_pdf_with_friendly_message(self):
+        uploaded = SimpleUploadedFile(
+            "modelo.pdf",
+            b"pdf-invalido",
+            content_type="application/pdf",
+        )
+        form = DocumentTemplateForm(
+            data={
+                "name": "Template Inválido",
+                "slug": "template-invalido",
+                "description": "Teste",
+                "status": DocumentTemplate.Status.DRAFT,
+            },
+            files={"background_pdf": uploaded},
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("Não foi possível ler este PDF", form.errors["background_pdf"][0])

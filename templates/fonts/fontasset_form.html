@@ -5,11 +5,20 @@
 {% block content %}
 <section class="split-grid">
     <div class="form-shell">
-        <div class="eyebrow">Fonte</div>
+        <div class="eyebrow"><span class="ui-icon" aria-hidden="true">Aa</span> Fonte</div>
         <h1 class="section-title" style="margin-top: 0.7rem;">{% if form.instance.pk %}Editar fonte{% else %}Cadastrar fonte{% endif %}</h1>
         <p class="muted">Cadastre a família e a variante real para que a composição vetorial final use o arquivo correto.</p>
         <form method="post" enctype="multipart/form-data">
             {% csrf_token %}
+            {% if form.non_field_errors %}
+                <div class="form-alert form-alert-error">
+                    <span class="ui-icon ui-icon-soft" aria-hidden="true">!</span>
+                    <div>
+                        <strong>Não foi possível salvar esta fonte</strong>
+                        {{ form.non_field_errors }}
+                    </div>
+                </div>
+            {% endif %}
             <div class="form-grid">
                 {% for field in form %}
                     <div class="field-group">
@@ -27,11 +36,12 @@
         </form>
     </div>
     <aside class="panel">
-        <h2 class="section-title">Boas práticas</h2>
+        <h2 class="section-title"><span class="ui-icon" aria-hidden="true">◌</span> Boas práticas</h2>
         <ul class="list">
             <li>Cadastre variantes reais como `Regular`, `Bold` e `Italic` separadamente.</li>
             <li>Prefira usar exatamente a fonte do modelo original para manter a fidelidade tipográfica.</li>
             <li>O editor e a geração final devem usar o mesmo arquivo de fonte.</li>
+            <li>O cadastro agora valida cobertura básica para português brasileiro, incluindo acentos e cedilha.</li>
         </ul>
     </aside>
 </section>

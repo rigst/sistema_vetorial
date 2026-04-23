@@ -4,7 +4,7 @@
 
 {% block content %}
 <section class="hero-shell">
-    <div class="eyebrow">Templates vetoriais</div>
+    <div class="eyebrow"><span class="ui-icon" aria-hidden="true">□</span> Templates vetoriais</div>
     <div class="section-header">
         <div>
             <h1 class="hero-title">Modelos prontos para edição visual.</h1>
@@ -12,6 +12,24 @@
         </div>
         <a class="button" href="{% url 'editor:create' %}">Novo template</a>
     </div>
+    <form method="get" class="form-grid">
+        <div class="field-group">
+            <label for="template-search">Buscar</label>
+            <input id="template-search" type="text" name="q" value="{{ query }}" placeholder="Nome, slug ou descrição">
+        </div>
+        <div class="field-group">
+            <label for="template-status">Status</label>
+            <select id="template-status" name="status">
+                <option value="">Todos</option>
+                {% for value, label in status_choices %}
+                    <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="field-group" style="align-self:end;">
+            <button type="submit">Filtrar</button>
+        </div>
+    </form>
 </section>
 
 <section class="table-card">
@@ -56,4 +74,11 @@
         </div>
     {% endif %}
 </section>
+{% if templates %}
+    <section class="panel" style="margin-top: 1rem;">
+        <h2 class="section-title"><span class="ui-icon" aria-hidden="true">⋄</span> Uso recomendado</h2>
+        <p class="muted">Abra o template, confira a prévia textual, ajuste o layout no editor visual e só então gere a amostra com as primeiras linhas do Excel.</p>
+    </section>
+{% endif %}
+{% include "partials/pagination.html" %}
 {% endblock %}
