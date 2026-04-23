@@ -130,7 +130,12 @@
                     <option value="10">10 pt</option>
                 </select>
             </label>
-            <p class="muted editor-help">Setas movem. `Shift` acelera. `Alt` redimensiona. Clique no campo para selecionar.</p>
+            <div class="editor-selection-meta">
+                <strong id="selection-title">Nenhum campo selecionado</strong>
+                <span class="muted" id="selection-subtitle">Clique em um campo para editar com mais precisão.</span>
+            </div>
+            <button type="button" class="button button-secondary" id="clear-selection-button">Limpar seleção</button>
+            <p class="muted editor-help">Clique para selecionar. `Ctrl` ou `Cmd` soma seleção. Setas movem. `Shift` acelera. `Alt` redimensiona.</p>
         </div>
         {% if preview_pages %}
             <div class="page-tabs" id="page-tabs">
@@ -155,6 +160,8 @@
             data-csrf-token="{{ csrf_token }}"
         >
             {% if preview_pages %}
+                <div class="guide-line guide-line-x" id="guide-line-x" aria-hidden="true"></div>
+                <div class="guide-line guide-line-y" id="guide-line-y" aria-hidden="true"></div>
                 {% for field in template_obj.fields.all %}
                     <div
                         class="layout-field"
@@ -199,9 +206,15 @@
   const renderedFields = new Map();
   let activeField = null;
   let selectedFieldId = null;
+  const selectedFieldIds = new Set();
   let activePage = 1;
   const snapToggle = document.getElementById("snap-toggle");
   const snapSize = document.getElementById("snap-size");
+  const selectionTitle = document.getElementById("selection-title");
+  const selectionSubtitle = document.getElementById("selection-subtitle");
+  const clearSelectionButton = document.getElementById("clear-selection-button");
+  const guideLineX = document.getElementById("guide-line-x");
+  const guideLineY = document.getElementById("guide-line-y");
 
   const pageTabs = Array.from(document.querySelectorAll(".page-tab"));
   const setStageBackground = (imageUrl) => {
@@ -225,20 +238,6 @@
     return snap ? Math.round(value / snap) * snap : value;
   };
 
-  const selectField = (id) => {
-    selectedFieldId = id;
-    renderedFields.forEach((_, fieldId) => {
-      const element = stage.querySelector(`.layout-field[data-id="${fieldId}"]`);
-      if (element) {
-        element.classList.toggle("is-selected", fieldId === id);
-      }
-    });
-  };
-
-  const updateFeedback = (field) => {
-    feedback.textContent = `${field.label}: página ${field.page_number} · x ${field.x.toFixed(2)} · y ${field.y.toFixed(2)} · w ${(field.width || 0).toFixed(2)} · h ${(field.height || 0).toFixed(2)}`;
-  };
-
   const toStageMetrics = (field) => {
     const rect = stageRect();
     const scale = rect.width / pageWidth;
@@ -247,6 +246,131 @@
     const left = field.x * scale;
     const top = (pageHeight - field.y - (field.height || field.font_size * 1.8 || 36)) * scale;
     return { left, top, width, height, scale };
+  };
+
+  const setGuides = (field) => {
+    if (!field || Number(field.page_number) !== activePage) {
+      guideLineX.style.display = "none";
+      guideLineY.style.display = "none";
+      return;
+    }
+    const metrics = toStageMetrics(field);
+    guideLineX.style.display = "block";
+    guideLineY.style.display = "block";
+    guideLineX.style.top = `${metrics.top + metrics.height / 2}px`;
+    guideLineY.style.left = `${metrics.left + metrics.width / 2}px`;
+  };
+
+  const updateFeedback = (field) => {
+    if (!field) {
+      feedback.textContent = "";
+      return;
+    }
+    feedback.textContent = `${field.label}: página ${field.page_number} · x ${field.x.toFixed(2)} · y ${field.y.toFixed(2)} · w ${(field.width || 0).toFixed(2)} · h ${(field.height || 0).toFixed(2)}`;
+  };
+
+  const refreshSelectionMeta = () => {
+    if (!selectedFieldIds.size) {
+      selectionTitle.textContent = "Nenhum campo selecionado";
+      selectionSubtitle.textContent = "Clique em um campo para editar com mais precisão.";
+      setGuides(null);
+      return;
+    }
+
+    const selected = Array.from(selectedFieldIds)
+      .map((id) => renderedFields.get(id))
+      .filter(Boolean);
+    const primary = renderedFields.get(selectedFieldId) || selected[0];
+    if (!primary) return;
+
+    selectionTitle.textContent = selected.length === 1 ? primary.label : `${selected.length} campos selecionados`;
+    selectionSubtitle.textContent = selected.length === 1
+      ? `Página ${primary.page_number} · coluna ${primary.excel_column || "sem vínculo"}`
+      : "Arraste para mover em conjunto ou use as setas para ajuste fino.";
+    setGuides(primary);
+  };
+
+  const paintSelection = () => {
+    renderedFields.forEach((_, fieldId) => {
+      const element = stage.querySelector(`.layout-field[data-id="${fieldId}"]`);
+      if (element) {
+        element.classList.toggle("is-selected", selectedFieldIds.has(fieldId));
+      }
+    });
+    refreshSelectionMeta();
+  };
+
+  const selectField = (id, additive = false) => {
+    if (!additive) {
+      selectedFieldIds.clear();
+    }
+    if (additive && selectedFieldIds.has(id)) {
+      selectedFieldIds.delete(id);
+    } else {
+      selectedFieldIds.add(id);
+      selectedFieldId = id;
+    }
+
+    if (!selectedFieldIds.size) {
+      selectedFieldId = null;
+    } else if (!selectedFieldIds.has(selectedFieldId)) {
+      selectedFieldId = Array.from(selectedFieldIds)[0];
+    }
+    paintSelection();
+  };
+
+  const selectedFields = () => Array.from(selectedFieldIds)
+    .map((id) => renderedFields.get(id))
+    .filter((field) => field && Number(field.page_number) === activePage);
+
+  const smartSnapTargets = (axis, field, mode) => {
+    const targets = axis === "x" ? [0, pageWidth / 2, pageWidth] : [0, pageHeight / 2, pageHeight];
+    renderedFields.forEach((other, id) => {
+      if (id === String(field.id) || Number(other.page_number) !== activePage) return;
+      if (axis === "x") {
+        targets.push(other.x, other.x + (other.width || 0) / 2, other.x + (other.width || 0));
+      } else {
+        targets.push(other.y, other.y - (other.height || 0) / 2, other.y - (other.height || 0));
+      }
+    });
+    return targets;
+  };
+
+  const smartSnapMove = (axis, candidate, field) => {
+    const threshold = 4;
+    const points = axis === "x"
+      ? [candidate, candidate + (field.width || 0) / 2, candidate + (field.width || 0)]
+      : [candidate, candidate - (field.height || 0) / 2, candidate - (field.height || 0)];
+    const targets = smartSnapTargets(axis, field, "move");
+    let best = candidate;
+    let bestDistance = Infinity;
+
+    points.forEach((point) => {
+      targets.forEach((target) => {
+        const distance = Math.abs(point - target);
+        if (distance <= threshold && distance < bestDistance) {
+          bestDistance = distance;
+          best = candidate + (target - point);
+        }
+      });
+    });
+    return best;
+  };
+
+  const smartSnapResize = (axis, candidate, field) => {
+    const threshold = 4;
+    const point = axis === "x" ? field.x + candidate : field.y - candidate;
+    const targets = smartSnapTargets(axis, field, "resize");
+    let best = candidate;
+    let bestDistance = Infinity;
+    targets.forEach((target) => {
+      const distance = Math.abs(point - target);
+      if (distance <= threshold && distance < bestDistance) {
+        bestDistance = distance;
+        best = axis === "x" ? candidate + (target - point) : candidate - (target - point);
+      }
+    });
+    return best;
   };
 
   const syncFieldElement = (element, field) => {
@@ -265,8 +389,18 @@
     syncFieldElement(element, field);
     element.addEventListener("pointerdown", (event) => {
       if (event.target.closest(".layout-resize")) return;
-      selectField(String(field.id));
-      activeField = { id: String(field.id), startX: event.clientX, startY: event.clientY };
+      selectField(String(field.id), event.ctrlKey || event.metaKey);
+      const ids = selectedFields().map((item) => String(item.id));
+      activeField = {
+        id: String(field.id),
+        ids,
+        startX: event.clientX,
+        startY: event.clientY,
+        origins: Object.fromEntries(ids.map((id) => {
+          const source = renderedFields.get(id);
+          return [id, { x: source.x, y: source.y, width: source.width, height: source.height }];
+        })),
+      };
       element.setPointerCapture(event.pointerId);
       element.classList.add("is-active");
       element.focus();
@@ -275,7 +409,16 @@
     resizeHandle?.addEventListener("pointerdown", (event) => {
       event.stopPropagation();
       selectField(String(field.id));
-      activeField = { id: String(field.id), startX: event.clientX, startY: event.clientY, mode: "resize" };
+      activeField = {
+        id: String(field.id),
+        ids: [String(field.id)],
+        startX: event.clientX,
+        startY: event.clientY,
+        mode: "resize",
+        origins: {
+          [String(field.id)]: { x: field.x, y: field.y, width: field.width, height: field.height },
+        },
+      };
       element.setPointerCapture(event.pointerId);
       element.classList.add("is-active");
       element.focus();
@@ -303,18 +446,37 @@
     const scale = rect.width / pageWidth;
     const deltaX = (event.clientX - activeField.startX) / scale;
     const deltaY = (event.clientY - activeField.startY) / scale;
-    activeField.startX = event.clientX;
-    activeField.startY = event.clientY;
 
     if (activeField.mode === "resize") {
-      field.width = applySnap(clamp((field.width || 160) + deltaX, 20, pageWidth - field.x));
-      field.height = applySnap(clamp((field.height || field.font_size * 1.8 || 36) + deltaY, 16, pageHeight));
+      let nextWidth = applySnap(clamp(activeField.origins[activeField.id].width + deltaX, 20, pageWidth - field.x));
+      let nextHeight = applySnap(clamp(activeField.origins[activeField.id].height + deltaY, 16, pageHeight));
+      nextWidth = applySnap(smartSnapResize("x", nextWidth, field));
+      nextHeight = applySnap(smartSnapResize("y", nextHeight, field));
+      field.width = clamp(nextWidth, 20, pageWidth - field.x);
+      field.height = clamp(nextHeight, 16, pageHeight);
+      syncFieldElement(element, field);
+      updateFeedback(field);
     } else {
-      field.x = applySnap(clamp(field.x + deltaX, 0, pageWidth - (field.width || 0)));
-      field.y = applySnap(clamp(field.y - deltaY, field.height || 0, pageHeight));
+      const primaryOrigin = activeField.origins[activeField.id];
+      let targetX = applySnap(clamp(primaryOrigin.x + deltaX, 0, pageWidth - (field.width || 0)));
+      let targetY = applySnap(clamp(primaryOrigin.y - deltaY, field.height || 0, pageHeight));
+      targetX = applySnap(smartSnapMove("x", targetX, field));
+      targetY = applySnap(smartSnapMove("y", targetY, field));
+      const deltaMoveX = targetX - primaryOrigin.x;
+      const deltaMoveY = targetY - primaryOrigin.y;
+
+      activeField.ids.forEach((id) => {
+        const current = renderedFields.get(id);
+        const origin = activeField.origins[id];
+        const currentElement = stage.querySelector(`.layout-field[data-id="${id}"]`);
+        if (!current || !origin || !currentElement) return;
+        current.x = applySnap(clamp(origin.x + deltaMoveX, 0, pageWidth - (current.width || 0)));
+        current.y = applySnap(clamp(origin.y + deltaMoveY, current.height || 0, pageHeight));
+        syncFieldElement(currentElement, current);
+      });
+      updateFeedback(field);
     }
-    syncFieldElement(element, field);
-    updateFeedback(field);
+    paintSelection();
   });
 
   pageTabs.forEach((tab) => {
@@ -326,6 +488,7 @@
         const element = stage.querySelector(`.layout-field[data-id="${id}"]`);
         if (element) syncFieldElement(element, field);
       });
+      paintSelection();
     });
   });
 
@@ -334,6 +497,7 @@
       const element = stage.querySelector(`.layout-field[data-id="${id}"]`);
       if (element) syncFieldElement(element, field);
     });
+    paintSelection();
   });
 
   window.addEventListener("keydown", (event) => {
@@ -362,25 +526,53 @@
       }
     } else {
       if (event.key === "ArrowRight") {
-        field.x = applySnap(clamp(field.x + step, 0, pageWidth - (field.width || 0)));
+        selectedFields().forEach((selected) => {
+          selected.x = applySnap(clamp(selected.x + step, 0, pageWidth - (selected.width || 0)));
+        });
         handled = true;
       } else if (event.key === "ArrowLeft") {
-        field.x = applySnap(clamp(field.x - step, 0, pageWidth - (field.width || 0)));
+        selectedFields().forEach((selected) => {
+          selected.x = applySnap(clamp(selected.x - step, 0, pageWidth - (selected.width || 0)));
+        });
         handled = true;
       } else if (event.key === "ArrowUp") {
-        field.y = applySnap(clamp(field.y + step, field.height || 0, pageHeight));
+        selectedFields().forEach((selected) => {
+          selected.y = applySnap(clamp(selected.y + step, selected.height || 0, pageHeight));
+        });
         handled = true;
       } else if (event.key === "ArrowDown") {
-        field.y = applySnap(clamp(field.y - step, field.height || 0, pageHeight));
+        selectedFields().forEach((selected) => {
+          selected.y = applySnap(clamp(selected.y - step, selected.height || 0, pageHeight));
+        });
         handled = true;
       }
     }
 
     if (handled) {
       event.preventDefault();
-      syncFieldElement(element, field);
+      selectedFields().forEach((selected) => {
+        const currentElement = stage.querySelector(`.layout-field[data-id="${selected.id}"]`);
+        if (currentElement) syncFieldElement(currentElement, selected);
+      });
       updateFeedback(field);
+      paintSelection();
     }
+  });
+
+  stage.addEventListener("click", (event) => {
+    if (event.target === stage) {
+      selectedFieldIds.clear();
+      selectedFieldId = null;
+      paintSelection();
+      updateFeedback(null);
+    }
+  });
+
+  clearSelectionButton?.addEventListener("click", () => {
+    selectedFieldIds.clear();
+    selectedFieldId = null;
+    paintSelection();
+    updateFeedback(null);
   });
 
   if (initialFields.length) {

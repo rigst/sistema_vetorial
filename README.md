@@ -25,15 +25,37 @@ Base inicial em Django para um aplicativo web de edição de templates sobre PDF
 ```bash
 cd /home/rodrigo/Projetos/sistema_vetorial
 source .venv/bin/activate
+cp .env.example .env
 python manage.py migrate
 python manage.py createsuperuser
 python manage.py runserver
+```
+
+## Processamento assíncrono
+
+Suba o Redis:
+
+```bash
+docker compose up -d redis
+```
+
+Suba o worker Celery:
+
+```bash
+celery -A config worker -l info
+```
+
+Suba o agendador Celery Beat:
+
+```bash
+celery -A config beat -l info
 ```
 
 ## Retenção de arquivos
 
 - arquivos enviados e gerados são mantidos por 7 dias;
 - após esse prazo, jobs, templates e fontes antigas são removidos automaticamente junto com seus arquivos físicos;
+- o storage é privado e os arquivos não possuem URL pública direta;
 - em produção, execute `celery worker` e `celery beat` para a limpeza diária automática;
 - como fallback operacional, você pode rodar manualmente:
 

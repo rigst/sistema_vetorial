@@ -13,6 +13,7 @@ from openpyxl import Workbook
 from reportlab.pdfgen import canvas
 
 from core.cleanup import cleanup_expired_records
+from core.storage import PrivateMediaStorage
 from editor.models import DocumentTemplate
 from editor.services import update_template_pdf_metadata
 from fonts.models import FontAsset
@@ -129,3 +130,8 @@ class AuthFlowTests(TestCase):
         self.assertFalse(old_job_excel.exists())
         self.assertTrue(DocumentTemplate.objects.filter(pk=recent_template.pk).exists())
         self.assertTrue(recent_template_pdf.exists())
+
+    def test_private_storage_has_no_public_url(self):
+        storage = PrivateMediaStorage(location=TEST_MEDIA_ROOT)
+        with self.assertRaises(ValueError):
+            storage.url("arquivo.pdf")

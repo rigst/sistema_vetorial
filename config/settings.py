@@ -1,13 +1,23 @@
 from pathlib import Path
+import os
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = "django-insecure-c_-ahegiuv-n4bsuq77in$s(#)6@^yxsl3g0p0nd5&jn9zaq1-"
+ENV_PATH = BASE_DIR / ".env"
+if ENV_PATH.exists():
+    for line in ENV_PATH.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip())
 
-DEBUG = True
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-c_-ahegiuv-n4bsuq77in$s(#)6@^yxsl3g0p0nd5&jn9zaq1-")
 
-ALLOWED_HOSTS = []
+DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
+
+ALLOWED_HOSTS = [host for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",") if host] or []
 
 
 INSTALLED_APPS = [
@@ -90,7 +100,20 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "media/"
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT = Path(os.environ.get("DJANGO_MEDIA_ROOT", BASE_DIR / "private_media"))
+
+STORAGES = {
+    "default": {
+        "BACKEND": "core.storage.PrivateMediaStorage",
+        "OPTIONS": {
+            "location": str(MEDIA_ROOT),
+            "base_url": None,
+        },
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
 
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "core:home"
@@ -98,11 +121,13 @@ LOGOUT_REDIRECT_URL = "login"
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
-FILE_RETENTION_DAYS = 7
+FILE_RETENTION_DAYS = int(os.environ.get("FILE_RETENTION_DAYS", "7"))
 
-CELERY_BROKER_URL = "redis://localhost:6379/0"
-CELERY_RESULT_BACKEND = "redis://localhost:6379/0"
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", CELERY_BROKER_URL)
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 60 * 30
+CELERY_TASK_ALWAYS_EAGER = os.environ.get("CELERY_TASK_ALWAYS_EAGER", "0") == "1"
+CELERY_TASK_EAGER_PROPAGATES = True
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

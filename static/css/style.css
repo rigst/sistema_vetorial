@@ -580,6 +580,27 @@ textarea:focus {
   padding: 1.5rem;
 }
 
+.guide-line {
+  position: absolute;
+  display: none;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.guide-line-x {
+  left: 0;
+  right: 0;
+  height: 1px;
+  border-top: 1px dashed rgba(61, 95, 140, 0.45);
+}
+
+.guide-line-y {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  border-left: 1px dashed rgba(61, 95, 140, 0.45);
+}
+
 .page-tabs {
   display: flex;
   gap: 0.6rem;
@@ -619,6 +640,12 @@ textarea:focus {
   padding: 0.5rem 0.7rem;
 }
 
+.editor-selection-meta {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 220px;
+}
+
 .editor-help {
   margin-left: auto;
 }
@@ -652,6 +679,7 @@ textarea:focus {
   user-select: none;
   touch-action: none;
   box-shadow: 0 8px 18px rgba(31, 122, 114, 0.12);
+  z-index: 2;
 }
 
 .layout-field span {
