@@ -1,31 +1,19 @@
 {% extends "base.html" %}
 
-{% block title %}Novo Job | Sistema Vetorial{% endblock %}
+{% block title %}Novo job | StölbenVetorial{% endblock %}
 
 {% block content %}
 <section class="split-grid">
     <div class="form-shell">
-        <div class="eyebrow"><span class="ui-icon" aria-hidden="true">↺</span> Novo job</div>
-        <h1 class="section-title" style="margin-top: 0.7rem;">Criar job de geração</h1>
-        <p class="muted">Associe um Excel a um template salvo. A primeira linha do arquivo será tratada como cabeçalho.</p>
-        <p class="muted">O Excel enviado e os arquivos gerados por este job ficam disponíveis por 7 dias.</p>
+        <div class="eyebrow">Novo job</div>
+        <h1 class="section-title" style="margin-top: 0.7rem;">Criar job</h1>
         <form method="post" enctype="multipart/form-data">
             {% csrf_token %}
-            {% if form.non_field_errors %}
-                <div class="form-alert form-alert-error">
-                    <span class="ui-icon ui-icon-soft" aria-hidden="true">!</span>
-                    <div>
-                        <strong>Revise os dados enviados</strong>
-                        {{ form.non_field_errors }}
-                    </div>
-                </div>
-            {% endif %}
             <div class="form-grid">
                 {% for field in form %}
                     <div class="field-group">
                         <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                         {{ field }}
-                        {% if field.help_text %}<p class="form-hint muted">{{ field.help_text }}</p>{% endif %}
                         {{ field.errors }}
                     </div>
                 {% endfor %}
@@ -37,32 +25,17 @@
             </div>
         </form>
     </div>
-    <aside class="panel">
-        <h2 class="section-title"><span class="ui-icon" aria-hidden="true">⋄</span> Fluxo esperado</h2>
-        <ul class="list">
-            <li>Salvar o job com o Excel original.</li>
-            <li>Gerar amostra com até 3 linhas válidas.</li>
-            <li>Depois aprovar e processar o lote completo.</li>
-        </ul>
-        {% if selected_template %}
-            <div style="margin-top: 1rem;">
-                <h2 class="section-title"><span class="ui-icon" aria-hidden="true">⌘</span> Mapeamento esperado</h2>
-                <p class="muted">O cabeçalho do Excel deve conter as colunas abaixo para alimentar o template selecionado.</p>
-                {% if expected_headers %}
-                    <p class="muted">Cabeçalhos esperados: {{ expected_headers|join:", " }}</p>
-                {% endif %}
-                <ul class="list">
-                    {% for field in selected_template.fields.all %}
-                        <li>
-                            <strong>{{ field.label }}</strong><br>
-                            <span class="muted">{{ field.excel_column|default:"Sem coluna definida" }} · {{ field.get_value_type_display }} · {{ field.get_text_transform_display }}</span>
-                        </li>
-                    {% empty %}
-                        <li class="muted">Este template ainda não possui campos configurados.</li>
-                    {% endfor %}
-                </ul>
-            </div>
-        {% endif %}
-    </aside>
+    {% if selected_template %}
+        <aside class="panel">
+            <h2 class="section-title">Colunas usadas</h2>
+            <ul class="list">
+                {% for field in selected_template.fields.all %}
+                    <li><strong>{{ field.name }}</strong><br><span class="muted">Coluna {{ field.excel_column }}</span></li>
+                {% empty %}
+                    <li class="muted">Este template ainda não possui campos.</li>
+                {% endfor %}
+            </ul>
+        </aside>
+    {% endif %}
 </section>
 {% endblock %}

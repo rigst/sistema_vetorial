@@ -7,6 +7,6 @@ from .models import FontAsset
 
 @admin.register(FontAsset)
 class FontAssetAdmin(OwnedAdminMixin, admin.ModelAdmin):
-    list_display = ("family", "variant", "name", "user", "is_active", "updated_at")
-    list_filter = ("variant", "is_active")
-    search_fields = ("family", "name", "user__username")
+    list_display = ("name", "user", "is_active", "is_builtin", "updated_at")
+    list_filter = ("is_active", "is_builtin")
+    search_fields = ("name", "user__username")

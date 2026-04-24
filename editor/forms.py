@@ -1,5 +1,6 @@
-from django import forms
 import pikepdf
+from django import forms
+from django.utils.text import slugify
 
 from fonts.models import FontAsset
 
@@ -8,25 +9,44 @@ from .models import DocumentTemplate, TemplateField
 
 class DocumentTemplateForm(forms.ModelForm):
     def clean_background_pdf(self):
-        uploaded = self.cleaned_data["background_pdf"]
+        uploaded = self.cleaned_data.get("background_pdf")
+        if not uploaded:
+            return self.instance.background_pdf
         suffix = uploaded.name.lower().rsplit(".", 1)[-1] if "." in uploaded.name else ""
         if suffix != "pdf":
             raise forms.ValidationError("Envie um arquivo PDF vetorial válido para o fundo.")
         uploaded.seek(0)
         try:
-            pikepdf.Pdf.open(uploaded)
+            with pikepdf.Pdf.open(uploaded) as pdf:
+                if len(pdf.pages) != 1:
+                    raise forms.ValidationError("O template deve ter exatamente 1 página.")
         except Exception as exc:
             uploaded.seek(0)
+            if isinstance(exc, forms.ValidationError):
+                raise
             raise forms.ValidationError("Não foi possível ler este PDF. Verifique se o arquivo não está corrompido.") from exc
         uploaded.seek(0)
         return uploaded
 
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        base_slug = slugify(instance.name) or "template"
+        slug = base_slug
+        counter = 2
+        while DocumentTemplate.objects.filter(user=instance.user, slug=slug).exclude(pk=instance.pk).exists():
+            slug = f"{base_slug}-{counter}"
+            counter += 1
+        instance.slug = slug
+        instance.page_count = 1
+        if commit:
+            instance.save()
+        return instance
+
     class Meta:
         model = DocumentTemplate
-        fields = ["name", "slug", "description", "background_pdf", "status"]
+        fields = ["name", "description", "background_pdf"]
         widgets = {
             "name": forms.TextInput(attrs={"placeholder": "Ex.: Certificado Base 2026"}),
-            "slug": forms.TextInput(attrs={"placeholder": "certificado-base-2026"}),
             "description": forms.Textarea(attrs={"rows": 4, "placeholder": "Observações do template."}),
         }
 
@@ -36,50 +56,33 @@ class TemplateFieldForm(forms.ModelForm):
         model = TemplateField
         fields = [
             "name",
-            "label",
             "excel_column",
-            "order_index",
-            "page_number",
             "value_type",
-            "x",
-            "y",
-            "width",
-            "height",
             "font",
             "font_size",
-            "is_bold",
-            "is_italic",
             "text_align",
             "text_transform",
             "transform_exceptions",
             "color",
-            "letter_spacing",
             "line_height",
             "max_lines",
             "integer_min_digits",
             "integer_keep_sign",
-            "prefix",
-            "suffix",
             "empty_value",
             "trim_whitespace",
             "overflow_mode",
-            "preview_text",
         ]
         widgets = {
             "name": forms.TextInput(attrs={"placeholder": "nome"}),
-            "label": forms.TextInput(attrs={"placeholder": "Nome"}),
-            "excel_column": forms.TextInput(attrs={"placeholder": "Coluna do Excel"}),
+            "excel_column": forms.NumberInput(attrs={"placeholder": "1", "min": "1"}),
             "transform_exceptions": forms.TextInput(
                 attrs={"placeholder": "de, da, do, dos, das, e, com"}
             ),
-            "prefix": forms.TextInput(attrs={"placeholder": "Prefixo opcional"}),
-            "suffix": forms.TextInput(attrs={"placeholder": "Sufixo opcional"}),
             "empty_value": forms.TextInput(attrs={"placeholder": "Valor quando vazio"}),
-            "preview_text": forms.TextInput(attrs={"placeholder": "Texto de exemplo"}),
             "color": forms.TextInput(attrs={"placeholder": "#000000"}),
         }
 
     def __init__(self, *args, **kwargs):
         user = kwargs.pop("user")
         super().__init__(*args, **kwargs)
-        self.fields["font"].queryset = FontAsset.objects.filter(user=user, is_active=True).order_by("family", "variant")
+        self.fields["font"].queryset = FontAsset.objects.filter(user=user, is_active=True).order_by("name")

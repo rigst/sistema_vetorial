@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pikepdf
 from django.core.files.base import File
-from django.utils.text import slugify
 
 from .models import DocumentTemplate, TemplatePreviewPage
 
@@ -36,7 +35,7 @@ def _render_page_previews(template: DocumentTemplate) -> None:
         preview_page = TemplatePreviewPage(template=template, page_number=index, width=template.page_width or 0, height=template.page_height or 0)
         with preview_file.open("rb") as rendered:
             preview_page.image.save(
-                f"{slugify(template.slug)}-preview-{index}.png",
+                f"{template.storage_slug}-preview-{index}.png",
                 File(rendered),
                 save=False,
             )
@@ -44,7 +43,7 @@ def _render_page_previews(template: DocumentTemplate) -> None:
 
     if preview_files:
         with preview_files[0].open("rb") as rendered:
-            template.preview_image.save(f"{slugify(template.slug)}-preview.png", File(rendered), save=False)
+            template.preview_image.save(f"{template.storage_slug}-preview.png", File(rendered), save=False)
 
 
 def update_template_pdf_metadata(template: DocumentTemplate) -> DocumentTemplate:

@@ -41,6 +41,7 @@ class GenerationJob(OwnedModel):
     column_map = models.JSONField(default=dict, blank=True)
     zip_file = models.FileField(upload_to=job_zip_upload_to, blank=True)
     last_error = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         ordering = ["-created_at"]

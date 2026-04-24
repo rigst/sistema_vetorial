@@ -1,15 +1,14 @@
 {% extends "base.html" %}
 
-{% block title %}{{ job.name }} | Sistema Vetorial{% endblock %}
+{% block title %}{{ job.name }} | StölbenVetorial{% endblock %}
 
 {% block content %}
 <section class="hero-shell">
-    <div class="eyebrow"><span class="ui-icon" aria-hidden="true">↺</span> Job</div>
+    <div class="eyebrow">Job</div>
     <div class="section-header">
         <div>
             <h1 class="hero-title">{{ job.name }}</h1>
-            <p class="hero-copy">Acompanhe o processamento em tempo quase real, confira falhas por linha e baixe o Excel original, PDFs individuais ou o ZIP final.</p>
-            <p class="muted">Arquivos enviados e exportados neste job são mantidos por até 7 dias e depois excluídos automaticamente do servidor.</p>
+            <p class="hero-copy">Acompanhe o processamento e os arquivos gerados.</p>
         </div>
         <div class="inline-actions">
             {% if job.kind == 'preview' %}
@@ -22,7 +21,10 @@
                 {% csrf_token %}
                 <button type="submit" class="button button-secondary">Reprocessar</button>
             </form>
-            <a class="button button-secondary" href="{% url 'jobs:delete' job.pk %}">Excluir</a>
+            <form method="post" action="{% url 'jobs:delete' job.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="button button-secondary">Inativar</button>
+            </form>
             <a class="button button-secondary" href="{% url 'jobs:list' %}">Voltar</a>
         </div>
     </div>
@@ -30,7 +32,7 @@
 
 <section class="split-grid">
     <div class="panel template-meta">
-        <h2 class="section-title"><span class="ui-icon" aria-hidden="true">•</span> Resumo do job</h2>
+        <h2 class="section-title">Resumo do job</h2>
         <div class="progress-shell" style="margin-bottom: 1rem;">
             <div class="progress-bar">
                 <div class="progress-bar-fill" id="job-progress-fill" style="width: 0%;"></div>
@@ -67,7 +69,7 @@
     </div>
 
     <aside class="panel">
-        <h2 class="section-title"><span class="ui-icon" aria-hidden="true">⋄</span> Arquivos gerados</h2>
+        <h2 class="section-title">Arquivos gerados</h2>
         {% if job.column_map.headers %}
             <p class="muted" style="margin-bottom: 0.8rem;">Cabeçalhos detectados: {{ job.column_map.headers|join:", " }}</p>
         {% endif %}

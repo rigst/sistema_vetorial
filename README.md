@@ -1,71 +1,51 @@
-# Sistema Vetorial
+# StölbenVetorial
 
-Base inicial em Django para um aplicativo web de edição de templates sobre PDF vetorial e geração de PDFs finais em lote a partir de Excel.
+Sistema Django para edição visual de templates em PDF e geração de arquivos por lote a partir de Excel.
 
-## Stack inicial
+## Principais recursos
 
-- Django
-- SQLite no bootstrap
-- Celery + Redis configurados para a próxima etapa
-- openpyxl para leitura do Excel
-- ReportLab para camada vetorial de texto
-- pikepdf para composição sobre o PDF base
-- retenção automática de 7 dias para arquivos enviados e gerados
+- login com acesso visitante temporário;
+- exclusão automática dos dados do visitante ao sair;
+- templates com PDF de uma única página;
+- editor visual na mesma página, com arraste e atualização dinâmica;
+- campos configurados por nome, coluna numérica do Excel, fonte, cor e opções avançadas;
+- fontes ativas e inativas por usuário;
+- jobs com retenção automática de 7 dias;
+- storage privado com acesso restrito ao dono dos arquivos.
 
-## Estrutura atual
+## Módulos
 
-- `core`: home autenticada e componentes base
-- `fonts`: cadastro de fontes por usuário
-- `editor`: templates e campos editáveis
-- `jobs`: jobs de geração e itens por linha
-- `templates/`: layout inicial e tela de login
+- `core`: autenticação, dashboard, manual e limpeza.
+- `editor`: templates, preview do PDF e editor visual.
+- `fonts`: cadastro e inativação de fontes.
+- `jobs`: processamento de planilhas e geração de arquivos.
 
 ## Como rodar
 
 ```bash
 cd /home/rodrigo/Projetos/sistema_vetorial
 source .venv/bin/activate
-cp .env.example .env
 python manage.py migrate
 python manage.py createsuperuser
 python manage.py runserver
 ```
 
-## Processamento assíncrono
-
-Suba o Redis:
+## Processamento e limpeza
 
 ```bash
 docker compose up -d redis
-```
-
-Suba o worker Celery:
-
-```bash
 celery -A config worker -l info
-```
-
-Suba o agendador Celery Beat:
-
-```bash
 celery -A config beat -l info
 ```
 
-## Retenção de arquivos
-
-- arquivos enviados e gerados são mantidos por 7 dias;
-- após esse prazo, jobs, templates e fontes antigas são removidos automaticamente junto com seus arquivos físicos;
-- o storage é privado e os arquivos não possuem URL pública direta;
-- em produção, execute `celery worker` e `celery beat` para a limpeza diária automática;
-- como fallback operacional, você pode rodar manualmente:
+Fallback manual:
 
 ```bash
 python manage.py cleanup_expired_files
 ```
 
-## Próximos passos
+## Testes
 
-1. Refinar o editor visual com snapping e guias.
-2. Ampliar o preview com dados reais e validações tipográficas.
-3. Operar Celery e Beat em produção para processamento e limpeza automática.
-4. Fortalecer observabilidade e testes de interface.
+```bash
+.venv/bin/python manage.py test
+```

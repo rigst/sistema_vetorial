@@ -1,21 +1,25 @@
 {% extends "base.html" %}
 
-{% block title %}Entrar | Sistema Vetorial{% endblock %}
+{% block title %}Entrar | StölbenVetorial{% endblock %}
 
 {% block content %}
 <section class="auth-shell">
     <div class="form-shell">
         <div class="eyebrow">Acesso</div>
         <h1 class="section-title" style="font-size: 2rem; margin-top: 0.7rem;">Entrar</h1>
-        <p class="muted">Ambiente inicial do editor vetorial e da geração de PDFs por lote.</p>
+        <p class="muted">Entre com seu usuário e senha para acessar o sistema.</p>
         <form method="post" class="auth-form">
-        {% csrf_token %}
+            {% csrf_token %}
             {{ form.as_p }}
             <button type="submit">Entrar</button>
         </form>
-        <p class="muted" style="margin-top: 1rem;">
-            <a class="link-action" href="{% url 'password_reset' %}">Esqueci minha senha</a>
-        </p>
+        <div class="visitor-box">
+            <p class="muted">Quer apenas testar a interface? O acesso visitante cria um perfil temporário e exclui templates, fontes e jobs ao sair.</p>
+            <form method="post">
+                {% csrf_token %}
+                <button type="submit" name="entrar_visitante" value="1" class="button button-secondary">Entrar como visitante</button>
+            </form>
+        </div>
     </div>
 </section>
 {% endblock %}

@@ -1,17 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Painel | Sistema Vetorial{% endblock %}
+{% block title %}Dashboard | StölbenVetorial{% endblock %}
 
 {% block content %}
 <section class="hero-shell">
-    <div class="eyebrow">Projeto inicial</div>
-    <h1 class="hero-title">Pipeline base para templates vetoriais, preview e geração por lote.</h1>
-    <p class="hero-copy">
-        Esta primeira implementação já deixa o domínio central preparado para fontes, templates editáveis,
-        upload de Excel e jobs de geração com rastreamento por usuário.
-    </p>
+    <div class="eyebrow">Dashboard</div>
+    <h1 class="hero-title">Seus templates e jobs mais recentes.</h1>
     <div class="form-alert">
-        <span class="ui-icon ui-icon-soft" aria-hidden="true">i</span>
         <div>
             <strong>Retenção automática de 7 dias</strong>
             Arquivos enviados e gerados no sistema são mantidos por até 7 dias e depois removidos automaticamente do servidor para poupar espaço.
@@ -23,17 +18,17 @@
     <article class="panel">
         <p class="muted">Templates</p>
         <h2 class="stat-value">{{ template_count }}</h2>
-        <p class="muted">Modelos vetoriais configurados para o usuário atual.</p>
-    </article>
-    <article class="panel">
-        <p class="muted">Fontes</p>
-        <h2 class="stat-value">{{ font_count }}</h2>
-        <p class="muted">Famílias e variantes prontas para uso no editor.</p>
+        <p class="muted">Templates ativos.</p>
     </article>
     <article class="panel">
         <p class="muted">Jobs</p>
         <h2 class="stat-value">{{ job_count }}</h2>
-        <p class="muted">Execuções salvas para reprocessamento e download futuro.</p>
+        <p class="muted">Jobs ativos.</p>
+    </article>
+    <article class="panel">
+        <p class="muted">Fontes ativas</p>
+        <h2 class="stat-value">{{ font_count }}</h2>
+        <p class="muted">Disponíveis no editor.</p>
     </article>
 </section>
 
@@ -44,7 +39,7 @@
             {% for template in recent_templates %}
                 <li>
                     <strong>{{ template.name }}</strong><br>
-                    <span class="muted">{{ template.get_status_display }} · v{{ template.version }}</span>
+                    <span class="muted">{{ template.updated_at|date:"d/m/Y H:i" }}</span>
                 </li>
             {% empty %}
                 <li class="muted">Nenhum template cadastrado ainda.</li>
@@ -62,14 +57,6 @@
             {% empty %}
                 <li class="muted">Nenhum job gerado ainda.</li>
             {% endfor %}
-        </ul>
-    </article>
-    <article class="panel">
-        <h2 class="section-title">Próximos passos</h2>
-        <ul class="list">
-            <li>Operar Celery e Celery Beat em produção com Redis persistente.</li>
-            <li>Ampliar testes de interface e QA manual em desktop e mobile.</li>
-            <li>Adicionar guias avançadas e edição inline mais rica no canvas.</li>
         </ul>
     </article>
 </section>

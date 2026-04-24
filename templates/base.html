@@ -4,15 +4,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Sistema Vetorial{% endblock %}</title>
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20260423-01">
+    <title>{% block title %}StölbenVetorial{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20260423-02">
 </head>
 <body>
     <header class="site-header">
         <div class="container">
             <nav class="nav">
                 <div class="nav-top">
-                    <a href="{% url 'core:home' %}" class="brand">Sistema<span>Vetorial</span></a>
+                    <a href="{% url 'core:home' %}" class="brand">Stölben<span>Vetorial</span></a>
 
                     {% if user.is_authenticated %}
                         <button class="nav-toggle js-nav-toggle" type="button" aria-expanded="false" aria-controls="header-user-meta header-main-links">
@@ -24,8 +24,9 @@
 
                         <div id="header-user-meta" class="header-user-meta">
                             <div class="header-user-info">
-                                <span class="header-user-greeting">Olá, {{ user.username }}</span>
-                                <span class="user-role">Editor vetorial</span>
+                                <span class="header-user-greeting">{{ app_display_name }}</span>
+                                <span class="user-separator" aria-hidden="true">|</span>
+                                <span class="user-role">{{ app_role_label }}</span>
                             </div>
                             <div class="header-user-actions">
                                 <form action="{% url 'logout' %}" method="post">
@@ -40,10 +41,11 @@
                 {% if user.is_authenticated %}
                     <div id="header-main-links" class="nav-bottom">
                         <ul class="nav-links">
-                            <li><a href="{% url 'core:home' %}" {% if request.resolver_match.namespace == 'core' %}class="active"{% endif %}>Painel</a></li>
+                            <li><a href="{% url 'core:home' %}" {% if request.resolver_match.namespace == 'core' and request.resolver_match.url_name == 'home' %}class="active"{% endif %}>Dashboard</a></li>
                             <li><a href="{% url 'editor:list' %}" {% if request.resolver_match.namespace == 'editor' %}class="active"{% endif %}>Templates</a></li>
                             <li><a href="{% url 'fonts:list' %}" {% if request.resolver_match.namespace == 'fonts' %}class="active"{% endif %}>Fontes</a></li>
                             <li><a href="{% url 'jobs:list' %}" {% if request.resolver_match.namespace == 'jobs' %}class="active"{% endif %}>Jobs</a></li>
+                            <li><a href="{% url 'core:manual' %}" {% if request.resolver_match.namespace == 'core' and request.resolver_match.url_name == 'manual' %}class="active"{% endif %}>Manual</a></li>
                         </ul>
                     </div>
                 {% endif %}
@@ -57,9 +59,6 @@
                 <ul class="flash-list">
                     {% for message in messages %}
                         <li class="flash-message {% if message.tags %}flash-{{ message.tags }}{% endif %}">
-                            <span class="ui-icon ui-icon-soft" aria-hidden="true">
-                                {% if "error" in message.tags %}!{% elif "success" in message.tags %}✓{% elif "warning" in message.tags %}•{% else %}i{% endif %}
-                            </span>
                             <span>{{ message }}</span>
                         </li>
                     {% endfor %}
@@ -76,7 +75,6 @@
       const meta = document.querySelector("#header-user-meta");
       const links = document.querySelector("#header-main-links");
       if (!toggle || !meta || !links) return;
-
       toggle.addEventListener("click", () => {
         const expanded = toggle.getAttribute("aria-expanded") === "true";
         toggle.setAttribute("aria-expanded", String(!expanded));
@@ -85,5 +83,6 @@
       });
     })();
     </script>
+    {% block extra_js %}{% endblock %}
 </body>
 </html>

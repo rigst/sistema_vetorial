@@ -15,7 +15,7 @@ class GenerationItemInline(admin.TabularInline):
 @admin.register(GenerationJob)
 class GenerationJobAdmin(OwnedAdminMixin, admin.ModelAdmin):
     owner_related_fields = {"template": DocumentTemplate}
-    list_display = ("name", "user", "template", "status", "processed_rows", "total_rows", "updated_at")
-    list_filter = ("status",)
+    list_display = ("name", "user", "template", "status", "processed_rows", "total_rows", "is_active", "updated_at")
+    list_filter = ("status", "is_active")
     search_fields = ("name", "user__username", "template__name")
     inlines = [GenerationItemInline]

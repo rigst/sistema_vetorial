@@ -1,47 +1,67 @@
 {% extends "base.html" %}
 
-{% block title %}Template | Sistema Vetorial{% endblock %}
+{% block title %}{% if form.instance.pk %}Editar template{% else %}Novo template{% endif %} | StölbenVetorial{% endblock %}
 
 {% block content %}
-<section class="split-grid">
+<section class="split-grid split-grid-wide">
     <div class="form-shell">
-        <div class="eyebrow"><span class="ui-icon" aria-hidden="true">□</span> Template</div>
+        <div class="eyebrow">Template</div>
         <h1 class="section-title" style="margin-top: 0.7rem;">{% if form.instance.pk %}Editar template{% else %}Criar template{% endif %}</h1>
-        <p class="muted">Cadastre a base vetorial do documento e os metadados principais antes de entrar no editor visual.</p>
-        <form method="post" enctype="multipart/form-data">
+        <form method="post" enctype="multipart/form-data" id="template-form">
             {% csrf_token %}
-            {% if form.non_field_errors %}
-                <div class="form-alert form-alert-error">
-                    <span class="ui-icon ui-icon-soft" aria-hidden="true">!</span>
-                    <div>
-                        <strong>Revise o PDF enviado</strong>
-                        {{ form.non_field_errors }}
-                    </div>
-                </div>
-            {% endif %}
             <div class="form-grid">
                 {% for field in form %}
                     <div class="field-group">
                         <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                         {{ field }}
-                        {% if field.help_text %}<p class="form-hint muted">{{ field.help_text }}</p>{% endif %}
                         {{ field.errors }}
                     </div>
                 {% endfor %}
             </div>
             <div class="inline-actions">
                 <button type="submit">Salvar template</button>
+                {% if form.instance.pk %}
+                    <a class="button button-secondary" href="{% url 'editor:detail' form.instance.pk %}">Abrir editor visual</a>
+                {% endif %}
                 <a class="button button-secondary" href="{% url 'editor:list' %}">Voltar</a>
             </div>
         </form>
     </div>
-    <aside class="panel">
-        <h2 class="section-title"><span class="ui-icon" aria-hidden="true">⋄</span> O que vem depois</h2>
-        <ul class="list">
-            <li>Adicionar campos editáveis sobre o fundo vetorial.</li>
-            <li>Configurar fontes, tamanhos, alinhamento e overflow.</li>
-            <li>Testar com as 3 primeiras linhas válidas do Excel.</li>
-        </ul>
-    </aside>
+
+    <div class="panel preview-upload-panel">
+        <h2 class="section-title">Pré-visualização</h2>
+        <div class="upload-preview-frame">
+            {% if template_obj.preview_image %}
+                <img id="background-upload-preview" src="{% url 'editor:preview-page' template_obj.pk 1 %}" alt="Pré-visualização atual do template">
+            {% else %}
+                <embed id="background-upload-preview" src="" type="application/pdf">
+            {% endif %}
+        </div>
+        {% if template_obj.page_width and template_obj.page_height %}
+            <p class="muted">{{ page_width_cm }} cm × {{ page_height_cm }} cm</p>
+        {% else %}
+            <p class="muted">Ao selecionar um PDF válido de uma página, a pré-visualização é atualizada imediatamente nesta tela.</p>
+        {% endif %}
+    </div>
 </section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(() => {
+  const input = document.getElementById("id_background_pdf");
+  const preview = document.getElementById("background-upload-preview");
+  if (!input || !preview) return;
+  input.addEventListener("change", () => {
+    const [file] = input.files || [];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    if (preview.tagName === "IMG") {
+      preview.src = url;
+      return;
+    }
+    preview.setAttribute("src", url);
+  });
+})();
+</script>
 {% endblock %}

@@ -1,15 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Jobs | Sistema Vetorial{% endblock %}
+{% block title %}Jobs | StölbenVetorial{% endblock %}
 
 {% block content %}
 <section class="hero-shell">
-    <div class="eyebrow">Geração por lote</div>
     <div class="section-header">
         <div>
-            <h1 class="hero-title">Execuções salvas por usuário.</h1>
-            <p class="hero-copy">Cada job guarda o Excel enviado, o template usado e o histórico de processamento linha a linha.</p>
-            <p class="muted">Os arquivos deste job ficam disponíveis por 7 dias e depois são removidos automaticamente do servidor.</p>
+            <div class="eyebrow">Jobs</div>
+            <h1 class="hero-title">Jobs</h1>
         </div>
         <a class="button" href="{% url 'jobs:create' %}">Novo job</a>
     </div>
@@ -18,15 +16,7 @@
             <label for="job-search">Buscar</label>
             <input id="job-search" type="text" name="q" value="{{ query }}" placeholder="Nome do job ou template">
         </div>
-        <div class="field-group">
-            <label for="job-status">Status</label>
-            <select id="job-status" name="status">
-                <option value="">Todos</option>
-                {% for value, label in status_choices %}
-                    <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-        </div>
+        {% if show_inactive %}<input type="hidden" name="inativos" value="1">{% endif %}
         <div class="field-group" style="align-self:end;">
             <button type="submit">Filtrar</button>
         </div>
@@ -43,7 +33,6 @@
                         <th>Template</th>
                         <th>Status</th>
                         <th>Linhas</th>
-                        <th>Atualizado</th>
                         <th>Ações</th>
                     </tr>
                 </thead>
@@ -52,16 +41,18 @@
                         <tr>
                             <td>{{ job.name }}</td>
                             <td>{{ job.template.name }}</td>
-                            <td><span class="status-pill status-{{ job.status }}">{{ job.get_status_display }}</span></td>
+                            <td>{{ job.get_status_display }}</td>
                             <td>{{ job.processed_rows }}/{{ job.total_rows }}</td>
-                            <td>{{ job.updated_at|date:"d/m/Y H:i" }}</td>
-                            <td class="inline-actions">
-                                <a class="link-action" href="{% url 'jobs:detail' job.pk %}">Abrir</a>
-                                <form method="post" action="{% url 'jobs:rerun' job.pk %}" style="display:inline;">
+                            <td class="inline-actions icon-actions">
+                                <a class="icon-button" href="{% url 'jobs:detail' job.pk %}" title="Abrir" aria-label="Abrir">👁</a>
+                                <form method="post" action="{% url 'jobs:rerun' job.pk %}">
                                     {% csrf_token %}
-                                    <button type="submit" class="link-action" style="background:none;border:0;padding:0;box-shadow:none;color:var(--accent);">Reprocessar</button>
+                                    <button type="submit" class="icon-button" title="Reprocessar" aria-label="Reprocessar">↻</button>
                                 </form>
-                                <a class="link-action" href="{% url 'jobs:delete' job.pk %}">Excluir</a>
+                                <form method="post" action="{% url 'jobs:delete' job.pk %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="icon-button icon-button-danger" title="Excluir" aria-label="Excluir">🗑</button>
+                                </form>
                             </td>
                         </tr>
                     {% endfor %}
@@ -70,10 +61,16 @@
         </div>
     {% else %}
         <div class="empty-state">
-            <h2 class="section-title">Nenhum job criado</h2>
-            <p class="muted">Depois do template ficar pronto, os lotes de geração aparecerão aqui.</p>
+            <h2 class="section-title">Nenhum job encontrado</h2>
         </div>
     {% endif %}
 </section>
+<div class="subtle-link-row">
+    {% if show_inactive %}
+        <a href="{% url 'jobs:list' %}" class="subtle-link">Mostrar ativos</a>
+    {% else %}
+        <a href="{% url 'jobs:list' %}?inativos=1" class="subtle-link">Mostrar inativos</a>
+    {% endif %}
+</div>
 {% include "partials/pagination.html" %}
 {% endblock %}

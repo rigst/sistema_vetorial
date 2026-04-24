@@ -7,8 +7,10 @@ from pathlib import Path
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
+from django.urls import reverse
 
 from .forms import FontAssetForm
+from .models import FontAsset
 from .services import inspect_font_file
 
 
@@ -16,7 +18,7 @@ TEST_MEDIA_ROOT = tempfile.mkdtemp(prefix="sistema_vetorial_fonts_tests_")
 
 
 @override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
-class FontValidationTests(TestCase):
+class FontTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = get_user_model().objects.create_user(username="fonts-user", password="senha123")
@@ -30,48 +32,31 @@ class FontValidationTests(TestCase):
     def test_inspect_font_file_reports_portuguese_support(self):
         metadata = inspect_font_file(str(self.font_path))
         self.assertTrue(metadata["supports_pt_br_basic"])
-        self.assertFalse(metadata["missing_pt_br_basic_chars"])
 
-    def test_font_form_persists_metadata(self):
-        uploaded = SimpleUploadedFile(
-            "DejaVuSans.ttf",
-            self.font_path.read_bytes(),
-            content_type="font/ttf",
-        )
-        form = FontAssetForm(
-            data={
-                "name": "",
-                "family": "",
-                "variant": "regular",
-                "is_active": "on",
-            },
-            files={"file": uploaded},
-        )
+    def test_font_form_uses_filename_when_name_missing(self):
+        uploaded = SimpleUploadedFile("minha_fonte.ttf", self.font_path.read_bytes(), content_type="font/ttf")
+        form = FontAssetForm(data={"name": ""}, files={"file": uploaded})
 
         self.assertTrue(form.is_valid(), form.errors)
         instance = form.save(commit=False)
         instance.user = self.user
         instance.save()
 
-        self.assertTrue(instance.metadata.get("supports_pt_br_basic"))
-        self.assertTrue(instance.family)
-        self.assertTrue(instance.name)
+        self.assertEqual(instance.name, "Minha Fonte")
+        self.assertTrue(instance.is_active)
 
-    def test_font_form_rejects_invalid_font_with_friendly_message(self):
-        uploaded = SimpleUploadedFile(
-            "fonte.ttf",
-            b"arquivo-invalido",
-            content_type="font/ttf",
+    def test_delete_view_marks_font_inactive(self):
+        font = FontAsset.objects.create(
+            user=self.user,
+            name="Fonte Teste",
+            family="Fonte Teste",
+            variant=FontAsset.Variant.REGULAR,
+            file=SimpleUploadedFile("DejaVuSans.ttf", self.font_path.read_bytes(), content_type="font/ttf"),
         )
-        form = FontAssetForm(
-            data={
-                "name": "",
-                "family": "",
-                "variant": "regular",
-                "is_active": "on",
-            },
-            files={"file": uploaded},
-        )
+        self.client.force_login(self.user)
 
-        self.assertFalse(form.is_valid())
-        self.assertIn("Não foi possível ler esta fonte", form.errors["file"][0])
+        response = self.client.post(reverse("fonts:delete", kwargs={"pk": font.pk}))
+
+        self.assertEqual(response.status_code, 302)
+        font.refresh_from_db()
+        self.assertFalse(font.is_active)

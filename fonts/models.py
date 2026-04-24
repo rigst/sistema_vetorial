@@ -19,6 +19,7 @@ class FontAsset(OwnedModel):
     file = models.FileField(upload_to=font_upload_to)
     variant = models.CharField(max_length=20, choices=Variant.choices, default=Variant.REGULAR)
     is_active = models.BooleanField(default=True)
+    is_builtin = models.BooleanField(default=False)
     metadata = models.JSONField(default=dict, blank=True)
 
     class Meta:

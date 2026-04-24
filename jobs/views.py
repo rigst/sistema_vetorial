@@ -7,7 +7,7 @@ from django.db.models import Q
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.views import View
-from django.views.generic import CreateView, DeleteView, DetailView, ListView
+from django.views.generic import CreateView, DetailView, ListView
 
 from core.mixins import UserOwnedQuerysetMixin
 from django.conf import settings
@@ -27,18 +27,16 @@ class GenerationJobListView(UserOwnedQuerysetMixin, ListView):
     def get_queryset(self):
         queryset = super().get_queryset().select_related("template")
         query = self.request.GET.get("q", "").strip()
-        status = self.request.GET.get("status", "").strip()
+        show_inactive = self.request.GET.get("inativos") == "1"
+        queryset = queryset.filter(is_active=not show_inactive)
         if query:
             queryset = queryset.filter(Q(name__icontains=query) | Q(template__name__icontains=query))
-        if status:
-            queryset = queryset.filter(status=status)
         return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["query"] = self.request.GET.get("q", "").strip()
-        context["status_filter"] = self.request.GET.get("status", "").strip()
-        context["status_choices"] = GenerationJob.Status.choices
+        context["show_inactive"] = self.request.GET.get("inativos") == "1"
         return context
 
 
@@ -94,14 +92,14 @@ class GenerationJobDetailView(UserOwnedQuerysetMixin, DetailView):
     context_object_name = "job"
 
 
-class GenerationJobDeleteView(UserOwnedQuerysetMixin, DeleteView):
-    model = GenerationJob
-    template_name = "jobs/job_confirm_delete.html"
-    success_url = reverse_lazy("jobs:list")
-
-    def delete(self, request, *args, **kwargs):
-        messages.success(request, "Job removido com sucesso.")
-        return super().delete(request, *args, **kwargs)
+class GenerationJobDeleteView(LoginRequiredMixin, View):
+    def post(self, request, *args, **kwargs):
+        job = GenerationJob.objects.filter(pk=kwargs["pk"], user=request.user).first()
+        if job:
+            job.is_active = False
+            job.save(update_fields=["is_active", "updated_at"])
+            messages.success(request, "Job movido para inativos.")
+        return redirect("jobs:list")
 
 
 class PromotePreviewJobView(LoginRequiredMixin, View):

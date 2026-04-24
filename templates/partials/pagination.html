@@ -1,11 +1,11 @@
 {% if page_obj and page_obj.paginator.num_pages > 1 %}
     <nav class="inline-actions" aria-label="Paginação" style="margin-top: 1rem;">
         {% if page_obj.has_previous %}
-            <a class="button button-secondary" href="?{% if query %}q={{ query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter|urlencode }}&{% endif %}page={{ page_obj.previous_page_number }}">Anterior</a>
+            <a class="button button-secondary" href="?{% if query %}q={{ query|urlencode }}&{% endif %}{% if show_inactive %}inativos=1&{% endif %}{% if status_filter %}status={{ status_filter|urlencode }}&{% endif %}page={{ page_obj.previous_page_number }}">Anterior</a>
         {% endif %}
         <span class="muted">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
         {% if page_obj.has_next %}
-            <a class="button button-secondary" href="?{% if query %}q={{ query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter|urlencode }}&{% endif %}page={{ page_obj.next_page_number }}">Próxima</a>
+            <a class="button button-secondary" href="?{% if query %}q={{ query|urlencode }}&{% endif %}{% if show_inactive %}inativos=1&{% endif %}{% if status_filter %}status={{ status_filter|urlencode }}&{% endif %}page={{ page_obj.next_page_number }}">Próxima</a>
         {% endif %}
     </nav>
 {% endif %}

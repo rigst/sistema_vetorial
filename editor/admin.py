@@ -24,7 +24,7 @@ class TemplatePreviewPageInline(admin.TabularInline):
 
 @admin.register(DocumentTemplate)
 class DocumentTemplateAdmin(OwnedAdminMixin, admin.ModelAdmin):
-    list_display = ("name", "user", "status", "version", "page_count", "updated_at")
-    list_filter = ("status",)
+    list_display = ("name", "user", "page_count", "is_active", "updated_at")
+    list_filter = ("is_active",)
     search_fields = ("name", "slug", "user__username")
     inlines = [TemplateFieldInline, TemplatePreviewPageInline]

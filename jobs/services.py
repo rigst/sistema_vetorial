@@ -166,7 +166,7 @@ def format_field_value(field: TemplateField, raw_value: str) -> str:
     elif field.text_transform == TemplateField.TextTransform.TITLE_SMART:
         value = _smart_title(value, field.transform_exceptions)
 
-    return _normalize_unicode_text(f"{field.prefix or ''}{value}{field.suffix or ''}")
+    return _normalize_unicode_text(value)
 
 
 def load_excel_rows(excel_path: str):
@@ -182,9 +182,10 @@ def load_excel_rows(excel_path: str):
         payload = {}
         has_value = False
         for idx, header in enumerate(headers):
-            key = header or f"coluna_{idx + 1}"
             value = _normalize_value(row[idx] if idx < len(row) else "")
-            payload[key] = value
+            payload[f"coluna_{idx + 1}"] = value
+            if header:
+                payload[header] = value
             has_value = has_value or bool(value)
         if has_value:
             data_rows.append((row_index, payload))
@@ -192,7 +193,7 @@ def load_excel_rows(excel_path: str):
 
 
 def get_template_expected_headers(job: GenerationJob) -> list[str]:
-    return [field.excel_column for field in job.template.fields.all() if field.excel_column]
+    return [f"Coluna {field.excel_column}" for field in job.template.fields.all() if field.excel_column]
 
 
 def _fit_text_lines(text: str, font_name: str, font_size: float, max_width: float, mode: str, max_lines: int):
@@ -286,17 +287,16 @@ def _build_overlay_pdf(job: GenerationJob, payload: dict) -> bytes:
     page_height = float(job.template.page_height or 0)
     pdf_canvas = canvas.Canvas(buffer, pagesize=(page_width, page_height))
 
-    fields = list(job.template.fields.select_related("font").order_by("page_number", "order_index"))
-    total_pages = max(job.template.page_count, 1)
-
-    for page_number in range(1, total_pages + 1):
-        for field in fields:
-            if field.page_number != page_number:
-                continue
-            raw_value = payload.get(field.excel_column) or payload.get(field.label) or payload.get(field.name) or ""
-            value = format_field_value(field, raw_value)
-            _draw_field(pdf_canvas, field, value)
-        pdf_canvas.showPage()
+    fields = list(job.template.fields.select_related("font").order_by("order_index", "id"))
+    for field in fields:
+        raw_value = ""
+        if field.excel_column and str(field.excel_column).isdigit():
+            raw_value = payload.get(f"coluna_{int(field.excel_column)}", "")
+        if not raw_value:
+            raw_value = payload.get(field.name) or field.empty_value or field.name
+        value = format_field_value(field, raw_value)
+        _draw_field(pdf_canvas, field, value)
+    pdf_canvas.showPage()
     pdf_canvas.save()
     return buffer.getvalue()
 
@@ -371,7 +371,13 @@ def process_job(job: GenerationJob) -> GenerationJob:
         return job
 
     expected_headers = get_template_expected_headers(job)
-    missing_headers = [header for header in expected_headers if header not in headers]
+    max_column = len(headers)
+    missing_headers = []
+    for field in job.template.fields.all():
+        if not field.excel_column or not str(field.excel_column).isdigit():
+            continue
+        if int(field.excel_column) > max_column:
+            missing_headers.append(f"Coluna {field.excel_column}")
 
     limit = 3 if job.kind == GenerationJob.Kind.PREVIEW else len(data_rows)
     selected_rows = data_rows[:limit]

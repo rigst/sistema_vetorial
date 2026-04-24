@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Visualizar {{ template_obj.name }} | StölbenVetorial{% endblock %}
+
+{% block content %}
+<section class="hero-shell">
+    <div class="section-header">
+        <div>
+            <div class="eyebrow">Visualização</div>
+            <h1 class="hero-title">{{ template_obj.name }}</h1>
+        </div>
+        <a class="button button-secondary" href="{% url 'editor:update' template_obj.pk %}">Editar</a>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="preview-stage preview-stage-large" id="template-preview-stage" data-page-width="{{ template_obj.page_width|default:0 }}" data-page-height="{{ template_obj.page_height|default:0 }}">
+        {% if preview_pages %}
+            <img class="stage-background" src="{% url 'editor:preview-page' template_obj.pk 1 %}" alt="Pré-visualização do template">
+        {% endif %}
+    </div>
+</section>
+{{ field_json|json_script:"template-preview-data" }}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(() => {
+  const stage = document.getElementById("template-preview-stage");
+  if (!stage) return;
+  const fields = JSON.parse(document.getElementById("template-preview-data").textContent);
+  const pageWidth = Number(stage.dataset.pageWidth || 1);
+  const pageHeight = Number(stage.dataset.pageHeight || 1);
+  const render = () => {
+    stage.querySelectorAll(".layout-field").forEach((node) => node.remove());
+    const scale = stage.clientWidth / pageWidth;
+    fields.forEach((field) => {
+      const node = document.createElement("div");
+      node.className = "layout-field layout-field-static";
+      node.style.left = `${field.x * scale}px`;
+      node.style.top = `${(pageHeight - field.y - field.height) * scale}px`;
+      node.style.width = `${Math.max(field.width * scale, 40)}px`;
+      node.style.height = `${Math.max(field.height * scale, 24)}px`;
+      node.style.color = field.color;
+      node.style.fontSize = `${Math.max(field.font_size * scale, 12)}px`;
+      node.style.lineHeight = String(field.line_height);
+      node.style.textAlign = field.text_align;
+      node.textContent = field.preview_value;
+      stage.appendChild(node);
+    });
+  };
+  window.addEventListener("resize", render);
+  render();
+})();
+</script>
+{% endblock %}

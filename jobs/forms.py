@@ -44,20 +44,26 @@ class GenerationJobForm(forms.ModelForm):
         user = kwargs.pop("user")
         template_id = kwargs.pop("template_id", None)
         super().__init__(*args, **kwargs)
-        self.fields["template"].queryset = DocumentTemplate.objects.filter(user=user).order_by("name")
+        self.fields["template"].queryset = DocumentTemplate.objects.filter(user=user, is_active=True).order_by("name")
         if template_id:
             self.fields["template"].initial = template_id
 
     def clean(self):
         cleaned = super().clean()
         template = cleaned.get("template")
-        headers = getattr(self, "_uploaded_headers", None)
+        headers = getattr(self, "_uploaded_headers", []) or []
         if template and headers:
-            expected = [field.excel_column for field in template.fields.all() if field.excel_column]
-            missing = [header for header in expected if header not in headers]
-            if missing:
+            invalid_columns = []
+            max_column = len(headers)
+            for field in template.fields.all():
+                if not field.excel_column or not str(field.excel_column).isdigit():
+                    continue
+                column_number = int(field.excel_column)
+                if column_number < 1 or column_number > max_column:
+                    invalid_columns.append(f"{field.name} -> coluna {column_number}")
+            if invalid_columns:
                 raise forms.ValidationError(
-                    "O Excel não possui todos os cabeçalhos esperados pelo template. Faltando: "
-                    + ", ".join(missing)
+                    "O Excel não possui todas as colunas numéricas esperadas pelo template: "
+                    + ", ".join(invalid_columns)
                 )
         return cleaned

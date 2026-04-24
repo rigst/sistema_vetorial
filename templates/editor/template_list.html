@@ -1,31 +1,22 @@
 {% extends "base.html" %}
 
-{% block title %}Templates | Sistema Vetorial{% endblock %}
+{% block title %}Templates | StölbenVetorial{% endblock %}
 
 {% block content %}
 <section class="hero-shell">
-    <div class="eyebrow"><span class="ui-icon" aria-hidden="true">□</span> Templates vetoriais</div>
     <div class="section-header">
         <div>
-            <h1 class="hero-title">Modelos prontos para edição visual.</h1>
-            <p class="hero-copy">Cada template armazena o PDF de fundo, as dimensões da página e as regras tipográficas que serão reaplicadas em lote.</p>
+            <div class="eyebrow">Templates</div>
+            <h1 class="hero-title">Templates</h1>
         </div>
         <a class="button" href="{% url 'editor:create' %}">Novo template</a>
     </div>
     <form method="get" class="form-grid">
         <div class="field-group">
             <label for="template-search">Buscar</label>
-            <input id="template-search" type="text" name="q" value="{{ query }}" placeholder="Nome, slug ou descrição">
+            <input id="template-search" type="text" name="q" value="{{ query }}" placeholder="Nome do template">
         </div>
-        <div class="field-group">
-            <label for="template-status">Status</label>
-            <select id="template-status" name="status">
-                <option value="">Todos</option>
-                {% for value, label in status_choices %}
-                    <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-        </div>
+        {% if show_inactive %}<input type="hidden" name="inativos" value="1">{% endif %}
         <div class="field-group" style="align-self:end;">
             <button type="submit">Filtrar</button>
         </div>
@@ -39,9 +30,6 @@
                 <thead>
                     <tr>
                         <th>Nome</th>
-                        <th>Status</th>
-                        <th>Páginas</th>
-                        <th>Versão</th>
                         <th>Atualizado</th>
                         <th>Ações</th>
                     </tr>
@@ -50,16 +38,17 @@
                     {% for template in templates %}
                         <tr>
                             <td>{{ template.name }}</td>
-                            <td><span class="status-pill status-{{ template.status }}">{{ template.get_status_display }}</span></td>
-                            <td>{{ template.page_count }}</td>
-                            <td>v{{ template.version }}</td>
                             <td>{{ template.updated_at|date:"d/m/Y H:i" }}</td>
-                            <td class="inline-actions">
-                                <a class="link-action" href="{% url 'editor:detail' template.pk %}">Abrir</a>
-                                <a class="link-action" href="{% url 'editor:update' template.pk %}">Editar</a>
-                                <form method="post" action="{% url 'editor:duplicate' template.pk %}" style="display:inline;">
+                            <td class="inline-actions icon-actions">
+                                <a class="icon-button" href="{% url 'editor:preview' template.pk %}" title="Visualizar" aria-label="Visualizar">👁</a>
+                                <a class="icon-button" href="{% url 'editor:update' template.pk %}" title="Editar" aria-label="Editar">✎</a>
+                                <form method="post" action="{% url 'editor:duplicate' template.pk %}">
                                     {% csrf_token %}
-                                    <button type="submit" class="link-action" style="background:none;border:0;padding:0;box-shadow:none;color:var(--accent);">Duplicar</button>
+                                    <button type="submit" class="icon-button" title="Duplicar" aria-label="Duplicar">⧉</button>
+                                </form>
+                                <form method="post" action="{% url 'editor:delete' template.pk %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="icon-button icon-button-danger" title="Excluir" aria-label="Excluir">🗑</button>
                                 </form>
                             </td>
                         </tr>
@@ -69,16 +58,17 @@
         </div>
     {% else %}
         <div class="empty-state">
-            <h2 class="section-title">Nenhum template criado</h2>
-            <p class="muted">Comece carregando um PDF vetorial de fundo e definindo o primeiro template.</p>
+            <h2 class="section-title">Nenhum template encontrado</h2>
+            <p class="muted">Crie seu primeiro template para começar.</p>
         </div>
     {% endif %}
 </section>
-{% if templates %}
-    <section class="panel" style="margin-top: 1rem;">
-        <h2 class="section-title"><span class="ui-icon" aria-hidden="true">⋄</span> Uso recomendado</h2>
-        <p class="muted">Abra o template, confira a prévia textual, ajuste o layout no editor visual e só então gere a amostra com as primeiras linhas do Excel.</p>
-    </section>
-{% endif %}
+<div class="subtle-link-row">
+    {% if show_inactive %}
+        <a href="{% url 'editor:list' %}" class="subtle-link">Mostrar ativos</a>
+    {% else %}
+        <a href="{% url 'editor:list' %}?inativos=1" class="subtle-link">Mostrar inativos</a>
+    {% endif %}
+</div>
 {% include "partials/pagination.html" %}
 {% endblock %}

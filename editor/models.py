@@ -5,41 +5,39 @@ from fonts.models import FontAsset
 
 
 def background_upload_to(instance: "DocumentTemplate", filename: str) -> str:
-    return f"users/{instance.user_id}/templates/{instance.slug}/background/{filename}"
+    return f"users/{instance.user_id}/templates/{instance.storage_slug}/background/{filename}"
 
 
 def preview_upload_to(instance: "DocumentTemplate", filename: str) -> str:
-    return f"users/{instance.user_id}/templates/{instance.slug}/preview/{filename}"
+    return f"users/{instance.user_id}/templates/{instance.storage_slug}/preview/{filename}"
 
 
 def preview_page_upload_to(instance: "TemplatePreviewPage", filename: str) -> str:
-    return f"users/{instance.template.user_id}/templates/{instance.template.slug}/preview_pages/{filename}"
+    return f"users/{instance.template.user_id}/templates/{instance.template.storage_slug}/preview_pages/{filename}"
 
 
 class DocumentTemplate(OwnedModel):
-    class Status(models.TextChoices):
-        DRAFT = "draft", "Rascunho"
-        READY = "ready", "Pronto"
-        ARCHIVED = "archived", "Arquivado"
-
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255)
     description = models.TextField(blank=True)
     background_pdf = models.FileField(upload_to=background_upload_to)
     preview_image = models.ImageField(upload_to=preview_upload_to, blank=True)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
     page_width = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     page_height = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     page_count = models.PositiveIntegerField(default=1)
-    version = models.PositiveIntegerField(default=1)
     editor_state = models.JSONField(default=dict, blank=True)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         ordering = ["name", "-updated_at"]
-        unique_together = ("user", "slug", "version")
+        unique_together = ("user", "slug")
 
     def __str__(self) -> str:
         return self.name
+
+    @property
+    def storage_slug(self) -> str:
+        return self.slug or f"template-{self.pk or 'novo'}"
 
 
 class TemplateField(TimeStampedModel):
@@ -67,7 +65,6 @@ class TemplateField(TimeStampedModel):
 
     template = models.ForeignKey(DocumentTemplate, on_delete=models.CASCADE, related_name="fields")
     name = models.CharField(max_length=100)
-    label = models.CharField(max_length=255)
     excel_column = models.CharField(max_length=255, blank=True)
     order_index = models.PositiveIntegerField(default=0)
     page_number = models.PositiveIntegerField(default=1)
@@ -78,19 +75,14 @@ class TemplateField(TimeStampedModel):
     height = models.DecimalField(max_digits=8, decimal_places=2, default=0)
     font = models.ForeignKey(FontAsset, on_delete=models.PROTECT, related_name="template_fields")
     font_size = models.DecimalField(max_digits=6, decimal_places=2)
-    is_bold = models.BooleanField(default=False)
-    is_italic = models.BooleanField(default=False)
     text_align = models.CharField(max_length=10, choices=TextAlign.choices, default=TextAlign.LEFT)
     text_transform = models.CharField(max_length=20, choices=TextTransform.choices, default=TextTransform.NONE)
     transform_exceptions = models.CharField(max_length=255, blank=True)
     color = models.CharField(max_length=20, default="#000000")
-    letter_spacing = models.DecimalField(max_digits=6, decimal_places=2, default=0)
     line_height = models.DecimalField(max_digits=6, decimal_places=2, default=1.2)
     max_lines = models.PositiveIntegerField(default=1)
     integer_min_digits = models.PositiveIntegerField(default=0)
     integer_keep_sign = models.BooleanField(default=True)
-    prefix = models.CharField(max_length=50, blank=True)
-    suffix = models.CharField(max_length=50, blank=True)
     empty_value = models.CharField(max_length=255, blank=True)
     trim_whitespace = models.BooleanField(default=True)
     overflow_mode = models.CharField(
@@ -98,7 +90,6 @@ class TemplateField(TimeStampedModel):
         choices=OverflowMode.choices,
         default=OverflowMode.TRUNCATE,
     )
-    preview_text = models.CharField(max_length=255, blank=True)
     constraints = models.JSONField(default=dict, blank=True)
 
     class Meta:
@@ -106,7 +97,7 @@ class TemplateField(TimeStampedModel):
         unique_together = ("template", "name")
 
     def __str__(self) -> str:
-        return f"{self.template.name} :: {self.label}"
+        return f"{self.template.name} :: {self.name}"
 
 
 class TemplatePreviewPage(TimeStampedModel):

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Manual | StölbenVetorial{% endblock %}
+
+{% block content %}
+<section class="hero-shell">
+    <div class="eyebrow">Manual</div>
+    <h1 class="hero-title">Como usar o StölbenVetorial.</h1>
+</section>
+
+<section class="content-grid">
+    <article class="panel">
+        <h2 class="section-title">1. Fontes</h2>
+        <p class="muted">Envie arquivos TTF ou OTF. O sistema já adiciona fontes básicas automaticamente para cada usuário. Ao excluir uma fonte, ela fica inativa e pode ser reaberta na lista de inativas.</p>
+    </article>
+    <article class="panel">
+        <h2 class="section-title">2. Templates</h2>
+        <p class="muted">Cada template aceita apenas um PDF de uma página. Depois de salvar, abra a edição visual para criar campos, arrastar no preview e ajustar fonte, cor, transformação e coluna do Excel.</p>
+    </article>
+    <article class="panel">
+        <h2 class="section-title">3. Jobs</h2>
+        <p class="muted">Envie o Excel e selecione o template. As colunas dos campos são numéricas e começam em 1, seguindo a posição das colunas no arquivo.</p>
+    </article>
+    <article class="panel">
+        <h2 class="section-title">4. Visitante</h2>
+        <p class="muted">O perfil visitante é temporário. Ao sair, o sistema exclui automaticamente os dados criados nessa sessão e informa isso na tela de login e logout.</p>
+    </article>
+</section>
+{% endblock %}

@@ -9,14 +9,12 @@ class FontAssetForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["name"].required = False
-        self.fields["family"].required = False
 
     class Meta:
         model = FontAsset
-        fields = ["name", "family", "variant", "file", "is_active"]
+        fields = ["name", "file"]
         widgets = {
-            "name": forms.TextInput(attrs={"placeholder": "Ex.: Gotham Bold"}),
-            "family": forms.TextInput(attrs={"placeholder": "Ex.: Gotham"}),
+            "name": forms.TextInput(attrs={"placeholder": "Nome da fonte"}),
         }
 
     def clean_file(self):
@@ -49,12 +47,11 @@ class FontAssetForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
+        if not cleaned.get("name") and cleaned.get("file"):
+            cleaned["name"] = Path(cleaned["file"].name).stem.replace("_", " ").replace("-", " ").title()
         metadata = getattr(self, "_font_metadata", None)
-        if metadata:
-            if not cleaned.get("family") and metadata.get("family_name"):
-                cleaned["family"] = metadata["family_name"]
-            if not cleaned.get("name") and metadata.get("full_name"):
-                cleaned["name"] = metadata["full_name"]
+        if metadata and not cleaned.get("name") and metadata.get("full_name"):
+            cleaned["name"] = metadata["full_name"]
         return cleaned
 
     def save(self, commit=True):
@@ -62,10 +59,9 @@ class FontAssetForm(forms.ModelForm):
         metadata = getattr(self, "_font_metadata", None)
         if metadata:
             instance.metadata = metadata
-            if not instance.family and metadata.get("family_name"):
-                instance.family = metadata["family_name"]
-            if not instance.name and metadata.get("full_name"):
-                instance.name = metadata["full_name"]
+        instance.family = instance.name
+        instance.variant = FontAsset.Variant.REGULAR
+        instance.is_active = True
         if commit:
             instance.save()
         return instance
