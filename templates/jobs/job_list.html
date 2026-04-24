@@ -11,16 +11,6 @@
         </div>
         <a class="button" href="{% url 'jobs:create' %}">Novo job</a>
     </div>
-    <form method="get" class="form-grid">
-        <div class="field-group">
-            <label for="job-search">Buscar</label>
-            <input id="job-search" type="text" name="q" value="{{ query }}" placeholder="Nome do job ou template">
-        </div>
-        {% if show_inactive %}<input type="hidden" name="inativos" value="1">{% endif %}
-        <div class="field-group" style="align-self:end;">
-            <button type="submit">Filtrar</button>
-        </div>
-    </form>
 </section>
 
 <section class="table-card">

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import math
 from functools import lru_cache
 import re
 import unicodedata
@@ -260,24 +261,76 @@ def _draw_field(pdf_canvas, field: TemplateField, value: str):
         max_lines,
     )
 
-    pdf_canvas.saveState()
-    pdf_canvas.setFillColor(HexColor(field.color or "#000000"))
-    pdf_canvas.setFont(font_name, adjusted_size)
-
-    line_height = max(adjusted_size * float(field.line_height), adjusted_size)
+    line_height = max(adjusted_size * float(field.line_height), adjusted_size * 0.2)
     top_y = float(field.y)
 
+    def aligned_x(draw_x, line):
+        if field.text_align == TemplateField.TextAlign.CENTER and max_width > 0:
+            return draw_x + (max_width - pdfmetrics.stringWidth(line, font_name, adjusted_size)) / 2
+        if field.text_align == TemplateField.TextAlign.RIGHT and max_width > 0:
+            return draw_x + max_width - pdfmetrics.stringWidth(line, font_name, adjusted_size)
+        return draw_x
+
+    def draw_text_line(draw_x, baseline_y, line, *, fill_color=None, stroke_color=None, line_width=1, alpha=1):
+        pdf_canvas.saveState()
+        pdf_canvas.setLineWidth(line_width)
+        text = pdf_canvas.beginText()
+        text.setTextOrigin(draw_x, baseline_y)
+        text.setFont(font_name, adjusted_size)
+        if stroke_color is not None:
+            text.setTextRenderMode(2 if fill_color is not None else 1)
+            text.setStrokeColor(stroke_color)
+            if hasattr(text, "setStrokeAlpha"):
+                text.setStrokeAlpha(alpha)
+        else:
+            text.setTextRenderMode(0)
+        if fill_color is not None:
+            text.setFillColor(fill_color)
+            if hasattr(text, "setFillAlpha"):
+                text.setFillAlpha(1)
+        text.textLine(line)
+        pdf_canvas.drawText(text)
+        pdf_canvas.restoreState()
+
+    if field.border_enabled and float(field.border_size_ratio or 0) > 0:
+        border_width = max(adjusted_size * float(field.border_size_ratio), 0.2)
+        blur_factor = max(float(field.border_blur or 0), 0)
+        border_alpha = min(max(float(field.border_opacity or 1), 0), 1)
+        border_color = HexColor(field.border_color or "#000000")
+        pdf_canvas.saveState()
+        for index, line in enumerate(lines[:max_lines]):
+            baseline_y = top_y - adjusted_size - (index * line_height)
+            x = aligned_x(float(field.x), line)
+            if blur_factor > 0:
+                shadow_samples = max(6 + int(blur_factor * 4), 6)
+                shadow_radius = blur_factor * 0.35
+                for sample in range(shadow_samples):
+                    angle = (sample / shadow_samples) * math.tau
+                    draw_text_line(
+                        x + (shadow_radius * math.cos(angle)),
+                        baseline_y + (shadow_radius * math.sin(angle)),
+                        line,
+                        fill_color=border_color,
+                        alpha=max(border_alpha * 0.22, 0.05),
+                    )
+            draw_text_line(
+                x,
+                baseline_y,
+                line,
+                fill_color=HexColor(field.color or "#000000"),
+                stroke_color=border_color,
+                line_width=border_width,
+                alpha=border_alpha,
+            )
+        pdf_canvas.restoreState()
+        return
+
+    pdf_canvas.saveState()
+    fill_color = HexColor(field.color or "#000000")
     for index, line in enumerate(lines[:max_lines]):
         baseline_y = top_y - adjusted_size - (index * line_height)
-        x = float(field.x)
-        if field.text_align == TemplateField.TextAlign.CENTER and max_width > 0:
-            x = x + max_width / 2
-            pdf_canvas.drawCentredString(x, baseline_y, line)
-        elif field.text_align == TemplateField.TextAlign.RIGHT and max_width > 0:
-            x = x + max_width
-            pdf_canvas.drawRightString(x, baseline_y, line)
-        else:
-            pdf_canvas.drawString(x, baseline_y, line)
+        x = aligned_x(float(field.x), line)
+        draw_text_line(x, baseline_y, line, fill_color=fill_color)
     pdf_canvas.restoreState()
 
 

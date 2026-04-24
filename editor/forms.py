@@ -48,6 +48,7 @@ class DocumentTemplateForm(forms.ModelForm):
         widgets = {
             "name": forms.TextInput(attrs={"placeholder": "Ex.: Certificado Base 2026"}),
             "description": forms.Textarea(attrs={"rows": 4, "placeholder": "Observações do template."}),
+            "background_pdf": forms.FileInput(),
         }
 
 

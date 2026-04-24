@@ -133,6 +133,42 @@ class EditorFlowTests(TestCase):
         self.assertEqual(field.name, "Nome completo")
         self.assertEqual(field.text_transform, TemplateField.TextTransform.UPPER)
 
+    def test_fields_api_creates_field_centered_with_next_excel_column(self):
+        template = DocumentTemplate.objects.create(
+            user=self.user,
+            name="Faixa Central",
+            slug="faixa-central",
+            background_pdf=self._build_pdf_upload(),
+            page_width=400,
+            page_height=120,
+        )
+        TemplateField.objects.create(
+            template=template,
+            name="Campo existente",
+            excel_column="3",
+            x=20,
+            y=80,
+            width=100,
+            height=20,
+            font=self.font,
+            font_size=18,
+            order_index=1,
+        )
+
+        self.client.force_login(self.user)
+        create_response = self.client.post(
+            reverse("editor:fields-api", kwargs={"pk": template.pk}),
+            data='{"name":"Novo campo","font_id":%s}' % self.font.pk,
+            content_type="application/json",
+        )
+
+        self.assertEqual(create_response.status_code, 201)
+        field = TemplateField.objects.exclude(name="Campo existente").get()
+        self.assertEqual(field.excel_column, "4")
+        self.assertEqual(float(field.x), 136.0)
+        self.assertEqual(float(field.y), 49.2)
+        self.assertEqual(field.text_align, TemplateField.TextAlign.CENTER)
+
     def test_delete_template_marks_inactive(self):
         template = DocumentTemplate.objects.create(
             user=self.user,
@@ -146,3 +182,17 @@ class EditorFlowTests(TestCase):
         self.assertEqual(response.status_code, 302)
         template.refresh_from_db()
         self.assertFalse(template.is_active)
+
+    def test_update_page_renders_with_private_storage(self):
+        template = DocumentTemplate.objects.create(
+            user=self.user,
+            name="Template Privado",
+            slug="template-privado",
+            background_pdf=self._build_pdf_upload(),
+        )
+        update_template_pdf_metadata(template)
+
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("editor:update", kwargs={"pk": template.pk}))
+
+        self.assertEqual(response.status_code, 200)

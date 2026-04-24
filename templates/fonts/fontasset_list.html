@@ -11,16 +11,6 @@
         </div>
         <a class="button" href="{% url 'fonts:create' %}">Nova fonte</a>
     </div>
-    <form method="get" class="form-grid">
-        <div class="field-group">
-            <label for="font-search">Buscar</label>
-            <input id="font-search" type="text" name="q" value="{{ query }}" placeholder="Nome da fonte">
-        </div>
-        {% if show_inactive %}<input type="hidden" name="inativos" value="1">{% endif %}
-        <div class="field-group" style="align-self:end;">
-            <button type="submit">Filtrar</button>
-        </div>
-    </form>
 </section>
 
 <section class="table-card">
@@ -30,7 +20,6 @@
                 <thead>
                     <tr>
                         <th>Nome</th>
-                        <th>Compatibilidade PT-BR</th>
                         <th>Ações</th>
                     </tr>
                 </thead>
@@ -38,7 +27,6 @@
                     {% for font in fonts %}
                         <tr>
                             <td>{{ font.name }}</td>
-                            <td>{% if font.metadata.supports_pt_br_basic %}Compatível{% else %}Parcial{% endif %}</td>
                             <td class="inline-actions icon-actions">
                                 <a class="icon-button" href="{% url 'fonts:update' font.pk %}" title="Editar" aria-label="Editar">✎</a>
                                 <form method="post" action="{% url 'fonts:delete' font.pk %}">

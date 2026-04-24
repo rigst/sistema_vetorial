@@ -20,9 +20,6 @@
             </div>
             <div class="inline-actions">
                 <button type="submit">Salvar template</button>
-                {% if form.instance.pk %}
-                    <a class="button button-secondary" href="{% url 'editor:detail' form.instance.pk %}">Abrir editor visual</a>
-                {% endif %}
                 <a class="button button-secondary" href="{% url 'editor:list' %}">Voltar</a>
             </div>
         </form>
@@ -49,19 +46,26 @@
 {% block extra_js %}
 <script>
 (() => {
+  const form = document.getElementById("template-form");
   const input = document.getElementById("id_background_pdf");
   const preview = document.getElementById("background-upload-preview");
-  if (!input || !preview) return;
-  input.addEventListener("change", () => {
-    const [file] = input.files || [];
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    if (preview.tagName === "IMG") {
-      preview.src = url;
-      return;
-    }
-    preview.setAttribute("src", url);
-  });
+  if (input && preview) {
+    input.addEventListener("change", () => {
+      const [file] = input.files || [];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      if (preview.tagName === "IMG") {
+        preview.src = url;
+        return;
+      }
+      preview.setAttribute("src", url);
+    });
+  }
+  if (form && {{ form.instance.pk|yesno:"true,false" }}) {
+    form.addEventListener("submit", () => {
+      form.dataset.redirectToEditor = "1";
+    });
+  }
 })();
 </script>
 {% endblock %}

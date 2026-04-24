@@ -11,18 +11,20 @@
             <p class="hero-copy">{{ page_width_cm }} cm × {{ page_height_cm }} cm</p>
         </div>
         <div class="inline-actions">
-            <button type="button" class="button" id="new-field-button">Novo campo</button>
+            <a class="button button-secondary" href="{% url 'editor:list' %}">Voltar</a>
             <button type="button" class="button button-secondary" id="save-layout-button">Salvar posições</button>
-            <a class="button button-secondary" href="{% url 'editor:preview' template_obj.pk %}">Visualizar</a>
         </div>
     </div>
 </section>
 
 <section class="editor-shell editor-shell-single">
-    <div class="panel editor-preview-panel">
+    <div class="editor-preview-panel">
         <div class="section-header">
-            <h2 class="section-title">Pré-visualização</h2>
-            <span class="muted" id="editor-status-text">Selecione um campo para editar.</span>
+            <div>
+                <h2 class="section-title">Pré-visualização</h2>
+                <span class="muted" id="editor-status-text">Selecione um campo para editar.</span>
+            </div>
+            <button type="button" class="button button-secondary button-compact" id="new-field-button">Novo campo</button>
         </div>
         <div
             class="preview-stage preview-stage-large"
@@ -34,6 +36,7 @@
         >
             {% if preview_pages %}
                 <img class="stage-background" src="{% url 'editor:preview-page' template_obj.pk 1 %}" alt="Pré-visualização do template">
+                <div class="stage-overlay" id="layout-stage-overlay"></div>
             {% else %}
                 <div class="empty-stage">Salve um PDF válido para habilitar a edição visual.</div>
             {% endif %}
@@ -44,7 +47,6 @@
         <div class="section-header">
             <h2 class="section-title">Campo</h2>
             <div class="inline-actions">
-                <button type="button" class="icon-button" id="edit-field-button" title="Editar campo" aria-label="Editar campo">✎</button>
                 <button type="button" class="icon-button icon-button-danger" id="delete-field-button" title="Excluir campo" aria-label="Excluir campo">🗑</button>
             </div>
         </div>
@@ -72,18 +74,18 @@
                     <input id="field-color" name="color" type="text" value="#000000">
                 </div>
             </div>
-            <div class="field-group">
-                <label for="field-text-transform">Transformação</label>
-                <select id="field-text-transform" name="text_transform">
-                    <option value="none">Sem transformação</option>
-                    <option value="upper">Maiúsculas</option>
-                    <option value="lower">Minúsculas</option>
-                    <option value="title">Iniciais maiúsculas</option>
-                    <option value="title_smart">Palavras principais</option>
-                </select>
-            </div>
             <details class="field-advanced">
                 <summary>Opções avançadas</summary>
+                <div class="field-group">
+                    <label for="field-text-transform">Transformação</label>
+                    <select id="field-text-transform" name="text_transform">
+                        <option value="none">Sem transformação</option>
+                        <option value="upper">Maiúsculas</option>
+                        <option value="lower">Minúsculas</option>
+                        <option value="title">Iniciais maiúsculas</option>
+                        <option value="title_smart">Palavras principais</option>
+                    </select>
+                </div>
                 <div class="field-group">
                     <label for="field-value-type">Tipo</label>
                     <select id="field-value-type" name="value_type">
@@ -124,6 +126,38 @@
                     <label for="field-transform-exceptions">Exceções da transformação</label>
                     <input id="field-transform-exceptions" name="transform_exceptions" type="text">
                 </div>
+                <div class="field-group field-group-inline-toggle">
+                    <label for="field-border-enabled">Ativar borda</label>
+                    <input id="field-border-enabled" name="border_enabled" type="checkbox">
+                </div>
+                <div class="field-group">
+                    <label for="field-border-color">Cor da borda</label>
+                    <div class="color-input-row">
+                        <input id="field-border-color-picker" type="color" value="#000000">
+                        <input id="field-border-color" name="border_color" type="text" value="#000000">
+                    </div>
+                </div>
+                <div class="field-group">
+                    <label for="field-border-size-ratio">Tamanho em relação à letra</label>
+                    <div class="slider-input-row">
+                        <input id="field-border-size-ratio-range" type="range" min="0" max="0.2" step="0.01">
+                        <input id="field-border-size-ratio" name="border_size_ratio" type="number" min="0" max="0.2" step="0.01" inputmode="decimal">
+                    </div>
+                </div>
+                <div class="field-group">
+                    <label for="field-border-opacity">Opacidade</label>
+                    <div class="slider-input-row">
+                        <input id="field-border-opacity-range" type="range" min="0" max="1" step="0.01">
+                        <input id="field-border-opacity" name="border_opacity" type="number" min="0" max="1" step="0.01" inputmode="decimal">
+                    </div>
+                </div>
+                <div class="field-group">
+                    <label for="field-border-blur">Blur</label>
+                    <div class="slider-input-row">
+                        <input id="field-border-blur-range" type="range" min="0" max="3" step="0.05">
+                        <input id="field-border-blur" name="border_blur" type="number" min="0" max="3" step="0.05" inputmode="decimal">
+                    </div>
+                </div>
             </details>
         </form>
     </aside>
@@ -138,14 +172,16 @@
 (() => {
   const stage = document.getElementById("layout-stage");
   const fieldForm = document.getElementById("field-form");
+  const overlay = document.getElementById("layout-stage-overlay");
+  const stageBackground = stage?.querySelector(".stage-background");
   const newFieldButton = document.getElementById("new-field-button");
   const saveLayoutButton = document.getElementById("save-layout-button");
   const statusText = document.getElementById("editor-status-text");
   const deleteFieldButton = document.getElementById("delete-field-button");
-  if (!stage || !fieldForm) return;
+  if (!stage || !fieldForm || !overlay) return;
 
-  const pageWidth = Number(stage.dataset.pageWidth || 1);
-  const pageHeight = Number(stage.dataset.pageHeight || 1);
+  const rawPageWidth = Number(stage.dataset.pageWidth || 0);
+  const rawPageHeight = Number(stage.dataset.pageHeight || 0);
   const fieldsUrl = stage.dataset.fieldsUrl;
   const layoutUrl = stage.dataset.layoutUrl;
   const fonts = JSON.parse(document.getElementById("editor-font-data").textContent);
@@ -155,6 +191,11 @@
     excel_column: document.getElementById("field-excel-column"),
     font_id: document.getElementById("field-font-id"),
     color: document.getElementById("field-color"),
+    border_enabled: document.getElementById("field-border-enabled"),
+    border_color: document.getElementById("field-border-color"),
+    border_size_ratio: document.getElementById("field-border-size-ratio"),
+    border_opacity: document.getElementById("field-border-opacity"),
+    border_blur: document.getElementById("field-border-blur"),
     text_transform: document.getElementById("field-text-transform"),
     value_type: document.getElementById("field-value-type"),
     text_align: document.getElementById("field-text-align"),
@@ -165,11 +206,48 @@
     transform_exceptions: document.getElementById("field-transform-exceptions"),
   };
   const colorPicker = document.getElementById("field-color-picker");
+  const borderColorPicker = document.getElementById("field-border-color-picker");
+  const rangeInputs = {
+    border_size_ratio: document.getElementById("field-border-size-ratio-range"),
+    border_opacity: document.getElementById("field-border-opacity-range"),
+    border_blur: document.getElementById("field-border-blur-range"),
+  };
   const state = { selectedId: fields[0]?.id || null };
+  let activeDrag = null;
+  let activeResize = null;
 
+  const normalizeNumericInputValue = (value) => String(value ?? "").replace(",", ".");
+  const toNumber = (value, fallback = 0) => {
+    const parsed = Number(normalizeNumericInputValue(value));
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+  const getPageWidth = () => toNumber(rawPageWidth, 0) || toNumber(stageBackground?.naturalWidth, 0) || 1;
+  const getPageHeight = () => toNumber(rawPageHeight, 0) || toNumber(stageBackground?.naturalHeight, 0) || 1;
+  const getRenderWidth = () => toNumber(stageBackground?.clientWidth, 0) || toNumber(stage.clientWidth, 1) || 1;
+  const getRenderHeight = () => toNumber(stageBackground?.clientHeight, 0) || toNumber(stage.clientHeight, 1) || 1;
   const getSelected = () => fields.find((field) => field.id === state.selectedId) || null;
-  const pxScale = () => stage.clientWidth / pageWidth;
+  const nextExcelColumn = () => {
+    const numericColumns = fields
+      .map((field) => Number.parseInt(field.excel_column, 10))
+      .filter((value) => Number.isFinite(value));
+    return (numericColumns.length ? Math.max(...numericColumns) : 0) + 1;
+  };
+  const pxScale = () => {
+    const pageWidth = getPageWidth();
+    return getRenderWidth() / pageWidth;
+  };
   const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]")?.value;
+  const syncStageSize = () => {
+    const imageWidth = toNumber(stageBackground?.naturalWidth, 0) || getPageWidth();
+    const imageHeight = toNumber(stageBackground?.naturalHeight, 0) || getPageHeight();
+    const availableWidth = stage.parentElement.clientWidth - 4;
+    const preferredWidth = Math.min(availableWidth, imageWidth);
+    const preferredHeight = Math.max((preferredWidth / imageWidth) * imageHeight, 40);
+    stage.style.width = `${preferredWidth}px`;
+    stage.style.height = `${preferredHeight}px`;
+    overlay.style.width = "100%";
+    overlay.style.height = "100%";
+  };
 
   const request = async (url, method, body) => {
     const response = await fetch(url, {
@@ -183,69 +261,264 @@
     return response.json();
   };
 
+  const persistField = async (field, payload) => {
+    const result = await request(`/templates/campos/${field.id}/`, "PATCH", payload);
+    Object.assign(field, result.field);
+    return result.field;
+  };
+
+  const syncRangeInputs = () => {
+    Object.entries(rangeInputs).forEach(([key, input]) => {
+      if (!input || !formDataMap[key]) return;
+      input.value = formDataMap[key].value || input.min || 0;
+    });
+  };
+
+  const syncNumericMirrors = () => {
+    Object.keys(rangeInputs).forEach((key) => {
+      if (!formDataMap[key]) return;
+      formDataMap[key].value = normalizeNumericInputValue(formDataMap[key].value);
+    });
+    if (formDataMap.line_height) {
+      formDataMap.line_height.value = normalizeNumericInputValue(formDataMap.line_height.value);
+    }
+  };
+
+  const colorWithAlpha = (color, alpha) => {
+    const safeAlpha = Math.min(Math.max(toNumber(alpha, 1), 0), 1);
+    if (typeof color === "string" && color.startsWith("#") && color.length === 7) {
+      const r = parseInt(color.slice(1, 3), 16);
+      const g = parseInt(color.slice(3, 5), 16);
+      const b = parseInt(color.slice(5, 7), 16);
+      return `rgba(${r}, ${g}, ${b}, ${safeAlpha})`;
+    }
+    return color;
+  };
+
+  const markSelectedNode = (node) => {
+    overlay.querySelectorAll(".layout-field").forEach((item) => item.classList.remove("is-selected"));
+    if (node) {
+      node.classList.add("is-selected");
+    }
+  };
+
+  const selectField = (field, node = null, options = {}) => {
+    const { focus = false } = options;
+    state.selectedId = field?.id || null;
+    if (node) {
+      markSelectedNode(node);
+    }
+    syncForm();
+    if (focus && formDataMap.name) {
+      formDataMap.name.focus();
+      formDataMap.name.select();
+    }
+  };
+
+  const clampFieldBounds = (field) => {
+    const pageWidth = getPageWidth();
+    const pageHeight = getPageHeight();
+    const fieldWidth = Math.min(toNumber(field.width, pageWidth * 0.32), pageWidth);
+    const fieldHeight = Math.min(toNumber(field.height, pageHeight * 0.18), pageHeight);
+    field.width = Number(fieldWidth.toFixed(2));
+    field.height = Number(fieldHeight.toFixed(2));
+    field.x = Number(Math.min(Math.max(toNumber(field.x, 0), 0), Math.max(pageWidth - fieldWidth, 0)).toFixed(2));
+    field.y = Number(Math.min(Math.max(toNumber(field.y, 0), 0), Math.max(pageHeight - fieldHeight, 0)).toFixed(2));
+  };
+
   const applyPreviewStyle = (node, field) => {
+    const pageWidth = getPageWidth();
+    const pageHeight = getPageHeight();
     const scale = pxScale();
-    const width = Math.max(field.width * scale, 40);
-    const height = Math.max(field.height * scale, 24);
-    const left = field.x * scale;
-    const top = (pageHeight - field.y - field.height) * scale;
+    const renderHeight = getRenderHeight();
+    clampFieldBounds(field);
+    const fieldWidth = toNumber(field.width, pageWidth * 0.32);
+    const fieldHeight = toNumber(field.height, pageHeight * 0.18);
+    const fieldX = toNumber(field.x, (pageWidth - fieldWidth) / 2);
+    const fieldY = toNumber(field.y, (pageHeight - fieldHeight) / 2);
+    const width = Math.max(fieldWidth * scale, 40);
+    const height = Math.max(fieldHeight * scale, 24);
+    const left = fieldX * scale;
+    const top = renderHeight - ((fieldY + fieldHeight) * scale);
     node.style.left = `${left}px`;
     node.style.top = `${top}px`;
     node.style.width = `${width}px`;
     node.style.height = `${height}px`;
     node.style.color = field.color;
-    node.style.fontSize = `${Math.max(field.font_size * scale, 12)}px`;
-    node.style.lineHeight = String(field.line_height);
+    node.style.fontSize = `${Math.max(toNumber(field.font_size, 24) * scale, 12)}px`;
+    node.style.lineHeight = String(toNumber(field.line_height, 1.1));
     node.style.textAlign = field.text_align;
-    node.textContent = field.preview_value || field.empty_value || field.name;
+    if (field.border_enabled && Number(field.border_size_ratio) > 0) {
+      const pxBorder = Math.max(toNumber(field.border_size_ratio, 0) * Math.max(toNumber(field.font_size, 24) * scale, 12), 0.5);
+      const blur = Math.max(toNumber(field.border_blur, 0) * scale, 0);
+      const alpha = Math.min(Math.max(toNumber(field.border_opacity, 1), 0), 1);
+      const borderColor = field.border_color || "#000000";
+      node.style.webkitTextStroke = `${pxBorder}px ${colorWithAlpha(borderColor, alpha)}`;
+      node.style.paintOrder = "stroke fill";
+      node.style.filter = blur > 0 ? `drop-shadow(0 0 ${blur}px ${colorWithAlpha(borderColor, alpha)})` : "none";
+    } else {
+      node.style.webkitTextStroke = "0 transparent";
+      node.style.paintOrder = "normal";
+      node.style.filter = "none";
+    }
+    node.style.textShadow = "none";
+    const label = node.querySelector(".layout-field-label");
+    label.textContent = field.preview_value || field.empty_value || field.name;
+    label.style.lineHeight = String(toNumber(field.line_height, 1.1));
     node.classList.toggle("is-selected", field.id === state.selectedId);
+    node.classList.toggle("is-dragging", activeDrag?.field?.id === field.id);
+    node.classList.toggle("is-resizing", activeResize?.field?.id === field.id);
   };
 
   const renderFields = () => {
-    stage.querySelectorAll(".layout-field").forEach((item) => item.remove());
+    overlay.querySelectorAll(".layout-field").forEach((item) => item.remove());
     fields.forEach((field) => {
-      const node = document.createElement("button");
-      node.type = "button";
+      const node = document.createElement("div");
       node.className = "layout-field";
       node.dataset.id = field.id;
+      node.setAttribute("role", "button");
+      node.setAttribute("tabindex", "0");
+      node.innerHTML = `
+        <span class="layout-field-label"></span>
+        <span class="layout-field-resize-handle" data-resize-handle></span>
+      `;
       applyPreviewStyle(node, field);
       node.addEventListener("click", () => {
-        state.selectedId = field.id;
-        syncForm();
-        renderFields();
+        selectField(field, node, { focus: true });
       });
-      let dragStart = null;
+      const resizeHandle = node.querySelector("[data-resize-handle]");
+      const startResize = (event) => {
+        if (event.pointerType === "mouse" && event.button !== 0) return false;
+        selectField(field, node);
+        activeResize = {
+          pointerId: event.pointerId,
+          node,
+          field,
+          startX: event.clientX,
+          startY: event.clientY,
+          startFontSize: toNumber(field.font_size, 24),
+          startWidth: toNumber(field.width, getPageWidth() * 0.32),
+          startHeight: toNumber(field.height, getPageHeight() * 0.18),
+        };
+        (event.currentTarget || resizeHandle).setPointerCapture(event.pointerId);
+        event.stopPropagation();
+        event.preventDefault();
+        return true;
+      };
+      resizeHandle.addEventListener("pointerdown", (event) => {
+        startResize(event);
+      });
+      resizeHandle.addEventListener("pointermove", (event) => {
+        if (!activeResize || activeResize.pointerId !== event.pointerId) return;
+        const scale = pxScale();
+        const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
+        const delta = ((event.clientX - activeResize.startX) - (event.clientY - activeResize.startY)) / safeScale;
+        const nextFontSize = Math.max(6, activeResize.startFontSize + (delta * 0.45));
+        const ratio = nextFontSize / Math.max(activeResize.startFontSize, 1);
+        field.font_size = Number(nextFontSize.toFixed(2));
+        field.width = Number(Math.max(30, activeResize.startWidth * ratio).toFixed(2));
+        field.height = Number(Math.max(16, activeResize.startHeight * ratio).toFixed(2));
+        clampFieldBounds(field);
+        applyPreviewStyle(node, field);
+        syncForm();
+        statusText.textContent = `Fonte: ${field.font_size.toFixed(1)}`;
+        event.stopPropagation();
+        event.preventDefault();
+      });
+      const finishResize = async (event) => {
+        if (!activeResize || activeResize.pointerId !== event.pointerId) return;
+        if (resizeHandle.hasPointerCapture(event.pointerId)) {
+          resizeHandle.releasePointerCapture(event.pointerId);
+        }
+        const resizeField = activeResize.field;
+        activeResize = null;
+        await persistField(resizeField, {
+          font_size: resizeField.font_size,
+          width: resizeField.width,
+          height: resizeField.height,
+        });
+        renderFields();
+        syncForm();
+      };
+      resizeHandle.addEventListener("pointerup", finishResize);
+      resizeHandle.addEventListener("pointercancel", finishResize);
       node.addEventListener("pointerdown", (event) => {
-        dragStart = {
+        if (event.target.closest("[data-resize-handle]")) return;
+        if (event.pointerType === "mouse" && event.button !== 0) return;
+        const rect = node.getBoundingClientRect();
+        const isResizeCorner = (rect.right - event.clientX) <= 34 && (rect.bottom - event.clientY) <= 34;
+        if (isResizeCorner) {
+          startResize(event);
+          return;
+        }
+        selectField(field, node);
+        activeDrag = {
+          pointerId: event.pointerId,
+          node,
+          field,
           x: event.clientX,
           y: event.clientY,
-          startFieldX: field.x,
-          startFieldY: field.y,
+          startFieldX: toNumber(field.x, 0),
+          startFieldY: toNumber(field.y, 0),
         };
         node.setPointerCapture(event.pointerId);
+        event.stopPropagation();
+        event.preventDefault();
+        node.classList.add("is-dragging");
       });
       node.addEventListener("pointermove", (event) => {
-        if (!dragStart) return;
+        if (activeResize) return;
+        if (!activeDrag || activeDrag.pointerId !== event.pointerId) return;
         const scale = pxScale();
-        field.x = Math.max(0, dragStart.startFieldX + ((event.clientX - dragStart.x) / scale));
-        field.y = Math.max(field.height, dragStart.startFieldY - ((event.clientY - dragStart.y) / scale));
+        const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
+        field.x = activeDrag.startFieldX + ((event.clientX - activeDrag.x) / safeScale);
+        field.y = activeDrag.startFieldY - ((event.clientY - activeDrag.y) / safeScale);
+        clampFieldBounds(field);
         applyPreviewStyle(node, field);
         statusText.textContent = `Posição: x ${field.x.toFixed(1)} · y ${field.y.toFixed(1)}`;
+        event.preventDefault();
       });
-      node.addEventListener("pointerup", () => {
-        dragStart = null;
+      node.addEventListener("pointerup", (event) => {
+        if (!activeDrag || activeDrag.pointerId !== event.pointerId) return;
+        if (node.hasPointerCapture(event.pointerId)) {
+          node.releasePointerCapture(event.pointerId);
+        }
+        activeDrag = null;
+        renderFields();
+        syncForm();
       });
-      stage.appendChild(node);
+      node.addEventListener("pointercancel", (event) => {
+        if (!activeDrag || activeDrag.pointerId !== event.pointerId) return;
+        if (node.hasPointerCapture(event.pointerId)) {
+          node.releasePointerCapture(event.pointerId);
+        }
+        activeDrag = null;
+        renderFields();
+        syncForm();
+      });
+      overlay.appendChild(node);
     });
   };
 
   const syncForm = () => {
     const field = getSelected();
-    if (!field) return;
+    if (!field) {
+      fieldForm.reset();
+      statusText.textContent = "Crie ou selecione um campo.";
+      return;
+    }
     Object.entries(formDataMap).forEach(([key, input]) => {
-      if (input) input.value = field[key] ?? "";
+      if (!input) return;
+      if (input.type === "checkbox") {
+        input.checked = Boolean(field[key]);
+        return;
+      }
+      input.value = field[key] ?? "";
     });
     colorPicker.value = field.color || "#000000";
+    borderColorPicker.value = field.border_color || "#000000";
+    syncRangeInputs();
+    syncNumericMirrors();
     statusText.textContent = `${field.name} selecionado`;
   };
 
@@ -254,35 +527,66 @@
     if (!field) return;
     const payload = {};
     Object.entries(formDataMap).forEach(([key, input]) => {
-      payload[key] = input.value;
+      payload[key] = input.type === "checkbox" ? input.checked : input.value;
     });
-    const result = await request(`/templates/campos/${field.id}/`, "PATCH", payload);
-    Object.assign(field, result.field);
+    await persistField(field, payload);
     renderFields();
     syncForm();
   };
 
   fieldForm.addEventListener("input", (event) => {
     if (event.target === colorPicker) return;
+    const rangeEntry = Object.entries(rangeInputs).find(([, input]) => input === event.target);
+    if (rangeEntry) {
+      formDataMap[rangeEntry[0]].value = event.target.value;
+      patchField();
+      return;
+    }
+    if (event.target.name && rangeInputs[event.target.name]) {
+      rangeInputs[event.target.name].value = normalizeNumericInputValue(event.target.value);
+    }
+    if (event.target.name === "line_height") {
+      event.target.value = normalizeNumericInputValue(event.target.value);
+    }
     if (event.target.name) patchField();
   });
   colorPicker.addEventListener("input", () => {
     formDataMap.color.value = colorPicker.value;
     patchField();
   });
-
+  borderColorPicker.addEventListener("input", () => {
+    formDataMap.border_color.value = borderColorPicker.value;
+    patchField();
+  });
   newFieldButton.addEventListener("click", async () => {
     const fontId = formDataMap.font_id.value || fonts[0]?.id;
     const result = await request(fieldsUrl, "POST", {
       name: `Campo ${fields.length + 1}`,
-      excel_column: fields.length + 1,
+      excel_column: nextExcelColumn(),
       font_id: Number(fontId),
       color: "#000000",
+      text_align: "center",
+      border_enabled: false,
+      border_color: "#000000",
+      border_size_ratio: 0,
+      border_opacity: 1,
+      border_blur: 0,
     });
     fields.push(result.field);
+    const pageWidth = getPageWidth();
+    const pageHeight = getPageHeight();
+    result.field.width = toNumber(result.field.width, pageWidth * 0.32);
+    result.field.height = toNumber(result.field.height, pageHeight * 0.18);
+    result.field.x = (pageWidth - result.field.width) / 2;
+    result.field.y = (pageHeight - result.field.height) / 2;
+    clampFieldBounds(result.field);
     state.selectedId = result.field.id;
     renderFields();
     syncForm();
+    if (formDataMap.name) {
+      formDataMap.name.focus();
+      formDataMap.name.select();
+    }
   });
 
   deleteFieldButton.addEventListener("click", async () => {
@@ -312,9 +616,19 @@
     statusText.textContent = "Posições salvas.";
   });
 
-  window.addEventListener("resize", renderFields);
-  renderFields();
-  syncForm();
+  const initializeStage = () => {
+    syncStageSize();
+    renderFields();
+    syncForm();
+  };
+  if (stageBackground && !stageBackground.complete) {
+    stageBackground.addEventListener("load", initializeStage, { once: true });
+  }
+  window.addEventListener("resize", () => {
+    syncStageSize();
+    renderFields();
+  });
+  initializeStage();
 })();
 </script>
 {% endblock %}

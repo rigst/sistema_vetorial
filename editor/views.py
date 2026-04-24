@@ -40,6 +40,11 @@ def field_to_dict(field: TemplateField) -> dict:
         "text_transform": field.text_transform,
         "transform_exceptions": field.transform_exceptions,
         "color": field.color,
+        "border_enabled": field.border_enabled,
+        "border_color": field.border_color,
+        "border_size_ratio": float(field.border_size_ratio),
+        "border_opacity": float(field.border_opacity),
+        "border_blur": float(field.border_blur),
         "line_height": float(field.line_height),
         "max_lines": field.max_lines,
         "integer_min_digits": field.integer_min_digits,
@@ -56,6 +61,16 @@ def _parse_json_body(request):
         return json.loads(request.body.decode("utf-8") or "{}")
     except json.JSONDecodeError:
         raise ValueError("Requisição inválida.")
+
+
+def _next_excel_column(template_obj: DocumentTemplate) -> int:
+    numeric_columns = []
+    for value in template_obj.fields.values_list("excel_column", flat=True):
+        try:
+            numeric_columns.append(int(str(value).strip()))
+        except (TypeError, ValueError):
+            continue
+    return (max(numeric_columns) if numeric_columns else 0) + 1
 
 
 class DocumentTemplateListView(UserOwnedQuerysetMixin, ListView):
@@ -97,7 +112,7 @@ class DocumentTemplateCreateView(LoginRequiredMixin, CreateView):
         return response
 
     def get_success_url(self):
-        return reverse("editor:update", kwargs={"pk": self.object.pk})
+        return reverse("editor:detail", kwargs={"pk": self.object.pk})
 
 
 class DocumentTemplateUpdateView(UserOwnedQuerysetMixin, UpdateView):
@@ -117,7 +132,7 @@ class DocumentTemplateUpdateView(UserOwnedQuerysetMixin, UpdateView):
         return response
 
     def get_success_url(self):
-        return reverse("editor:update", kwargs={"pk": self.object.pk})
+        return reverse("editor:detail", kwargs={"pk": self.object.pk})
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -229,25 +244,33 @@ class TemplateFieldsApiView(LoginRequiredMixin, View):
         font_id = payload.get("font_id")
         font = get_object_or_404(FontAsset, pk=font_id, user=request.user, is_active=True)
         order_index = template_obj.fields.count() + 1
+        next_excel_column = _next_excel_column(template_obj)
         page_width = float(template_obj.page_width or 1200)
         page_height = float(template_obj.page_height or 300)
         width = round(page_width * 0.32, 2)
         height = round(page_height * 0.18, 2)
+        center_x = round((page_width - width) / 2, 2)
+        center_y = round((page_height - height) / 2, 2)
         field = TemplateField.objects.create(
             template=template_obj,
             name=name,
-            excel_column=str(payload.get("excel_column") or order_index),
+            excel_column=str(payload.get("excel_column") or next_excel_column),
             value_type=payload.get("value_type") or TemplateField.ValueType.TEXT,
-            x=round((page_width - width) / 2, 2),
-            y=round((page_height + height) / 2, 2),
+            x=center_x,
+            y=center_y,
             width=width,
             height=height,
             font=font,
             font_size=payload.get("font_size") or max(round(page_height * 0.09, 2), 28),
-            text_align=payload.get("text_align") or TemplateField.TextAlign.LEFT,
+            text_align=payload.get("text_align") or TemplateField.TextAlign.CENTER,
             text_transform=payload.get("text_transform") or TemplateField.TextTransform.NONE,
             transform_exceptions=payload.get("transform_exceptions") or DEFAULT_EXCEPTIONS,
             color=payload.get("color") or "#000000",
+            border_enabled=payload.get("border_enabled", False),
+            border_color=payload.get("border_color") or "#000000",
+            border_size_ratio=payload.get("border_size_ratio") or 0,
+            border_opacity=payload.get("border_opacity") or 1,
+            border_blur=payload.get("border_blur") or 0,
             line_height=payload.get("line_height") or 1.1,
             max_lines=payload.get("max_lines") or 1,
             integer_min_digits=payload.get("integer_min_digits") or 0,
@@ -281,6 +304,11 @@ class TemplateFieldApiView(LoginRequiredMixin, View):
             "text_transform",
             "transform_exceptions",
             "color",
+            "border_enabled",
+            "border_color",
+            "border_size_ratio",
+            "border_opacity",
+            "border_blur",
             "line_height",
             "max_lines",
             "integer_min_digits",
