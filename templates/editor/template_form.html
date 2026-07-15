@@ -37,7 +37,7 @@
         {% if template_obj.page_width and template_obj.page_height %}
             <p class="muted">{{ page_width_cm }} cm × {{ page_height_cm }} cm</p>
         {% else %}
-            <p class="muted">Ao selecionar um PDF válido de uma página, a pré-visualização é atualizada imediatamente nesta tela.</p>
+            <p class="muted">Ao selecionar um PDF de uma página ou uma imagem, a pré-visualização é atualizada imediatamente nesta tela.</p>
         {% endif %}
     </div>
 </section>
@@ -54,11 +54,17 @@
       const [file] = input.files || [];
       if (!file) return;
       const url = URL.createObjectURL(file);
-      if (preview.tagName === "IMG") {
-        preview.src = url;
-        return;
+      const isImage = (file.type || "").startsWith("image/");
+      let target = document.getElementById("background-upload-preview");
+      const wantedTag = isImage ? "IMG" : "EMBED";
+      if (target.tagName !== wantedTag) {
+        const replacement = document.createElement(wantedTag.toLowerCase());
+        replacement.id = target.id;
+        if (!isImage) replacement.type = "application/pdf";
+        target.replaceWith(replacement);
+        target = replacement;
       }
-      preview.setAttribute("src", url);
+      target.setAttribute("src", url);
     });
   }
   if (form && {{ form.instance.pk|yesno:"true,false" }}) {

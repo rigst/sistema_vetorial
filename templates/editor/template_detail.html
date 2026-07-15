@@ -1,15 +1,15 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static l10n %}
 
 {% block title %}{{ template_obj.name }} | StölbenVetorial{% endblock %}
 
 {% block content %}
-<section class="hero-shell">
+<section class="hero-shell hero-compact">
     <div class="section-header">
         <div>
             <div class="eyebrow">Editor visual</div>
             <h1 class="hero-title">{{ template_obj.name }}</h1>
-            <p class="hero-copy">{{ page_width_cm }} cm × {{ page_height_cm }} cm</p>
+            <p class="hero-copy muted">{{ page_width_cm }} cm × {{ page_height_cm }} cm</p>
         </div>
         <div class="inline-actions">
             <a class="button button-secondary" href="{% url 'editor:list' %}">Voltar</a>
@@ -32,6 +32,10 @@
                 <button type="button" class="toolbar-button" id="redo-button" title="Refazer (Ctrl+Shift+Z)">↷</button>
             </div>
             <div class="toolbar-group">
+                <button type="button" class="toolbar-button" id="align-center-h" title="Centralizar na largura da página">Centrar ↔</button>
+                <button type="button" class="toolbar-button" id="align-center-v" title="Centralizar na altura da página">Centrar ↕</button>
+            </div>
+            <div class="toolbar-group">
                 <button type="button" class="toolbar-button" id="zoom-out-button" title="Reduzir zoom">−</button>
                 <span class="toolbar-label" id="editor-zoom-label">100%</span>
                 <button type="button" class="toolbar-button" id="zoom-in-button" title="Ampliar zoom">+</button>
@@ -48,10 +52,11 @@
         </div>
         <div class="editor-canvas-wrap" id="editor-canvas-wrap">
             <canvas id="editor-canvas"></canvas>
-        </div>
-        <div class="editor-statusbar">
-            <span class="muted" id="editor-status-text">Carregando editor…</span>
-            <span class="editor-save-state" id="editor-save-state"></span>
+            <span class="sample-badge">● Dados de amostra</span>
+            <div class="editor-statusbar">
+                <span class="muted" id="editor-status-text">Carregando editor…</span>
+                <span class="editor-save-state" id="editor-save-state"></span>
+            </div>
         </div>
         <p class="muted editor-hints">
             Arraste para mover · alças laterais mudam a largura · cantos mudam o tamanho da fonte ·
@@ -65,8 +70,9 @@
 
     <aside class="panel editor-config-panel" id="field-panel">
         <div class="section-header">
-            <h2 class="section-title">Campo</h2>
+            <h2 class="section-title">Campo <span class="field-panel-name" id="field-panel-name"></span></h2>
         </div>
+        <p class="panel-empty">Nenhum campo selecionado. Clique em um campo na página ou crie um novo com "+ Campo".</p>
         <form id="field-form" class="field-config-form">
             {% csrf_token %}
             <div class="field-group">
@@ -209,13 +215,13 @@
 {% block extra_js %}
 {% if preview_pages %}
 <script src="{% static 'js/fabric.min.js' %}?v=6.7.1"></script>
-<script src="{% static 'js/template_editor.js' %}?v=20260715-01"></script>
+<script src="{% static 'js/template_editor.js' %}?v=20260715-02"></script>
 <script>
 VetorialTemplateEditor.init({
   canvasId: "editor-canvas",
   wrapId: "editor-canvas-wrap",
   readOnly: false,
-  page: { width: {{ template_obj.page_width|default:1 }}, height: {{ template_obj.page_height|default:1 }} },
+  page: { width: {{ template_obj.page_width|default:1|unlocalize }}, height: {{ template_obj.page_height|default:1|unlocalize }} },
   backgroundUrl: "{% url 'editor:preview-page' template_obj.pk 1 %}",
   fields: JSON.parse(document.getElementById("editor-field-data").textContent),
   fonts: JSON.parse(document.getElementById("editor-font-data").textContent),

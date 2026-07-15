@@ -471,6 +471,8 @@ label {
 input[type="text"],
 input[type="password"],
 input[type="file"],
+input[type="number"],
+input[type="email"],
 select,
 textarea {
   width: 100%;
@@ -1184,6 +1186,20 @@ textarea:focus {
 }
 
 /* ===== Editor visual (Fabric.js) ===== */
+.hero-compact {
+  padding-top: 1.1rem;
+  padding-bottom: 1.1rem;
+}
+
+.hero-compact .hero-title {
+  font-size: clamp(1.4rem, 2.6vw, 1.9rem);
+  margin: 0.15rem 0 0.1rem;
+}
+
+.hero-compact .hero-copy {
+  margin: 0;
+}
+
 .editor-preview-panel {
   width: 100%;
   min-width: 0;
@@ -1228,6 +1244,11 @@ textarea:focus {
   color: var(--accent);
 }
 
+.toolbar-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .toolbar-button-danger:hover {
   color: var(--danger);
 }
@@ -1244,40 +1265,83 @@ textarea:focus {
   display: none;
 }
 
+#sample-controls.is-active {
+  border-color: rgba(31, 122, 114, 0.55);
+  background: rgba(31, 122, 114, 0.08);
+}
+
 #sample-controls.is-active .sample-only {
   display: inline-flex;
 }
 
+/* Bancada: base de corte escura onde a arte é o destaque */
 .editor-canvas-wrap {
+  position: relative;
   width: 100%;
-  border: 1px solid var(--border-strong);
+  border: 1px solid rgba(20, 32, 29, 0.9);
   border-radius: var(--radius-sm);
   background:
-    repeating-conic-gradient(rgba(60, 87, 85, 0.06) 0% 25%, transparent 0% 50%) 0 0 / 22px 22px,
-    var(--bg-soft);
+    linear-gradient(rgba(214, 235, 228, 0.055) 1px, transparent 1px) 0 0 / 100% 28px,
+    linear-gradient(90deg, rgba(214, 235, 228, 0.055) 1px, transparent 1px) 0 0 / 28px 100%,
+    #22312d;
   overflow: hidden;
   touch-action: none;
+  box-shadow: inset 0 1px 12px rgba(0, 0, 0, 0.35);
 }
 
 .editor-statusbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  width: 100%;
-  padding: 0.45rem 0.2rem 0;
-  font-size: 0.85rem;
+  padding: 0.4rem 0.85rem;
+  background: rgba(16, 24, 22, 0.82);
+  backdrop-filter: blur(4px);
+  font-size: 0.8rem;
+  color: #cfe4dd;
+  pointer-events: none;
+}
+
+.editor-statusbar .muted {
+  color: #cfe4dd;
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
 .editor-save-state {
   font-weight: 600;
-  color: var(--muted);
+  color: #9db8b0;
   white-space: nowrap;
 }
 
-.editor-save-state[data-tone="ok"] { color: var(--success); }
-.editor-save-state[data-tone="busy"] { color: var(--warning); }
-.editor-save-state[data-tone="error"] { color: var(--danger); }
+.editor-save-state[data-tone="ok"] { color: #7fd6a2; }
+.editor-save-state[data-tone="busy"] { color: #ffcf8f; }
+.editor-save-state[data-tone="error"] { color: #ff9d9d; }
+
+.sample-badge {
+  position: absolute;
+  top: 0.7rem;
+  left: 0.7rem;
+  display: none;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(255, 180, 84, 0.16);
+  border: 1px solid rgba(255, 180, 84, 0.45);
+  color: #ffcf8f;
+  font-size: 0.78rem;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.editor-canvas-wrap.is-sample .sample-badge {
+  display: inline-flex;
+}
 
 .editor-hints {
   font-size: 0.78rem;
@@ -1289,4 +1353,51 @@ textarea:focus {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.6rem;
+}
+
+.editor-config-panel .section-title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.field-panel-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.panel-empty {
+  display: none;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  padding: 0.4rem 0 0.6rem;
+}
+
+.editor-config-panel.is-empty .panel-empty {
+  display: block;
+}
+
+.editor-config-panel.is-empty .field-config-form {
+  display: none;
+}
+
+.color-input-row {
+  align-items: stretch;
+}
+
+.color-input-row input[type="color"] {
+  width: 100%;
+  height: 100%;
+  min-height: 2.9rem;
+  padding: 0.25rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
 }

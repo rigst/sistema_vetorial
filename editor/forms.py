@@ -77,6 +77,8 @@ class DocumentTemplateForm(forms.ModelForm):
         model = DocumentTemplate
         fields = ["name", "description", "background_pdf"]
         labels = {
+            "name": "Nome",
+            "description": "Descrição",
             "background_pdf": "Fundo (PDF, PNG, JPG ou WebP)",
         }
         widgets = {

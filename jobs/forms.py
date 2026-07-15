@@ -36,8 +36,14 @@ class GenerationJobForm(forms.ModelForm):
     class Meta:
         model = GenerationJob
         fields = ["name", "template", "source_excel"]
+        labels = {
+            "name": "Nome do job",
+            "template": "Template",
+            "source_excel": "Planilha Excel (.xlsx)",
+        }
         widgets = {
             "name": forms.TextInput(attrs={"placeholder": "Ex.: Lote abril 2026"}),
+            "source_excel": forms.FileInput(attrs={"accept": ".xlsx,.xlsm"}),
         }
 
     def __init__(self, *args, **kwargs):

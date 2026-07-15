@@ -187,10 +187,10 @@
       const vpt = canvas.viewportTransform;
       const zoom = canvas.getZoom();
       ctx.save();
-      ctx.strokeStyle = "rgba(60, 87, 85, 0.45)";
+      ctx.strokeStyle = "rgba(232, 244, 240, 0.55)";
       ctx.lineWidth = 1;
       ctx.strokeRect(vpt[4] - 0.5, vpt[5] - 0.5, page.width * zoom + 1, page.height * zoom + 1);
-      ctx.strokeStyle = "rgba(124, 92, 255, 0.9)";
+      ctx.strokeStyle = "rgba(255, 84, 174, 0.95)";
       ctx.lineWidth = 1;
       snapGuides.forEach((guide) => {
         ctx.beginPath();
@@ -591,6 +591,7 @@
 
     const updateSampleUi = () => {
       if (sampleControls) sampleControls.classList.toggle("is-active", sample.active);
+      if (wrap) wrap.classList.toggle("is-sample", sample.active);
       if (sampleLabel) {
         sampleLabel.textContent = sample.active
           ? `linha ${sample.rows[sample.index].row_number} (${sample.index + 1}/${sample.rows.length}${sample.total > sample.rows.length ? ` de ${sample.total}` : ""})`
@@ -666,10 +667,21 @@
     const selectedFields = () =>
       canvas.getActiveObjects().map((obj) => fieldsById.get(obj.vetFieldId)).filter(Boolean);
 
+    const panelEl = document.getElementById("field-panel");
+    const panelNameEl = document.getElementById("field-panel-name");
+
     function syncPanel() {
       if (readOnly || !formEl) return;
       const selected = selectedFields();
       const field = selected[0];
+      if (panelEl) panelEl.classList.toggle("is-empty", !field);
+      if (panelNameEl) {
+        panelNameEl.textContent = !field
+          ? ""
+          : selected.length > 1
+            ? `— ${selected.length} selecionados`
+            : `— ${field.name}`;
+      }
       if (!field) {
         formEl.reset();
         setStatus("Crie ou selecione um campo.");
@@ -845,6 +857,25 @@
     };
     document.getElementById("delete-field-button")?.addEventListener("click", deleteSelected);
 
+    // ----- centralizar na página -----
+    const centerSelected = (axis) => {
+      const objs = canvas.getActiveObjects().filter((obj) => obj.vetFieldId);
+      if (!objs.length) { setStatus("Selecione um campo para centralizar."); return; }
+      objs.forEach((obj) => {
+        obj.setCoords();
+        const rect = obj.getBoundingRect();
+        if (axis === "h") obj.set("left", obj.left + (page.width / 2 - (rect.left + rect.width / 2)));
+        else obj.set("top", obj.top + (page.height / 2 - (rect.top + rect.height / 2)));
+        obj.setCoords();
+        commitObject(obj);
+      });
+      canvas.requestRenderAll();
+      pushHistory();
+      syncPanel();
+    };
+    document.getElementById("align-center-h")?.addEventListener("click", () => centerSelected("h"));
+    document.getElementById("align-center-v")?.addEventListener("click", () => centerSelected("v"));
+
     // ----- toolbar restante -----
     document.getElementById("zoom-in-button")?.addEventListener("click", () => zoomBy(1.2));
     document.getElementById("zoom-out-button")?.addEventListener("click", () => zoomBy(1 / 1.2));
@@ -927,6 +958,7 @@
     // ----- inicialização final -----
     window.addEventListener("resize", debounce(fitToScreen, 150));
     fitToScreen();
+    window.__vetorialEditor = { canvas, fields, sample };
     if (!readOnly) {
       setStatus(fields.length ? "Selecione um campo para editar." : "Crie o primeiro campo com “Novo campo”.");
       setSaveState("Salvo ✓", "ok");

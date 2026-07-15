@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static l10n %}
 
 {% block title %}Visualizar {{ template_obj.name }} | StölbenVetorial{% endblock %}
 
@@ -36,13 +36,13 @@
 {% block extra_js %}
 {% if preview_pages %}
 <script src="{% static 'js/fabric.min.js' %}?v=6.7.1"></script>
-<script src="{% static 'js/template_editor.js' %}?v=20260715-01"></script>
+<script src="{% static 'js/template_editor.js' %}?v=20260715-02"></script>
 <script>
 VetorialTemplateEditor.init({
   canvasId: "editor-canvas",
   wrapId: "editor-canvas-wrap",
   readOnly: true,
-  page: { width: {{ template_obj.page_width|default:1 }}, height: {{ template_obj.page_height|default:1 }} },
+  page: { width: {{ template_obj.page_width|default:1|unlocalize }}, height: {{ template_obj.page_height|default:1|unlocalize }} },
   backgroundUrl: "{% url 'editor:preview-page' template_obj.pk 1 %}",
   fields: JSON.parse(document.getElementById("editor-field-data").textContent),
   fonts: JSON.parse(document.getElementById("editor-font-data").textContent),
