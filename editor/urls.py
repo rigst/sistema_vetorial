@@ -12,6 +12,7 @@ from .views import (
     TemplatePreviewPageImageView,
     TemplateFieldsApiView,
     TemplateLayoutUpdateView,
+    TemplateSampleDataView,
 )
 
 app_name = "editor"
@@ -27,5 +28,6 @@ urlpatterns = [
     path("<int:pk>/excluir/", DocumentTemplateDeleteView.as_view(), name="delete"),
     path("<int:pk>/layout/", TemplateLayoutUpdateView.as_view(), name="layout-update"),
     path("<int:pk>/campos/", TemplateFieldsApiView.as_view(), name="fields-api"),
+    path("<int:pk>/amostra/", TemplateSampleDataView.as_view(), name="sample-data"),
     path("campos/<int:pk>/", TemplateFieldApiView.as_view(), name="field-api"),
 ]

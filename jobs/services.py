@@ -246,7 +246,15 @@ def _fit_text_lines(text: str, font_name: str, font_size: float, max_width: floa
     return [trimmed], font_size
 
 
-def _draw_field(pdf_canvas, field: TemplateField, value: str):
+# Constantes de métrica do Fabric.js (editor visual): a primeira baseline fica a
+# fontSize * 1.13 * (1 - 0.222) do topo da caixa. Usar a mesma fórmula aqui faz o
+# PDF gerado coincidir com o que o editor mostra na tela.
+FABRIC_FONT_SIZE_MULT = 1.13
+FABRIC_FONT_SIZE_FRACTION = 0.222
+FIRST_BASELINE_FACTOR = FABRIC_FONT_SIZE_MULT * (1 - FABRIC_FONT_SIZE_FRACTION)
+
+
+def _draw_field(pdf_canvas, field: TemplateField, value: str, page_height: float):
     font_name = _register_font(field)
     validate_font_supports_text(field, value)
     font_size = float(field.font_size)
@@ -262,7 +270,7 @@ def _draw_field(pdf_canvas, field: TemplateField, value: str):
     )
 
     line_height = max(adjusted_size * float(field.line_height), adjusted_size * 0.2)
-    top_y = float(field.y)
+    rotation = float(field.rotation or 0)
 
     def aligned_x(draw_x, line):
         if field.text_align == TemplateField.TextAlign.CENTER and max_width > 0:
@@ -270,6 +278,9 @@ def _draw_field(pdf_canvas, field: TemplateField, value: str):
         if field.text_align == TemplateField.TextAlign.RIGHT and max_width > 0:
             return draw_x + max_width - pdfmetrics.stringWidth(line, font_name, adjusted_size)
         return draw_x
+
+    def baseline_y(index):
+        return -((FIRST_BASELINE_FACTOR * adjusted_size) + (index * line_height))
 
     def draw_text_line(draw_x, baseline_y, line, *, fill_color=None, stroke_color=None, line_width=1, alpha=1):
         pdf_canvas.saveState()
@@ -292,15 +303,21 @@ def _draw_field(pdf_canvas, field: TemplateField, value: str):
         pdf_canvas.drawText(text)
         pdf_canvas.restoreState()
 
+    pdf_canvas.saveState()
+    # Origem local no canto superior-esquerdo da caixa; y cresce para baixo no
+    # editor, então as baselines ficam em y locais negativos.
+    pdf_canvas.translate(float(field.x), page_height - float(field.y))
+    if rotation:
+        pdf_canvas.rotate(-rotation)
+
     if field.border_enabled and float(field.border_size_ratio or 0) > 0:
         border_width = max(adjusted_size * float(field.border_size_ratio), 0.2)
         blur_factor = max(float(field.border_blur or 0), 0)
         border_alpha = min(max(float(field.border_opacity or 1), 0), 1)
         border_color = HexColor(field.border_color or "#000000")
-        pdf_canvas.saveState()
         for index, line in enumerate(lines[:max_lines]):
-            baseline_y = top_y - adjusted_size - (index * line_height)
-            x = aligned_x(float(field.x), line)
+            line_baseline = baseline_y(index)
+            x = aligned_x(0, line)
             if blur_factor > 0:
                 shadow_samples = max(6 + int(blur_factor * 4), 6)
                 shadow_radius = blur_factor * 0.35
@@ -308,14 +325,14 @@ def _draw_field(pdf_canvas, field: TemplateField, value: str):
                     angle = (sample / shadow_samples) * math.tau
                     draw_text_line(
                         x + (shadow_radius * math.cos(angle)),
-                        baseline_y + (shadow_radius * math.sin(angle)),
+                        line_baseline + (shadow_radius * math.sin(angle)),
                         line,
                         fill_color=border_color,
                         alpha=max(border_alpha * 0.22, 0.05),
                     )
             draw_text_line(
                 x,
-                baseline_y,
+                line_baseline,
                 line,
                 fill_color=HexColor(field.color or "#000000"),
                 stroke_color=border_color,
@@ -325,12 +342,9 @@ def _draw_field(pdf_canvas, field: TemplateField, value: str):
         pdf_canvas.restoreState()
         return
 
-    pdf_canvas.saveState()
     fill_color = HexColor(field.color or "#000000")
     for index, line in enumerate(lines[:max_lines]):
-        baseline_y = top_y - adjusted_size - (index * line_height)
-        x = aligned_x(float(field.x), line)
-        draw_text_line(x, baseline_y, line, fill_color=fill_color)
+        draw_text_line(aligned_x(0, line), baseline_y(index), line, fill_color=fill_color)
     pdf_canvas.restoreState()
 
 
@@ -348,7 +362,7 @@ def _build_overlay_pdf(job: GenerationJob, payload: dict) -> bytes:
         if not raw_value:
             raw_value = payload.get(field.name) or field.empty_value or field.name
         value = format_field_value(field, raw_value)
-        _draw_field(pdf_canvas, field, value)
+        _draw_field(pdf_canvas, field, value, page_height)
     pdf_canvas.showPage()
     pdf_canvas.save()
     return buffer.getvalue()

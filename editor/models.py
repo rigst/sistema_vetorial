@@ -69,10 +69,14 @@ class TemplateField(TimeStampedModel):
     order_index = models.PositiveIntegerField(default=0)
     page_number = models.PositiveIntegerField(default=1)
     value_type = models.CharField(max_length=20, choices=ValueType.choices, default=ValueType.TEXT)
+    # x/y: canto superior-esquerdo da caixa, em pontos PDF, medidos a partir do
+    # topo-esquerda da página (mesmo sistema do canvas do editor).
     x = models.DecimalField(max_digits=8, decimal_places=2)
     y = models.DecimalField(max_digits=8, decimal_places=2)
     width = models.DecimalField(max_digits=8, decimal_places=2, default=0)
     height = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    # rotação em graus, sentido horário, em torno do canto superior-esquerdo.
+    rotation = models.DecimalField(max_digits=6, decimal_places=2, default=0)
     font = models.ForeignKey(FontAsset, on_delete=models.PROTECT, related_name="template_fields")
     font_size = models.DecimalField(max_digits=6, decimal_places=2)
     text_align = models.CharField(max_length=10, choices=TextAlign.choices, default=TextAlign.LEFT)

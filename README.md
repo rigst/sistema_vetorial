@@ -6,9 +6,11 @@ Sistema Django para edição visual de templates em PDF e geração de arquivos 
 
 - login com acesso visitante temporário;
 - exclusão automática dos dados do visitante ao sair;
-- templates com PDF de uma única página;
-- editor visual na mesma página, com arraste e atualização dinâmica;
-- campos configurados por nome, coluna numérica do Excel, fonte, cor e opções avançadas;
+- templates com fundo em PDF de uma página ou imagem (PNG/JPG/WebP, convertida para PDF);
+- editor visual baseado em Fabric.js: arraste, redimensione, gire, multi-seleção, snap com guias, zoom, undo/redo, atalhos de teclado e edição de texto com duplo clique;
+- pré-visualização fiel: as fontes do usuário são carregadas no navegador e a métrica de texto do editor é replicada na geração do PDF;
+- teste com dados reais no editor: envio de um Excel de amostra e navegação linha a linha;
+- campos configurados por nome, coluna numérica do Excel, fonte, cor, rotação, contorno e opções avançadas;
 - fontes ativas e inativas por usuário;
 - jobs com retenção automática de 7 dias;
 - storage privado com acesso restrito ao dono dos arquivos.

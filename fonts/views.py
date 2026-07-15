@@ -1,7 +1,8 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
 from django.db.models import Q
-from django.shortcuts import redirect
+from django.http import FileResponse
+from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import CreateView, ListView, UpdateView
@@ -60,3 +61,11 @@ class FontAssetDeleteView(LoginRequiredMixin, View):
             font.save(update_fields=["is_active", "updated_at"])
             messages.success(request, "Fonte movida para inativas.")
         return redirect("fonts:list")
+
+
+class FontAssetFileView(LoginRequiredMixin, View):
+    """Serve o arquivo TTF/OTF do dono para uso como webfont no editor."""
+
+    def get(self, request, *args, **kwargs):
+        font = get_object_or_404(FontAsset, pk=kwargs["pk"], user=request.user)
+        return FileResponse(font.file.open("rb"), content_type="font/ttf")

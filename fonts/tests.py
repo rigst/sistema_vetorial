@@ -60,3 +60,21 @@ class FontTests(TestCase):
         self.assertEqual(response.status_code, 302)
         font.refresh_from_db()
         self.assertFalse(font.is_active)
+
+    def test_font_file_endpoint_serves_only_owner(self):
+        font = FontAsset.objects.create(
+            user=self.user,
+            name="Dejavu",
+            family="Dejavu Sans",
+            file=SimpleUploadedFile("DejaVuSans.ttf", self.font_path.read_bytes(), content_type="font/ttf"),
+        )
+        url = reverse("fonts:file", kwargs={"pk": font.pk})
+
+        other = get_user_model().objects.create_user(username="outro-fontes", password="senha123")
+        self.client.force_login(other)
+        self.assertEqual(self.client.get(url).status_code, 404)
+
+        self.client.force_login(self.user)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "font/ttf")

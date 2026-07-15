@@ -1182,3 +1182,111 @@ textarea:focus {
     width: 100%;
   }
 }
+
+/* ===== Editor visual (Fabric.js) ===== */
+.editor-preview-panel {
+  width: 100%;
+  min-width: 0;
+}
+
+.editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 0.7rem;
+}
+
+.toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.25rem 0.35rem;
+}
+
+.toolbar-button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  padding: 0.32rem 0.55rem;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+  line-height: 1;
+}
+
+.toolbar-button:hover {
+  background: var(--surface-strong-2);
+  color: var(--accent);
+}
+
+.toolbar-button-danger:hover {
+  color: var(--danger);
+}
+
+.toolbar-label {
+  font-size: 0.82rem;
+  color: var(--text-soft);
+  min-width: 3ch;
+  text-align: center;
+  padding: 0 0.2rem;
+}
+
+#sample-controls .sample-only {
+  display: none;
+}
+
+#sample-controls.is-active .sample-only {
+  display: inline-flex;
+}
+
+.editor-canvas-wrap {
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background:
+    repeating-conic-gradient(rgba(60, 87, 85, 0.06) 0% 25%, transparent 0% 50%) 0 0 / 22px 22px,
+    var(--bg-soft);
+  overflow: hidden;
+  touch-action: none;
+}
+
+.editor-statusbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  padding: 0.45rem 0.2rem 0;
+  font-size: 0.85rem;
+}
+
+.editor-save-state {
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.editor-save-state[data-tone="ok"] { color: var(--success); }
+.editor-save-state[data-tone="busy"] { color: var(--warning); }
+.editor-save-state[data-tone="error"] { color: var(--danger); }
+
+.editor-hints {
+  font-size: 0.78rem;
+  margin-top: 0.55rem;
+  line-height: 1.5;
+}
+
+.field-group-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}

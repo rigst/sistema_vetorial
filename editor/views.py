@@ -1,5 +1,6 @@
 import json
 from copy import deepcopy
+from tempfile import NamedTemporaryFile
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -13,7 +14,7 @@ from django.views.generic import CreateView, DetailView, ListView, TemplateView,
 
 from core.mixins import UserOwnedQuerysetMixin
 from fonts.models import FontAsset
-from jobs.services import format_field_value
+from jobs.services import format_field_value, load_excel_rows
 
 from .forms import DocumentTemplateForm
 from .models import DocumentTemplate, TemplateField, TemplatePreviewPage
@@ -33,6 +34,7 @@ def field_to_dict(field: TemplateField) -> dict:
         "y": float(field.y),
         "width": float(field.width),
         "height": float(field.height),
+        "rotation": float(field.rotation),
         "font_id": field.font_id,
         "font_name": field.font.name,
         "font_size": float(field.font_size),
@@ -149,7 +151,15 @@ def _template_editor_context(template_obj, user):
         "preview_pages": template_obj.preview_pages.all(),
         "field_json": [field_to_dict(field) for field in fields],
         "font_options": fonts,
-        "font_json": [{"id": font.id, "name": font.name} for font in fonts],
+        "font_json": [
+            {
+                "id": font.id,
+                "name": font.name,
+                "family": font.family,
+                "url": reverse("fonts:file", kwargs={"pk": font.pk}),
+            }
+            for font in fonts
+        ],
         "page_width_cm": round(float(template_obj.page_width or 0) * 2.54 / 72, 2) if template_obj.page_width else 0,
         "page_height_cm": round(float(template_obj.page_height or 0) * 2.54 / 72, 2) if template_obj.page_height else 0,
     }
@@ -178,12 +188,7 @@ class DocumentTemplatePreviewView(UserOwnedQuerysetMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["template_obj"] = self.template_obj
-        context["preview_pages"] = self.template_obj.preview_pages.all()
-        context["field_json"] = [
-            {**field_to_dict(field), "preview_value": format_field_value(field, field.empty_value or field.name)}
-            for field in self.template_obj.fields.select_related("font").order_by("order_index", "id")
-        ]
+        context.update(_template_editor_context(self.template_obj, self.request.user))
         return context
 
 
@@ -260,6 +265,7 @@ class TemplateFieldsApiView(LoginRequiredMixin, View):
             y=center_y,
             width=width,
             height=height,
+            rotation=payload.get("rotation") or 0,
             font=font,
             font_size=payload.get("font_size") or max(round(page_height * 0.09, 2), 28),
             text_align=payload.get("text_align") or TemplateField.TextAlign.CENTER,
@@ -299,6 +305,7 @@ class TemplateFieldApiView(LoginRequiredMixin, View):
             "y",
             "width",
             "height",
+            "rotation",
             "font_size",
             "text_align",
             "text_transform",
@@ -349,9 +356,55 @@ class TemplateLayoutUpdateView(LoginRequiredMixin, View):
             field.y = item["y"]
             field.width = item["width"]
             field.height = item["height"]
+            field.rotation = item.get("rotation", field.rotation)
+            if item.get("font_size"):
+                field.font_size = item["font_size"]
             field.page_number = 1
-            field.save(update_fields=["x", "y", "width", "height", "page_number", "updated_at"])
+            field.save(update_fields=["x", "y", "width", "height", "rotation", "font_size", "page_number", "updated_at"])
         return JsonResponse({"ok": True, "updated": len(updates)})
+
+
+class TemplateSampleDataView(LoginRequiredMixin, View):
+    """Recebe um Excel de amostra e devolve os valores formatados por campo,
+    para o editor pré-visualizar o layout com dados reais, linha a linha."""
+
+    MAX_ROWS = 200
+
+    def post(self, request, *args, **kwargs):
+        template_obj = get_object_or_404(DocumentTemplate, pk=kwargs["pk"], user=request.user)
+        upload = request.FILES.get("excel")
+        if not upload:
+            return JsonResponse({"error": "Envie um arquivo Excel (.xlsx)."}, status=400)
+        try:
+            with NamedTemporaryFile(suffix=".xlsx") as temp:
+                for chunk in upload.chunks():
+                    temp.write(chunk)
+                temp.flush()
+                headers, data_rows = load_excel_rows(temp.name)
+        except Exception:
+            return JsonResponse(
+                {"error": "Não foi possível ler o Excel. Verifique se o arquivo está íntegro e no formato .xlsx."},
+                status=400,
+            )
+        if not data_rows:
+            return JsonResponse({"error": "O Excel não possui linhas preenchidas após o cabeçalho."}, status=400)
+
+        fields = list(template_obj.fields.select_related("font"))
+        rows = []
+        for row_number, payload in data_rows[: self.MAX_ROWS]:
+            values = {}
+            for field in fields:
+                raw_value = ""
+                if field.excel_column and str(field.excel_column).isdigit():
+                    raw_value = payload.get(f"coluna_{int(field.excel_column)}", "")
+                if not raw_value:
+                    raw_value = payload.get(field.name) or field.empty_value or field.name
+                try:
+                    values[str(field.id)] = format_field_value(field, raw_value)
+                except Exception:
+                    values[str(field.id)] = str(raw_value)
+            rows.append({"row_number": row_number, "values": values})
+        return JsonResponse({"headers": headers, "rows": rows, "total": len(data_rows)})
 
 
 class TemplatePreviewPageImageView(LoginRequiredMixin, View):
