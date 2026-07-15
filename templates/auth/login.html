@@ -13,13 +13,6 @@
             {{ form.as_p }}
             <button type="submit">Entrar</button>
         </form>
-        <div class="visitor-box">
-            <p class="muted">Quer apenas testar a interface? O acesso visitante cria um perfil temporário e exclui templates, fontes e jobs ao sair.</p>
-            <form method="post">
-                {% csrf_token %}
-                <button type="submit" name="entrar_visitante" value="1" class="button button-secondary">Entrar como visitante</button>
-            </form>
-        </div>
     </div>
 </section>
 {% endblock %}

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import secrets
 from pathlib import Path
 
-from django.contrib.auth import get_user_model, login, logout
+from django.contrib.auth import logout
 from django.contrib import messages
 from django.shortcuts import redirect
 from django.urls import reverse
@@ -64,22 +63,11 @@ class UsuarioLoginView(LoginView):
 
     def post(self, request, *args, **kwargs):
         if "entrar_visitante" in request.POST:
-            username = f"visitante_{secrets.token_hex(4)}"
-            user = get_user_model().objects.create_user(
-                username=username,
-                password=secrets.token_urlsafe(24),
-                first_name="Visitante",
-            )
-            profile = ensure_user_profile(user)
-            profile.role = UserProfile.Role.VISITOR
-            profile.save(update_fields=["role", "updated_at"])
-            ensure_default_fonts(user)
-            login(request, user)
-            messages.info(
+            messages.warning(
                 request,
-                "Você entrou como visitante. Ao sair, seus templates, fontes e jobs temporários serão excluídos automaticamente.",
+                "O acesso visitante está temporariamente desativado.",
             )
-            return redirect(reverse("core:home"))
+            return redirect(reverse("login"))
         response = super().post(request, *args, **kwargs)
         if request.user.is_authenticated:
             ensure_user_profile(request.user)

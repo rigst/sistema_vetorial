@@ -13,7 +13,6 @@ from reportlab.pdfgen import canvas
 
 from core.auth import ensure_default_fonts
 from core.cleanup import cleanup_expired_records
-from core.models import UserProfile
 from core.storage import PrivateMediaStorage
 from editor.models import DocumentTemplate
 from editor.services import update_template_pdf_metadata
@@ -47,15 +46,11 @@ class CoreTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse("login"), response.url)
 
-    def test_visitor_login_and_logout_cleanup(self):
+    def test_visitor_access_is_disabled(self):
         response = self.client.post(reverse("login"), {"entrar_visitante": "1"}, follow=True)
         self.assertEqual(response.status_code, 200)
-        user = get_user_model().objects.get(username__startswith="visitante_")
-        self.assertEqual(user.profile.role, UserProfile.Role.VISITOR)
-
-        response = self.client.post(reverse("logout"), follow=True)
-        self.assertContains(response, "dados temporários")
-        self.assertFalse(get_user_model().objects.filter(pk=user.pk).exists())
+        self.assertContains(response, "O acesso visitante está temporariamente desativado.")
+        self.assertFalse(get_user_model().objects.filter(username__startswith="visitante_").exists())
 
     def test_ensure_default_fonts_creates_builtin_fonts(self):
         user = get_user_model().objects.create_user(username="font-user", password="senha123")
