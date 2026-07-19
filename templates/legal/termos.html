@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Termos de Uso · StölbenVetorial{% endblock %}
+
+{% block content %}
+<div style="max-width:760px;margin:0 auto;padding:1.5rem 0 3rem">
+  <h1 style="margin-bottom:.25rem">Termos de Uso</h1>
+  <p style="opacity:.7;margin-bottom:1.5rem">Última atualização: 19 de julho de 2026</p>
+
+  <p>Ao usar o <strong>StölbenVetorial</strong> (vetorial.stolben.com), você concorda com estes termos.</p>
+
+  <h2>O serviço</h2>
+  <p>Sistema <strong>em desenvolvimento ativo</strong>, de acesso restrito, para geração de documentos em massa a partir de modelos PDF e planilhas. Funcionalidades podem mudar sem aviso e não há garantia de disponibilidade nem de preservação de dados nesta fase.</p>
+
+  <h2>Arquivos e responsabilidade</h2>
+  <ul>
+    <li>Você declara ter o direito de uso dos modelos, fontes e planilhas que envia, incluindo os dados de terceiros que elas contenham.</li>
+    <li>Os arquivos enviados e gerados <strong>expiram automaticamente em cerca de 7 dias</strong> — baixe os resultados; não há backup após a expiração.</li>
+    <li>Fontes tipográficas enviadas devem estar devidamente licenciadas para o uso pretendido.</li>
+  </ul>
+
+  <h2>Uso aceitável</h2>
+  <p>A conta é pessoal e intransferível. É proibido usar o serviço para fins ilícitos, gerar documentos fraudulentos ou sobrecarregar a infraestrutura.</p>
+
+  <h2>Responsabilidade e lei aplicável</h2>
+  <p>Na extensão máxima permitida pela lei, o serviço não responde por danos decorrentes do uso dos documentos gerados, de indisponibilidade ou da perda de arquivos expirados. Regem-se estes termos pelas leis brasileiras.</p>
+
+  <h2>Contato</h2>
+  <p>Dúvidas e solicitações: <a href="mailto:rodrigo@stolben.com">rodrigo@stolben.com</a>. Veja também a <a href="{% url 'privacidade' %}">Política de Privacidade</a>.</p>
+</div>
+{% endblock %}

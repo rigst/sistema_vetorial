@@ -5,51 +5,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}StölbenVetorial{% endblock %}</title>
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20260715-02">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20260715-03">
 </head>
 <body>
     <header class="site-header">
-        <div class="container">
-            <nav class="nav">
-                <div class="nav-top">
-                    <a href="{% url 'core:home' %}" class="brand">Stölben<span>Vetorial</span></a>
-
-                    {% if user.is_authenticated %}
-                        <button class="nav-toggle js-nav-toggle" type="button" aria-expanded="false" aria-controls="header-user-meta header-main-links">
-                            <span class="visually-hidden">Abrir menu</span>
-                            <span class="nav-toggle-bar" aria-hidden="true"></span>
-                            <span class="nav-toggle-bar" aria-hidden="true"></span>
-                            <span class="nav-toggle-bar" aria-hidden="true"></span>
-                        </button>
-
-                        <div id="header-user-meta" class="header-user-meta">
-                            <div class="header-user-info">
-                                <span class="header-user-greeting">{{ app_display_name }}</span>
-                                <span class="user-separator" aria-hidden="true">|</span>
-                                <span class="user-role">{{ app_role_label }}</span>
-                            </div>
-                            <div class="header-user-actions">
-                                <form action="{% url 'logout' %}" method="post">
-                                    {% csrf_token %}
-                                    <button class="nav-logout" type="submit">sair</button>
-                                </form>
-                            </div>
-                        </div>
-                    {% endif %}
+        <div class="container topbar">
+            <a href="{% url 'core:home' %}" class="brand">Stölben<span>Vetorial</span></a>
+            {% if user.is_authenticated %}
+                <div class="topbar-right">
+                    <a class="topbar-link {% if request.resolver_match.namespace == 'fonts' %}active{% endif %}" href="{% url 'fonts:list' %}">Fontes</a>
+                    <span class="topbar-user">{{ app_display_name }}</span>
+                    <form action="{% url 'logout' %}" method="post">
+                        {% csrf_token %}
+                        <button class="nav-logout" type="submit">sair</button>
+                    </form>
                 </div>
-
-                {% if user.is_authenticated %}
-                    <div id="header-main-links" class="nav-bottom">
-                        <ul class="nav-links">
-                            <li><a href="{% url 'core:home' %}" {% if request.resolver_match.namespace == 'core' and request.resolver_match.url_name == 'home' %}class="active"{% endif %}>Dashboard</a></li>
-                            <li><a href="{% url 'editor:list' %}" {% if request.resolver_match.namespace == 'editor' %}class="active"{% endif %}>Templates</a></li>
-                            <li><a href="{% url 'fonts:list' %}" {% if request.resolver_match.namespace == 'fonts' %}class="active"{% endif %}>Fontes</a></li>
-                            <li><a href="{% url 'jobs:list' %}" {% if request.resolver_match.namespace == 'jobs' %}class="active"{% endif %}>Jobs</a></li>
-                            <li><a href="{% url 'core:manual' %}" {% if request.resolver_match.namespace == 'core' and request.resolver_match.url_name == 'manual' %}class="active"{% endif %}>Manual</a></li>
-                        </ul>
-                    </div>
-                {% endif %}
-            </nav>
+            {% endif %}
         </div>
     </header>
 
@@ -69,20 +40,12 @@
         {% block content %}{% endblock %}
     </main>
 
-    <script>
-    (() => {
-      const toggle = document.querySelector(".js-nav-toggle");
-      const meta = document.querySelector("#header-user-meta");
-      const links = document.querySelector("#header-main-links");
-      if (!toggle || !meta || !links) return;
-      toggle.addEventListener("click", () => {
-        const expanded = toggle.getAttribute("aria-expanded") === "true";
-        toggle.setAttribute("aria-expanded", String(!expanded));
-        meta.classList.toggle("is-open", !expanded);
-        links.classList.toggle("is-open", !expanded);
-      });
-    })();
-    </script>
+    <footer style="max-width:1200px;margin:2.5rem auto 1.5rem;padding:0 1rem;text-align:center;font-size:.8rem;opacity:.75">
+        Um app <a href="https://stolben.com/" target="_blank" rel="noopener">Stölben</a> · © 2026 ·
+        <a href="{% url 'privacidade' %}">Privacidade</a> ·
+        <a href="{% url 'termos' %}">Termos</a>
+    </footer>
+
     {% block extra_js %}{% endblock %}
 </body>
 </html>

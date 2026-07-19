@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Política de Privacidade · StölbenVetorial{% endblock %}
+
+{% block content %}
+<div style="max-width:760px;margin:0 auto;padding:1.5rem 0 3rem">
+  <h1 style="margin-bottom:.25rem">Política de Privacidade</h1>
+  <p style="opacity:.7;margin-bottom:1.5rem">Última atualização: 19 de julho de 2026</p>
+
+  <p>Esta política descreve como o <strong>StölbenVetorial</strong> (vetorial.stolben.com), sistema em desenvolvimento e de acesso restrito, trata dados pessoais, em conformidade com a LGPD (Lei nº 13.709/2018). Responsável: Rodrigo Stölben — <a href="mailto:rodrigo@stolben.com">rodrigo@stolben.com</a>.</p>
+
+  <h2>O que coletamos</h2>
+  <ul>
+    <li><strong>Conta:</strong> nome de usuário e senha (com hash). As contas são criadas por administrador — não há cadastro público.</li>
+    <li><strong>Arquivos enviados:</strong> PDFs modelo, fontes e planilhas usadas na geração de documentos em massa. Ficam em área de mídia privada, fora do acesso público, e <strong>expiram automaticamente após cerca de 7 dias</strong> (limpeza diária).</li>
+    <li><strong>Registros de acesso:</strong> IP, data/hora e navegador (Marco Civil da Internet), com rotação automática.</li>
+  </ul>
+
+  <h2>Dados de terceiros nas planilhas</h2>
+  <p>As planilhas enviadas podem conter dados pessoais de terceiros (ex.: nomes para certificados ou crachás). Quem envia é responsável por ter base legal para usá-los; a plataforma os trata apenas para gerar os documentos solicitados e os expurga junto com os arquivos, no prazo acima.</p>
+
+  <h2>O que não fazemos</h2>
+  <p>Nenhum dado é enviado a terceiros ou a serviços de IA — o processamento é local. Não há rastreadores nem cookies de terceiros — apenas cookies essenciais de sessão e CSRF.</p>
+
+  <h2>Seus direitos</h2>
+  <p>Para acesso, correção ou exclusão antecipada de dados (LGPD, art. 18): <a href="mailto:rodrigo@stolben.com">rodrigo@stolben.com</a>.</p>
+
+  <p style="margin-top:1.5rem"><a href="{% url 'termos' %}">Termos de Uso</a></p>
+</div>
+{% endblock %}
