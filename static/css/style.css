@@ -1736,7 +1736,7 @@ textarea:focus {
   --legal-t700: var(--text-soft);
   --legal-t500: var(--muted);
   --legal-accent: var(--accent);
-  --legal-accent-forte: var(--ink);
+  --legal-accent-forte: var(--accent);
   --legal-danger: var(--danger);
   --legal-warn: var(--warning);
   --legal-raio-lg: var(--radius-lg);
