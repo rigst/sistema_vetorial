@@ -51,3 +51,21 @@ python manage.py cleanup_expired_files
 ```bash
 .venv/bin/python manage.py test
 ```
+
+## Licença
+
+Software **proprietário** — todos os direitos reservados (ver [LICENSE](LICENSE)).
+O código não é aberto nem redistribuível; o uso do serviço é regido pelos Termos de
+Uso publicados em vetorial.stolben.com.
+
+As bibliotecas de terceiros permanecem sob suas próprias licenças; o inventário está
+em [docs/LICENCAS-TERCEIROS.md](docs/LICENCAS-TERCEIROS.md), regenerável com:
+
+```bash
+./venv/bin/python scripts/licencas_terceiros.py
+```
+
+A pré-visualização de PDF chama o **`pdftoppm`** do poppler-utils (GPL-2.0) como
+processo externo, sem linkagem com este código e sem distribuir o binário — a
+reciprocidade da GPL não alcança o projeto. Fontes enviadas por usuários permanecem
+sob a licença de seus titulares, conforme os Termos de Uso.
