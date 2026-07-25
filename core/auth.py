@@ -6,7 +6,6 @@ from django.contrib.auth import logout
 from django.contrib import messages
 from django.shortcuts import redirect
 from django.urls import reverse
-from django.views.generic import TemplateView
 from django.contrib.auth.views import LoginView
 
 from editor.models import DocumentTemplate
@@ -89,6 +88,3 @@ def logout_and_cleanup(request):
         logout(request)
     return redirect(reverse("login"))
 
-
-class ManualView(TemplateView):
-    template_name = "core/manual.html"

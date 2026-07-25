@@ -6,6 +6,7 @@ from django.http import JsonResponse
 from django.db.models import Q
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
+from django.utils import timezone
 from django.views import View
 from django.views.generic import CreateView, DetailView, ListView
 
@@ -225,3 +226,53 @@ class GenerationItemDownloadView(LoginRequiredMixin, View):
         if not item or not item.output_pdf:
             return JsonResponse({"error": "not_found"}, status=404)
         return FileResponse(item.output_pdf.open("rb"), as_attachment=True, filename=item.output_pdf.name.split("/")[-1])
+
+
+class GenerationJobLaunchApiView(LoginRequiredMixin, View):
+    """Cria e dispara um job direto da bancada do projeto (AJAX)."""
+
+    def post(self, request, *args, **kwargs):
+        template_obj = DocumentTemplate.objects.filter(
+            pk=request.POST.get("template"), user=request.user, is_active=True
+        ).first()
+        if not template_obj:
+            return JsonResponse({"error": "Projeto não encontrado."}, status=404)
+        if not template_obj.fields.exists():
+            return JsonResponse({"error": "Crie ao menos um campo antes de gerar os arquivos."}, status=400)
+
+        kind = request.POST.get("kind")
+        if kind not in {GenerationJob.Kind.PREVIEW, GenerationJob.Kind.FULL}:
+            return JsonResponse({"error": "Tipo de geração inválido."}, status=400)
+
+        form = GenerationJobForm(
+            data={
+                "name": (request.POST.get("name") or "").strip()
+                or f"{template_obj.name} · {timezone.localtime():%d/%m %H:%M}",
+                "template": template_obj.pk,
+            },
+            files={"source_excel": request.FILES.get("source_excel")},
+            user=request.user,
+        )
+        if not form.is_valid():
+            first_error = next(iter(form.errors.values()))[0]
+            return JsonResponse({"error": first_error}, status=400)
+
+        job = form.save(commit=False)
+        job.user = request.user
+        job.kind = kind
+        job.status = GenerationJob.Status.QUEUED
+        job.save()
+        try:
+            spawn_job_process(settings.BASE_DIR, job.pk)
+        except Exception:
+            job.status = GenerationJob.Status.FAILED
+            job.last_error = "O job foi salvo, mas o processamento automático não pôde ser iniciado."
+            job.save(update_fields=["status", "last_error", "updated_at"])
+        return JsonResponse(
+            {
+                "id": job.pk,
+                "status": job.status,
+                "status_url": reverse("jobs:status", kwargs={"pk": job.pk}),
+            },
+            status=201,
+        )

@@ -1,58 +1,62 @@
 {% extends "base.html" %}
 
-{% block title %}Templates | StölbenVetorial{% endblock %}
+{% block title %}Projetos | StölbenVetorial{% endblock %}
 
 {% block content %}
 <section class="hero-shell">
     <div class="section-header">
         <div>
-            <div class="eyebrow">Templates</div>
-            <h1 class="hero-title">Templates</h1>
+            <div class="eyebrow">Projetos</div>
+            <h1 class="hero-title">{% if show_inactive %}Projetos inativos{% else %}Seus projetos{% endif %}</h1>
         </div>
-        <a class="button" href="{% url 'editor:create' %}">Novo template</a>
+        <div class="inline-actions">
+            <form method="get" class="page-head-search">
+                <input type="text" name="q" value="{{ query }}" placeholder="Buscar projeto…" aria-label="Buscar projeto">
+                {% if show_inactive %}<input type="hidden" name="inativos" value="1">{% endif %}
+            </form>
+            <a class="button" href="{% url 'editor:create' %}">+ Novo projeto</a>
+        </div>
     </div>
 </section>
 
-<section class="table-card">
-    {% if templates %}
-        <div class="table-scroll">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Nome</th>
-                        <th>Atualizado</th>
-                        <th>Ações</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for template in templates %}
-                        <tr>
-                            <td>{{ template.name }}</td>
-                            <td>{{ template.updated_at|date:"d/m/Y H:i" }}</td>
-                            <td class="inline-actions icon-actions">
-                                <a class="icon-button" href="{% url 'editor:preview' template.pk %}" title="Visualizar" aria-label="Visualizar">👁</a>
-                                <a class="icon-button" href="{% url 'editor:detail' template.pk %}" title="Editar" aria-label="Editar">✎</a>
-                                <form method="post" action="{% url 'editor:duplicate' template.pk %}">
-                                    {% csrf_token %}
-                                    <button type="submit" class="icon-button" title="Duplicar" aria-label="Duplicar">⧉</button>
-                                </form>
-                                <form method="post" action="{% url 'editor:delete' template.pk %}">
-                                    {% csrf_token %}
-                                    <button type="submit" class="icon-button icon-button-danger" title="Excluir" aria-label="Excluir">🗑</button>
-                                </form>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    {% else %}
-        <div class="empty-state">
-            <h2 class="section-title">Nenhum template encontrado</h2>
-            <p class="muted">Crie seu primeiro template para começar.</p>
-        </div>
-    {% endif %}
-</section>
+{% if templates %}
+    <div class="project-grid">
+        {% for template in templates %}
+            <article class="project-card">
+                <a class="project-thumb" href="{% url 'editor:detail' template.pk %}" aria-label="Abrir {{ template.name }}">
+                    {% if template.preview_image %}
+                        <img src="{% url 'editor:preview-page' template.pk 1 %}" alt="Arte de {{ template.name }}">
+                    {% else %}
+                        <span class="project-thumb-empty">sem arte de fundo</span>
+                    {% endif %}
+                </a>
+                <div class="project-card-body">
+                    <a class="project-name" href="{% url 'editor:detail' template.pk %}">{{ template.name }}</a>
+                    <span class="project-meta">atualizado em {{ template.updated_at|date:"d/m/Y H:i" }}</span>
+                    <div class="project-actions">
+                        <a class="icon-button" href="{% url 'editor:preview' template.pk %}" title="Visualizar" aria-label="Visualizar {{ template.name }}">👁</a>
+                        <form method="post" action="{% url 'editor:duplicate' template.pk %}">
+                            {% csrf_token %}
+                            <button type="submit" class="icon-button" title="Duplicar" aria-label="Duplicar {{ template.name }}">⧉</button>
+                        </form>
+                        <form method="post" action="{% url 'editor:delete' template.pk %}">
+                            {% csrf_token %}
+                            <button type="submit" class="icon-button icon-button-danger" title="Mover para inativos" aria-label="Mover {{ template.name }} para inativos">🗑</button>
+                        </form>
+                    </div>
+                </div>
+            </article>
+        {% endfor %}
+    </div>
+    {% include "partials/pagination.html" %}
+{% else %}
+    <section class="empty-state">
+        <h2 class="section-title">{% if query %}Nenhum projeto para “{{ query }}”{% else %}Comece o primeiro projeto{% endif %}</h2>
+        <p class="muted">Envie a arte de fundo (PDF ou imagem), organize os campos por cima e gere os arquivos a partir do Excel.</p>
+        <a class="button" href="{% url 'editor:create' %}">+ Novo projeto</a>
+    </section>
+{% endif %}
+
 <div class="subtle-link-row">
     {% if show_inactive %}
         <a href="{% url 'editor:list' %}" class="subtle-link">Mostrar ativos</a>
@@ -60,5 +64,4 @@
         <a href="{% url 'editor:list' %}?inativos=1" class="subtle-link">Mostrar inativos</a>
     {% endif %}
 </div>
-{% include "partials/pagination.html" %}
 {% endblock %}

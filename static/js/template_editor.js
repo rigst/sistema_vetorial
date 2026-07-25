@@ -89,12 +89,15 @@
     const fontFamilyFor = (fontId) => fontKeys[fontId] || "sans-serif";
 
     const canvas = new fabric.Canvas(canvasEl, {
-      selection: !readOnly,
+      // o retângulo de seleção fica desligado: arrastar área vazia move a
+      // página; múltiplos campos são selecionados com Shift+clique
+      selection: false,
       preserveObjectStacking: true,
       uniformScaling: true,
       stopContextMenu: true,
       fireRightClick: false,
       backgroundColor: "transparent",
+      defaultCursor: "grab",
     });
 
     // ----- fundo -----
@@ -155,14 +158,37 @@
       zoomBy(factor, new fabric.Point(opt.e.offsetX, opt.e.offsetY));
     });
 
-    // pan com barra de espaço ou botão do meio
+    // pan: arrastar área vazia com o botão esquerdo (ou espaço/botão do meio)
     let spacePressed = false;
     let panState = null;
     canvas.on("mouse:down", (opt) => {
-      if (spacePressed || opt.e.button === 1) {
+      if (spacePressed || opt.e.button === 1 || !opt.target) {
         panState = { x: opt.e.clientX, y: opt.e.clientY };
-        canvas.selection = false;
         canvas.setCursor("grabbing");
+        return;
+      }
+      // Shift+clique adiciona/remove da seleção múltipla
+      if (!readOnly && opt.e.shiftKey && opt.target.vetFieldId) {
+        const active = canvas.getActiveObject();
+        if (active && active !== opt.target) {
+          if (active instanceof fabric.ActiveSelection) {
+            if (active.getObjects().includes(opt.target)) {
+              active.remove(opt.target);
+              if (active.getObjects().length === 1) {
+                const last = active.getObjects()[0];
+                canvas.discardActiveObject();
+                canvas.setActiveObject(last);
+              }
+            } else {
+              active.add(opt.target);
+            }
+            active.setCoords();
+          } else {
+            canvas.setActiveObject(new fabric.ActiveSelection([active, opt.target], { canvas }));
+          }
+          canvas.requestRenderAll();
+          syncPanel();
+        }
       }
     });
     canvas.on("mouse:move", (opt) => {
@@ -176,7 +202,7 @@
     canvas.on("mouse:up", () => {
       if (panState) {
         panState = null;
-        canvas.selection = !readOnly;
+        canvas.setCursor("grab");
       }
       snapGuides.length = 0;
       canvas.requestRenderAll();
