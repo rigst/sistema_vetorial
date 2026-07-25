@@ -1,6 +1,7 @@
 from pathlib import Path
 import os
 import sys
+import tempfile
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -119,6 +120,12 @@ STATIC_ROOT = Path(os.environ.get("DJANGO_STATIC_ROOT", "/var/www/sistema_vetori
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = Path(os.environ.get("DJANGO_MEDIA_ROOT", "/var/www/sistema_vetorial/shared/private_media"))
+
+if "test" in sys.argv:
+    # A suíte grava fontes e PDFs de verdade. Apontando para a mídia de
+    # produção, ela só roda como www-data — e ainda sujaria os arquivos reais.
+    # Precisa vir antes de STORAGES, que congela o `location` na importação.
+    MEDIA_ROOT = Path(tempfile.mkdtemp(prefix="vetorial-test-media-"))
 
 STORAGES = {
     "default": {

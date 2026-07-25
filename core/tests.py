@@ -41,10 +41,17 @@ class CoreTests(TestCase):
         shutil.rmtree(temp_dir, ignore_errors=True)
         return SimpleUploadedFile(filename, content, content_type="application/pdf")
 
-    def test_login_required_redirects_home(self):
+    def test_acesso_anonimo_na_raiz_termina_no_login(self):
+        """A raiz virou um redirecionamento para a lista de modelos, então o
+        anônimo passa por lá antes de cair no login — dois saltos, não um."""
         response = self.client.get(reverse("core:home"))
+
         self.assertEqual(response.status_code, 302)
-        self.assertIn(reverse("login"), response.url)
+        self.assertEqual(response.url, reverse("editor:list"))
+
+        final = self.client.get(reverse("core:home"), follow=True)
+
+        self.assertIn(reverse("login"), final.redirect_chain[-1][0])
 
     def test_visitor_access_is_disabled(self):
         response = self.client.post(reverse("login"), {"entrar_visitante": "1"}, follow=True)
