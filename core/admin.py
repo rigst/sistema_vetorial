@@ -1,4 +1,5 @@
 from django.contrib import admin
+from unfold.admin import ModelAdmin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin
 
@@ -6,7 +7,7 @@ from .models import UserProfile
 
 
 @admin.register(UserProfile)
-class UserProfileAdmin(admin.ModelAdmin):
+class UserProfileAdmin(ModelAdmin):
     list_display = ("user", "role", "created_at", "updated_at")
     list_filter = ("role",)
     search_fields = ("user__username", "user__email", "user__first_name", "user__last_name")

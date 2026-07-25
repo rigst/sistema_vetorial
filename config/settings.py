@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import sys
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -24,6 +25,10 @@ ALLOWED_HOSTS = [host for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "").spl
 
 
 INSTALLED_APPS = [
+    # O unfold precisa vir antes do admin: é assim que os templates dele
+    # sobrescrevem os do django.contrib.admin.
+    "unfold",
+    "unfold.contrib.filters",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -34,6 +39,7 @@ INSTALLED_APPS = [
     "fonts",
     "editor",
     "jobs",
+    "legal",
 ]
 
 MIDDLEWARE = [
@@ -43,6 +49,9 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # Depois do Authentication (precisa de request.user): nova versão dos
+    # termos bloqueia o uso até ser aceita.
+    "legal.middleware.AceiteObrigatorioMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -125,7 +134,30 @@ STORAGES = {
 }
 
 LOGIN_URL = "login"
-LOGIN_REDIRECT_URL = "core:home"
+LOGIN_REDIRECT_URL = "editor:list"
+
+UNFOLD = {
+    "SITE_TITLE": "StölbenVetorial",
+    "SITE_HEADER": "StölbenVetorial",
+    "SITE_SUBHEADER": "Administração",
+    "SHOW_HISTORY": True,
+    "SHOW_VIEW_ON_SITE": False,
+    "COLORS": {
+        # Verde-petróleo do tema do app.
+        "primary": {
+            "50": "236 246 245", "100": "205 232 229", "200": "160 210 205",
+            "300": "110 184 177", "400": "63 152 144", "500": "31 122 114",
+            "600": "24 101 94", "700": "20 82 77", "800": "18 66 62",
+            "900": "16 55 52", "950": "8 32 30",
+        },
+    },
+}
+
+# Destino após o aceite nas telas do app `legal`.
+LEGAL_REDIRECT_URL = "editor:list"
+
+# Sem LEGAL_VISITOR_ACTION: o acesso visitante está desativado neste sistema, e
+# a tela de aceite de visitante responde 404 enquanto assim for.
 LOGOUT_REDIRECT_URL = "login"
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
@@ -151,15 +183,40 @@ if not DEBUG:
     SECURE_HSTS_PRELOAD = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
 
+if "test" in sys.argv:
+    # Sem isto, rodar a suíte com DEBUG=False faz o SecurityMiddleware devolver
+    # 301 em todo request, e os testes falham por motivo de ambiente, não de
+    # código.
+    SECURE_SSL_REDIRECT = False
+
 CSRF_TRUSTED_ORIGINS = [
     "https://vetorial.stolben.com",
     "https://www.vetorial.stolben.com",
 ]
 
+ADMIN_PATH_PREFIX = "/admin/"
+
 CONTENT_SECURITY_POLICY = (
     "default-src 'self'; "
     "img-src 'self' data: blob:; "
     "script-src 'self' 'unsafe-inline'; "
+    "style-src 'self' 'unsafe-inline'; "
+    "font-src 'self' data:; "
+    "object-src 'none'; "
+    "frame-ancestors 'none'; "
+    "base-uri 'self'; "
+    "form-action 'self'"
+)
+
+# Política exclusiva do admin. O 'unsafe-eval' é exigido pelo Alpine.js que o
+# django-unfold usa: ele compila as expressões de `x-data`/`x-init` com
+# `new Function()`, e o 'unsafe-inline' da política acima não cobre isso. Sem
+# a concessão o painel carrega sem menu, abas nem tema. Ela fica presa ao
+# /admin/, que só `is_staff` alcança.
+CONTENT_SECURITY_POLICY_ADMIN = (
+    "default-src 'self'; "
+    "img-src 'self' data: blob:; "
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
     "style-src 'self' 'unsafe-inline'; "
     "font-src 'self' data:; "
     "object-src 'none'; "

@@ -52,6 +52,23 @@ python manage.py cleanup_expired_files
 .venv/bin/python manage.py test
 ```
 
+## Conformidade legal (LGPD / Marco Civil)
+
+O app `legal` versiona os Termos de Uso e a Política de Privacidade e registra cada aceite
+com data, hora, IP, navegador e o `sha256` do texto exato aceito. Como aqui as contas são
+criadas por administrador e o acesso visitante está desativado, o aceite acontece pelo
+interstitial de re-aceite no primeiro acesso.
+
+Os registros de acesso do nginx são mantidos por **6 meses**, como exige o art. 15 do
+Marco Civil (`deploy/logrotate/stolben-acesso` e `deploy/nginx_acesso.py`).
+
+O procedimento completo está em [docs/CONFORMIDADE.md](docs/CONFORMIDADE.md).
+
+```bash
+./venv/bin/python manage.py importar_documentos_legais --publicar  # seed inicial
+./venv/bin/python manage.py exportar_documentos_legais             # espelho em git
+```
+
 ## Licença
 
 Software **proprietário** — todos os direitos reservados (ver [LICENSE](LICENSE)).
