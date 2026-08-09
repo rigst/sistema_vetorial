@@ -23,6 +23,10 @@ jobs:
       # testes não precisa de Postgres.
       postgres: false
 
+      # A suíte chama pdftoppm por subprocess para rasterizar PDF; sem o
+      # binário os testes falham com FileNotFoundError.
+      apt-packages: "poppler-utils"
+
       # Repositório privado: o plano gratuito do SonarQube Cloud cobre só
       # público, e o Codecov exigiria token próprio. Ficam desligados até que
       # o repositório abra ou ganhe um token.
