@@ -36,10 +36,15 @@ jobs:
 
       # DJANGO_DEBUG=1 desliga SECURE_SSL_REDIRECT, HSTS e cookies seguros, que
       # em produção derrubariam todo request do test client em 301.
+      # STATIC_ROOT e MEDIA_ROOT apontam por padrão para
+      # /var/www/sistema_vetorial/shared, que no runner não existe e não é
+      # gravável — os testes que escrevem arquivo morriam com PermissionError.
       test-env: |
         DJANGO_DEBUG=1
         DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,testserver
         CELERY_TASK_ALWAYS_EAGER=1
+        DJANGO_STATIC_ROOT=/tmp/vetorial-static
+        DJANGO_MEDIA_ROOT=/tmp/vetorial-media
 
       # Primeira adoção: tudo reporta antes de bloquear. Retire da lista
       # conforme cada etapa zerar.
