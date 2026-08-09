@@ -1,7 +1,7 @@
 from django.contrib import admin
-from unfold.admin import ModelAdmin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin
+from unfold.admin import ModelAdmin
 
 from .models import UserProfile
 

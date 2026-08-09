@@ -32,7 +32,12 @@ def _render_page_previews(template: DocumentTemplate) -> None:
 
     preview_files = sorted(output_dir.glob("page-*.png"))
     for index, preview_file in enumerate(preview_files, start=1):
-        preview_page = TemplatePreviewPage(template=template, page_number=index, width=template.page_width or 0, height=template.page_height or 0)
+        preview_page = TemplatePreviewPage(
+            template=template,
+            page_number=index,
+            width=template.page_width or 0,
+            height=template.page_height or 0,
+        )
         with preview_file.open("rb") as rendered:
             preview_page.image.save(
                 f"{template.storage_slug}-preview-{index}.png",
@@ -43,7 +48,9 @@ def _render_page_previews(template: DocumentTemplate) -> None:
 
     if preview_files:
         with preview_files[0].open("rb") as rendered:
-            template.preview_image.save(f"{template.storage_slug}-preview.png", File(rendered), save=False)
+            template.preview_image.save(
+                f"{template.storage_slug}-preview.png", File(rendered), save=False
+            )
 
 
 def update_template_pdf_metadata(template: DocumentTemplate) -> DocumentTemplate:

@@ -80,7 +80,9 @@ class TemplateField(TimeStampedModel):
     font = models.ForeignKey(FontAsset, on_delete=models.PROTECT, related_name="template_fields")
     font_size = models.DecimalField(max_digits=6, decimal_places=2)
     text_align = models.CharField(max_length=10, choices=TextAlign.choices, default=TextAlign.LEFT)
-    text_transform = models.CharField(max_length=20, choices=TextTransform.choices, default=TextTransform.NONE)
+    text_transform = models.CharField(
+        max_length=20, choices=TextTransform.choices, default=TextTransform.NONE
+    )
     transform_exceptions = models.CharField(max_length=255, blank=True)
     color = models.CharField(max_length=20, default="#000000")
     border_enabled = models.BooleanField(default=False)
@@ -110,7 +112,9 @@ class TemplateField(TimeStampedModel):
 
 
 class TemplatePreviewPage(TimeStampedModel):
-    template = models.ForeignKey(DocumentTemplate, on_delete=models.CASCADE, related_name="preview_pages")
+    template = models.ForeignKey(
+        DocumentTemplate, on_delete=models.CASCADE, related_name="preview_pages"
+    )
     page_number = models.PositiveIntegerField()
     image = models.ImageField(upload_to=preview_page_upload_to)
     width = models.DecimalField(max_digits=8, decimal_places=2, default=0)

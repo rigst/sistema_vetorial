@@ -18,9 +18,8 @@ class SecurityHeadersMiddleware:
     def _politica(self, request):
         prefixo = getattr(settings, "ADMIN_PATH_PREFIX", "/admin/")
         if request.path.startswith(prefixo):
-            return (
-                getattr(settings, "CONTENT_SECURITY_POLICY_ADMIN", "")
-                or getattr(settings, "CONTENT_SECURITY_POLICY", "")
+            return getattr(settings, "CONTENT_SECURITY_POLICY_ADMIN", "") or getattr(
+                settings, "CONTENT_SECURITY_POLICY", ""
             )
         return getattr(settings, "CONTENT_SECURITY_POLICY", "")
 

@@ -2,18 +2,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from django.contrib.auth import logout
 from django.contrib import messages
+from django.contrib.auth import logout
+from django.contrib.auth.views import LoginView
 from django.shortcuts import redirect
 from django.urls import reverse
-from django.contrib.auth.views import LoginView
 
 from editor.models import DocumentTemplate
 from fonts.models import FontAsset
 from jobs.models import GenerationJob
 
 from .models import UserProfile
-
 
 DEFAULT_FONT_SOURCES = [
     ("Dejavu Sans", Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")),
@@ -34,9 +33,15 @@ def ensure_default_fonts(user) -> None:
         if FontAsset.objects.filter(user=user, name=font_name, is_builtin=True).exists():
             continue
         with font_path.open("rb") as font_file:
-            font = FontAsset(user=user, name=font_name, family=font_name, is_builtin=True, is_active=True)
+            font = FontAsset(
+                user=user, name=font_name, family=font_name, is_builtin=True, is_active=True
+            )
             font.file.save(font_path.name, font_file, save=False)
-            font.metadata = {"builtin": True, "supports_pt_br_basic": True, "source": str(font_path)}
+            font.metadata = {
+                "builtin": True,
+                "supports_pt_br_basic": True,
+                "source": str(font_path),
+            }
             font.save()
 
 
@@ -76,7 +81,9 @@ class UsuarioLoginView(LoginView):
 
 def logout_and_cleanup(request):
     user = request.user if request.user.is_authenticated else None
-    was_visitor = bool(user and hasattr(user, "profile") and user.profile.role == UserProfile.Role.VISITOR)
+    was_visitor = bool(
+        user and hasattr(user, "profile") and user.profile.role == UserProfile.Role.VISITOR
+    )
     if was_visitor:
         cleanup_visitor_data(user)
         logout(request)
@@ -87,4 +94,3 @@ def logout_and_cleanup(request):
     else:
         logout(request)
     return redirect(reverse("login"))
-

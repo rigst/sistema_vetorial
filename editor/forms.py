@@ -10,7 +10,6 @@ from fonts.models import FontAsset
 
 from .models import DocumentTemplate, TemplateField
 
-
 IMAGE_SUFFIXES = {"png", "jpg", "jpeg", "webp"}
 
 
@@ -19,7 +18,9 @@ def _image_to_pdf(uploaded, base_name: str) -> ContentFile:
         image = Image.open(uploaded)
         image.load()
     except Exception as exc:
-        raise forms.ValidationError("Não foi possível ler esta imagem. Verifique se o arquivo não está corrompido.") from exc
+        raise forms.ValidationError(
+            "Não foi possível ler esta imagem. Verifique se o arquivo não está corrompido."
+        ) from exc
     if image.mode in {"RGBA", "LA", "P"}:
         converted = image.convert("RGBA")
         background = Image.new("RGB", converted.size, (255, 255, 255))
@@ -55,7 +56,9 @@ class DocumentTemplateForm(forms.ModelForm):
             uploaded.seek(0)
             if isinstance(exc, forms.ValidationError):
                 raise
-            raise forms.ValidationError("Não foi possível ler este PDF. Verifique se o arquivo não está corrompido.") from exc
+            raise forms.ValidationError(
+                "Não foi possível ler este PDF. Verifique se o arquivo não está corrompido."
+            ) from exc
         uploaded.seek(0)
         return uploaded
 
@@ -64,7 +67,11 @@ class DocumentTemplateForm(forms.ModelForm):
         base_slug = slugify(instance.name) or "template"
         slug = base_slug
         counter = 2
-        while DocumentTemplate.objects.filter(user=instance.user, slug=slug).exclude(pk=instance.pk).exists():
+        while (
+            DocumentTemplate.objects.filter(user=instance.user, slug=slug)
+            .exclude(pk=instance.pk)
+            .exists()
+        ):
             slug = f"{base_slug}-{counter}"
             counter += 1
         instance.slug = slug
@@ -83,7 +90,9 @@ class DocumentTemplateForm(forms.ModelForm):
         }
         widgets = {
             "name": forms.TextInput(attrs={"placeholder": "Ex.: Certificado Base 2026"}),
-            "description": forms.Textarea(attrs={"rows": 4, "placeholder": "Observações do template."}),
+            "description": forms.Textarea(
+                attrs={"rows": 4, "placeholder": "Observações do template."}
+            ),
             "background_pdf": forms.FileInput(attrs={"accept": ".pdf,.png,.jpg,.jpeg,.webp"}),
         }
 
@@ -122,4 +131,6 @@ class TemplateFieldForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         user = kwargs.pop("user")
         super().__init__(*args, **kwargs)
-        self.fields["font"].queryset = FontAsset.objects.filter(user=user, is_active=True).order_by("name")
+        self.fields["font"].queryset = FontAsset.objects.filter(user=user, is_active=True).order_by(
+            "name"
+        )

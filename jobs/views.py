@@ -1,9 +1,9 @@
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.files.base import ContentFile
-from django.http import FileResponse
-from django.http import JsonResponse
 from django.db.models import Q
+from django.http import FileResponse, JsonResponse
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -11,7 +11,6 @@ from django.views import View
 from django.views.generic import CreateView, DetailView, ListView
 
 from core.mixins import UserOwnedQuerysetMixin
-from django.conf import settings
 from editor.models import DocumentTemplate
 
 from .forms import GenerationJobForm
@@ -31,7 +30,9 @@ class GenerationJobListView(UserOwnedQuerysetMixin, ListView):
         show_inactive = self.request.GET.get("inativos") == "1"
         queryset = queryset.filter(is_active=not show_inactive)
         if query:
-            queryset = queryset.filter(Q(name__icontains=query) | Q(template__name__icontains=query))
+            queryset = queryset.filter(
+                Q(name__icontains=query) | Q(template__name__icontains=query)
+            )
         return queryset
 
     def get_context_data(self, **kwargs):
@@ -56,7 +57,9 @@ class GenerationJobCreateView(LoginRequiredMixin, CreateView):
     def form_valid(self, form):
         form.instance.user = self.request.user
         form.instance.kind = (
-            GenerationJob.Kind.FULL if "generate_full" in self.request.POST else GenerationJob.Kind.PREVIEW
+            GenerationJob.Kind.FULL
+            if "generate_full" in self.request.POST
+            else GenerationJob.Kind.PREVIEW
         )
         form.instance.status = GenerationJob.Status.QUEUED
         response = super().form_valid(form)
@@ -64,9 +67,7 @@ class GenerationJobCreateView(LoginRequiredMixin, CreateView):
             spawn_job_process(settings.BASE_DIR, self.object.pk)
         except Exception:
             self.object.status = GenerationJob.Status.FAILED
-            self.object.last_error = (
-                "O job foi salvo, mas não foi possível iniciar o processamento automático. Tente reenviar o job."
-            )
+            self.object.last_error = "O job foi salvo, mas não foi possível iniciar o processamento automático. Tente reenviar o job."
             self.object.save(update_fields=["status", "last_error", "updated_at"])
             messages.error(self.request, self.object.last_error)
         else:
@@ -81,9 +82,17 @@ class GenerationJobCreateView(LoginRequiredMixin, CreateView):
         template_id = self.request.GET.get("template") or self.request.POST.get("template")
         template_obj = None
         if template_id:
-            template_obj = DocumentTemplate.objects.filter(pk=template_id, user=self.request.user).prefetch_related("fields").first()
+            template_obj = (
+                DocumentTemplate.objects.filter(pk=template_id, user=self.request.user)
+                .prefetch_related("fields")
+                .first()
+            )
         context["selected_template"] = template_obj
-        context["expected_headers"] = [field.excel_column for field in template_obj.fields.all() if field.excel_column] if template_obj else []
+        context["expected_headers"] = (
+            [field.excel_column for field in template_obj.fields.all() if field.excel_column]
+            if template_obj
+            else []
+        )
         return context
 
 
@@ -105,9 +114,13 @@ class GenerationJobDeleteView(LoginRequiredMixin, View):
 
 class PromotePreviewJobView(LoginRequiredMixin, View):
     def post(self, request, *args, **kwargs):
-        preview_job = GenerationJob.objects.filter(
-            pk=kwargs["pk"], user=request.user, kind=GenerationJob.Kind.PREVIEW
-        ).select_related("template").first()
+        preview_job = (
+            GenerationJob.objects.filter(
+                pk=kwargs["pk"], user=request.user, kind=GenerationJob.Kind.PREVIEW
+            )
+            .select_related("template")
+            .first()
+        )
         if not preview_job:
             messages.error(request, "Prévia não encontrada.")
             return redirect("jobs:list")
@@ -128,9 +141,7 @@ class PromotePreviewJobView(LoginRequiredMixin, View):
             spawn_job_process(settings.BASE_DIR, full_job.pk)
         except Exception:
             full_job.status = GenerationJob.Status.FAILED
-            full_job.last_error = (
-                "O lote completo foi criado, mas não foi possível iniciar o processamento automático."
-            )
+            full_job.last_error = "O lote completo foi criado, mas não foi possível iniciar o processamento automático."
             full_job.save(update_fields=["status", "last_error", "updated_at"])
             messages.error(request, full_job.last_error)
         else:
@@ -140,7 +151,11 @@ class PromotePreviewJobView(LoginRequiredMixin, View):
 
 class RerunJobView(LoginRequiredMixin, View):
     def post(self, request, *args, **kwargs):
-        source_job = GenerationJob.objects.filter(pk=kwargs["pk"], user=request.user).select_related("template").first()
+        source_job = (
+            GenerationJob.objects.filter(pk=kwargs["pk"], user=request.user)
+            .select_related("template")
+            .first()
+        )
         if not source_job:
             messages.error(request, "Job não encontrado.")
             return redirect("jobs:list")
@@ -161,7 +176,9 @@ class RerunJobView(LoginRequiredMixin, View):
             spawn_job_process(settings.BASE_DIR, new_job.pk)
         except Exception:
             new_job.status = GenerationJob.Status.FAILED
-            new_job.last_error = "O job foi recriado, mas o processamento automático não pôde ser iniciado."
+            new_job.last_error = (
+                "O job foi recriado, mas o processamento automático não pôde ser iniciado."
+            )
             new_job.save(update_fields=["status", "last_error", "updated_at"])
             messages.error(request, new_job.last_error)
         else:
@@ -185,14 +202,18 @@ class GenerationJobStatusView(LoginRequiredMixin, View):
                 "success_rows": job.success_rows,
                 "failed_rows": job.failed_rows,
                 "last_error": job.last_error,
-                "zip_url": reverse("jobs:download-zip", kwargs={"pk": job.pk}) if job.zip_file else "",
+                "zip_url": reverse("jobs:download-zip", kwargs={"pk": job.pk})
+                if job.zip_file
+                else "",
                 "items": [
                     {
                         "row_number": item.row_number,
                         "status": item.status,
                         "status_display": item.get_status_display(),
                         "error_message": item.error_message,
-                        "output_url": reverse("jobs:download-item", kwargs={"pk": item.pk}) if item.output_pdf else "",
+                        "output_url": reverse("jobs:download-item", kwargs={"pk": item.pk})
+                        if item.output_pdf
+                        else "",
                     }
                     for item in job.items.order_by("row_number")
                 ],
@@ -205,7 +226,9 @@ class GenerationJobZipDownloadView(LoginRequiredMixin, View):
         job = GenerationJob.objects.filter(pk=kwargs["pk"], user=request.user).first()
         if not job or not job.zip_file:
             return JsonResponse({"error": "not_found"}, status=404)
-        return FileResponse(job.zip_file.open("rb"), as_attachment=True, filename=job.zip_file.name.split("/")[-1])
+        return FileResponse(
+            job.zip_file.open("rb"), as_attachment=True, filename=job.zip_file.name.split("/")[-1]
+        )
 
 
 class GenerationJobSourceExcelDownloadView(LoginRequiredMixin, View):
@@ -222,10 +245,18 @@ class GenerationJobSourceExcelDownloadView(LoginRequiredMixin, View):
 
 class GenerationItemDownloadView(LoginRequiredMixin, View):
     def get(self, request, *args, **kwargs):
-        item = GenerationItem.objects.filter(pk=kwargs["pk"], job__user=request.user).select_related("job").first()
+        item = (
+            GenerationItem.objects.filter(pk=kwargs["pk"], job__user=request.user)
+            .select_related("job")
+            .first()
+        )
         if not item or not item.output_pdf:
             return JsonResponse({"error": "not_found"}, status=404)
-        return FileResponse(item.output_pdf.open("rb"), as_attachment=True, filename=item.output_pdf.name.split("/")[-1])
+        return FileResponse(
+            item.output_pdf.open("rb"),
+            as_attachment=True,
+            filename=item.output_pdf.name.split("/")[-1],
+        )
 
 
 class GenerationJobLaunchApiView(LoginRequiredMixin, View):
@@ -238,7 +269,9 @@ class GenerationJobLaunchApiView(LoginRequiredMixin, View):
         if not template_obj:
             return JsonResponse({"error": "Projeto não encontrado."}, status=404)
         if not template_obj.fields.exists():
-            return JsonResponse({"error": "Crie ao menos um campo antes de gerar os arquivos."}, status=400)
+            return JsonResponse(
+                {"error": "Crie ao menos um campo antes de gerar os arquivos."}, status=400
+            )
 
         kind = request.POST.get("kind")
         if kind not in {GenerationJob.Kind.PREVIEW, GenerationJob.Kind.FULL}:
@@ -266,7 +299,9 @@ class GenerationJobLaunchApiView(LoginRequiredMixin, View):
             spawn_job_process(settings.BASE_DIR, job.pk)
         except Exception:
             job.status = GenerationJob.Status.FAILED
-            job.last_error = "O job foi salvo, mas o processamento automático não pôde ser iniciado."
+            job.last_error = (
+                "O job foi salvo, mas o processamento automático não pôde ser iniciado."
+            )
             job.save(update_fields=["status", "last_error", "updated_at"])
         return JsonResponse(
             {

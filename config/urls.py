@@ -1,10 +1,8 @@
-from django.conf import settings
-from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
-from legal import views as legal_views
 
 from core.auth import UsuarioLoginView, logout_and_cleanup
+from legal import views as legal_views
 
 urlpatterns = [
     path("admin/", admin.site.urls),

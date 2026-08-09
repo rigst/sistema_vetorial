@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import io
 import math
-from functools import lru_cache
 import re
 import unicodedata
 import zipfile
+from functools import lru_cache
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -50,11 +50,26 @@ def _normalize_value(value) -> str:
 
 
 DEFAULT_TITLE_EXCEPTIONS = {
-    "a", "as", "o", "os",
-    "de", "da", "das", "do", "dos",
-    "e", "em", "com", "para", "por",
-    "na", "nas", "no", "nos",
-    "à", "às",
+    "a",
+    "as",
+    "o",
+    "os",
+    "de",
+    "da",
+    "das",
+    "do",
+    "dos",
+    "e",
+    "em",
+    "com",
+    "para",
+    "por",
+    "na",
+    "nas",
+    "no",
+    "nos",
+    "à",
+    "às",
 }
 
 
@@ -122,7 +137,9 @@ def get_missing_font_chars(field: TemplateField, text: str) -> list[str]:
     if not text:
         return []
     supported_codepoints = _cached_font_cmap(field.font.file.path)
-    return sorted({char for char in text if not char.isspace() and ord(char) not in supported_codepoints})
+    return sorted(
+        {char for char in text if not char.isspace() and ord(char) not in supported_codepoints}
+    )
 
 
 def validate_font_supports_text(field: TemplateField, text: str) -> None:
@@ -194,10 +211,14 @@ def load_excel_rows(excel_path: str):
 
 
 def get_template_expected_headers(job: GenerationJob) -> list[str]:
-    return [f"Coluna {field.excel_column}" for field in job.template.fields.all() if field.excel_column]
+    return [
+        f"Coluna {field.excel_column}" for field in job.template.fields.all() if field.excel_column
+    ]
 
 
-def _fit_text_lines(text: str, font_name: str, font_size: float, max_width: float, mode: str, max_lines: int):
+def _fit_text_lines(
+    text: str, font_name: str, font_size: float, max_width: float, mode: str, max_lines: int
+):
     if not text:
         return [""], font_size
 
@@ -228,9 +249,15 @@ def _fit_text_lines(text: str, font_name: str, font_size: float, max_width: floa
         size = font_size
         while size >= 4:
             lines = wrap(size)
-            if len(lines) <= max_lines and max(
-                pdfmetrics.stringWidth(line, font_name, size) for line in lines if line is not None
-            ) <= max_width:
+            if (
+                len(lines) <= max_lines
+                and max(
+                    pdfmetrics.stringWidth(line, font_name, size)
+                    for line in lines
+                    if line is not None
+                )
+                <= max_width
+            ):
                 return lines, size
             size -= 0.5
         return wrap(max(4, size)), max(4, size)
@@ -282,7 +309,9 @@ def _draw_field(pdf_canvas, field: TemplateField, value: str, page_height: float
     def baseline_y(index):
         return -((FIRST_BASELINE_FACTOR * adjusted_size) + (index * line_height))
 
-    def draw_text_line(draw_x, baseline_y, line, *, fill_color=None, stroke_color=None, line_width=1, alpha=1):
+    def draw_text_line(
+        draw_x, baseline_y, line, *, fill_color=None, stroke_color=None, line_width=1, alpha=1
+    ):
         pdf_canvas.saveState()
         pdf_canvas.setLineWidth(line_width)
         text = pdf_canvas.beginText()
@@ -391,7 +420,9 @@ def _merge_overlay(background_pdf_path: str, overlay_bytes: bytes) -> bytes:
 
 
 def _create_item_pdf(job: GenerationJob, row_number: int, payload: dict) -> GenerationItem:
-    item = GenerationItem.objects.create(job=job, row_number=row_number, payload=payload, status=GenerationItem.Status.PROCESSING)
+    item = GenerationItem.objects.create(
+        job=job, row_number=row_number, payload=payload, status=GenerationItem.Status.PROCESSING
+    )
     try:
         overlay_bytes = _build_overlay_pdf(job, payload)
         output_bytes = _merge_overlay(job.template.background_pdf.path, overlay_bytes)
@@ -416,18 +447,18 @@ def _build_zip_for_job(job: GenerationJob) -> None:
         for item in completed_items:
             with item.output_pdf.open("rb") as generated:
                 archive.writestr(Path(item.output_pdf.name).name, generated.read())
-    job.zip_file.save(f"{job.name.lower().replace(' ', '_')}.zip", ContentFile(buffer.getvalue()), save=False)
+    job.zip_file.save(
+        f"{job.name.lower().replace(' ', '_')}.zip", ContentFile(buffer.getvalue()), save=False
+    )
 
 
 @transaction.atomic
 def process_job(job: GenerationJob) -> GenerationJob:
     try:
         headers, data_rows = load_excel_rows(job.source_excel.path)
-    except Exception as exc:
+    except Exception:
         job.status = GenerationJob.Status.FAILED
-        job.last_error = (
-            "Falha ao importar o Excel. Verifique se o arquivo está íntegro, com cabeçalho na primeira linha e formato válido."
-        )
+        job.last_error = "Falha ao importar o Excel. Verifique se o arquivo está íntegro, com cabeçalho na primeira linha e formato válido."
         job.save(update_fields=["status", "last_error", "updated_at"])
         return job
 
@@ -510,7 +541,15 @@ def process_job(job: GenerationJob) -> GenerationJob:
         else:
             job.failed_rows += 1
             job.last_error = item.error_message
-        job.save(update_fields=["processed_rows", "success_rows", "failed_rows", "last_error", "updated_at"])
+        job.save(
+            update_fields=[
+                "processed_rows",
+                "success_rows",
+                "failed_rows",
+                "last_error",
+                "updated_at",
+            ]
+        )
 
     if job.kind == GenerationJob.Kind.FULL:
         try:
@@ -521,7 +560,9 @@ def process_job(job: GenerationJob) -> GenerationJob:
             job.save(update_fields=["status", "last_error", "updated_at"])
             return job
 
-    job.status = GenerationJob.Status.COMPLETED if job.failed_rows == 0 else GenerationJob.Status.FAILED
+    job.status = (
+        GenerationJob.Status.COMPLETED if job.failed_rows == 0 else GenerationJob.Status.FAILED
+    )
     job.save(update_fields=["status", "zip_file", "updated_at"])
     return job
 
@@ -532,7 +573,9 @@ def clone_preview_to_full(preview_job: GenerationJob) -> GenerationJob:
             user=preview_job.user,
             template=preview_job.template,
             name=f"{preview_job.name} - lote completo",
-            source_excel=ContentFile(source_file.read(), name=Path(preview_job.source_excel.name).name),
+            source_excel=ContentFile(
+                source_file.read(), name=Path(preview_job.source_excel.name).name
+            ),
             kind=GenerationJob.Kind.FULL,
             status=GenerationJob.Status.QUEUED,
         )

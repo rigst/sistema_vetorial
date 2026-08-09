@@ -1,8 +1,7 @@
-from pathlib import Path
 import os
 import sys
 import tempfile
-
+from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -22,7 +21,9 @@ DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
 if not DEBUG and not SECRET_KEY:
     raise RuntimeError("Defina DJANGO_SECRET_KEY em producao.")
 
-ALLOWED_HOSTS = [host for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",") if host] or []
+ALLOWED_HOSTS = [
+    host for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",") if host
+] or []
 
 
 INSTALLED_APPS = [
@@ -116,10 +117,14 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
-STATIC_ROOT = Path(os.environ.get("DJANGO_STATIC_ROOT", "/var/www/sistema_vetorial/shared/staticfiles"))
+STATIC_ROOT = Path(
+    os.environ.get("DJANGO_STATIC_ROOT", "/var/www/sistema_vetorial/shared/staticfiles")
+)
 
 MEDIA_URL = "/media/"
-MEDIA_ROOT = Path(os.environ.get("DJANGO_MEDIA_ROOT", "/var/www/sistema_vetorial/shared/private_media"))
+MEDIA_ROOT = Path(
+    os.environ.get("DJANGO_MEDIA_ROOT", "/var/www/sistema_vetorial/shared/private_media")
+)
 
 if "test" in sys.argv:
     # A suíte grava fontes e PDFs de verdade. Apontando para a mídia de
@@ -152,10 +157,17 @@ UNFOLD = {
     "COLORS": {
         # Verde-petróleo do tema do app.
         "primary": {
-            "50": "236 246 245", "100": "205 232 229", "200": "160 210 205",
-            "300": "110 184 177", "400": "63 152 144", "500": "31 122 114",
-            "600": "24 101 94", "700": "20 82 77", "800": "18 66 62",
-            "900": "16 55 52", "950": "8 32 30",
+            "50": "236 246 245",
+            "100": "205 232 229",
+            "200": "160 210 205",
+            "300": "110 184 177",
+            "400": "63 152 144",
+            "500": "31 122 114",
+            "600": "24 101 94",
+            "700": "20 82 77",
+            "800": "18 66 62",
+            "900": "16 55 52",
+            "950": "8 32 30",
         },
     },
 }

@@ -16,7 +16,6 @@ from .forms import DocumentTemplateForm
 from .models import DocumentTemplate, TemplateField
 from .services import update_template_pdf_metadata
 
-
 TEST_MEDIA_ROOT = tempfile.mkdtemp(prefix="sistema_vetorial_editor_tests_")
 
 
@@ -31,7 +30,9 @@ class EditorFlowTests(TestCase):
             name="Dejavu Sans",
             family="Dejavu Sans",
             variant=FontAsset.Variant.REGULAR,
-            file=SimpleUploadedFile("DejaVuSans.ttf", font_path.read_bytes(), content_type="font/ttf"),
+            file=SimpleUploadedFile(
+                "DejaVuSans.ttf", font_path.read_bytes(), content_type="font/ttf"
+            ),
         )
 
     @classmethod
@@ -39,7 +40,9 @@ class EditorFlowTests(TestCase):
         super().tearDownClass()
         shutil.rmtree(TEST_MEDIA_ROOT, ignore_errors=True)
 
-    def _build_pdf_upload(self, filename: str = "background.pdf", pages: int = 1) -> SimpleUploadedFile:
+    def _build_pdf_upload(
+        self, filename: str = "background.pdf", pages: int = 1
+    ) -> SimpleUploadedFile:
         temp_dir = Path(tempfile.mkdtemp(prefix="editor-pdf-"))
         pdf_path = temp_dir / filename
         pdf_canvas = canvas.Canvas(str(pdf_path), pagesize=(400, 120))
@@ -72,7 +75,9 @@ class EditorFlowTests(TestCase):
         other_user = get_user_model().objects.create_user(username="outro", password="senha123")
 
         self.client.force_login(other_user)
-        response = self.client.get(reverse("editor:preview-page", kwargs={"pk": template.pk, "page_number": 1}))
+        response = self.client.get(
+            reverse("editor:preview-page", kwargs={"pk": template.pk, "page_number": 1})
+        )
 
         self.assertEqual(response.status_code, 404)
 
@@ -202,9 +207,13 @@ class EditorFlowTests(TestCase):
 class ImageBackgroundTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.user = get_user_model().objects.create_user(username="editor-imagem", password="senha123")
+        cls.user = get_user_model().objects.create_user(
+            username="editor-imagem", password="senha123"
+        )
 
-    def _build_image_upload(self, filename: str = "fundo.png", size=(400, 120)) -> SimpleUploadedFile:
+    def _build_image_upload(
+        self, filename: str = "fundo.png", size=(400, 120)
+    ) -> SimpleUploadedFile:
         from io import BytesIO
 
         from PIL import Image
@@ -247,13 +256,17 @@ class ImageBackgroundTests(TestCase):
 class FieldRotationAndSampleTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.user = get_user_model().objects.create_user(username="editor-rotacao", password="senha123")
+        cls.user = get_user_model().objects.create_user(
+            username="editor-rotacao", password="senha123"
+        )
         font_path = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
         cls.font = FontAsset.objects.create(
             user=cls.user,
             name="Dejavu Sans",
             family="Dejavu Sans",
-            file=SimpleUploadedFile("DejaVuSans.ttf", font_path.read_bytes(), content_type="font/ttf"),
+            file=SimpleUploadedFile(
+                "DejaVuSans.ttf", font_path.read_bytes(), content_type="font/ttf"
+            ),
         )
 
     def _build_template(self) -> DocumentTemplate:
@@ -269,7 +282,9 @@ class FieldRotationAndSampleTests(TestCase):
             user=self.user,
             name="Rotacionado",
             slug="rotacionado",
-            background_pdf=SimpleUploadedFile("fundo.pdf", buffer.getvalue(), content_type="application/pdf"),
+            background_pdf=SimpleUploadedFile(
+                "fundo.pdf", buffer.getvalue(), content_type="application/pdf"
+            ),
             page_width=400,
             page_height=120,
         )

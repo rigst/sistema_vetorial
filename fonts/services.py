@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import unicodedata
-from pathlib import Path
 
 from fontTools.ttLib import TTFont
-
 
 PT_BR_REQUIRED_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÀÁÂÃÇÉÊÍÓÔÕÚàáâãçéêíóôõúÊêÔôÜü0123456789.,;:-_()/'\"ºª& "
 

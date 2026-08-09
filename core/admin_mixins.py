@@ -1,6 +1,3 @@
-from django import forms
-
-
 class OwnedAdminMixin:
     owner_field_name = "user"
     owner_related_fields = {}
@@ -24,19 +21,34 @@ class OwnedAdminMixin:
 
     def has_view_permission(self, request, obj=None):
         allowed = super().has_view_permission(request, obj)
-        if not allowed or obj is None or request.user.is_superuser or not hasattr(obj, self.owner_field_name):
+        if (
+            not allowed
+            or obj is None
+            or request.user.is_superuser
+            or not hasattr(obj, self.owner_field_name)
+        ):
             return allowed
         return getattr(obj, self.owner_field_name) == request.user
 
     def has_change_permission(self, request, obj=None):
         allowed = super().has_change_permission(request, obj)
-        if not allowed or obj is None or request.user.is_superuser or not hasattr(obj, self.owner_field_name):
+        if (
+            not allowed
+            or obj is None
+            or request.user.is_superuser
+            or not hasattr(obj, self.owner_field_name)
+        ):
             return allowed
         return getattr(obj, self.owner_field_name) == request.user
 
     def has_delete_permission(self, request, obj=None):
         allowed = super().has_delete_permission(request, obj)
-        if not allowed or obj is None or request.user.is_superuser or not hasattr(obj, self.owner_field_name):
+        if (
+            not allowed
+            or obj is None
+            or request.user.is_superuser
+            or not hasattr(obj, self.owner_field_name)
+        ):
             return allowed
         return getattr(obj, self.owner_field_name) == request.user
 

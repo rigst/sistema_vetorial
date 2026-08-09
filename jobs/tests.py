@@ -20,7 +20,6 @@ from .forms import GenerationJobForm
 from .models import GenerationJob
 from .services import format_field_value, process_job
 
-
 TEST_MEDIA_ROOT = tempfile.mkdtemp(prefix="sistema_vetorial_jobs_tests_")
 
 
@@ -35,7 +34,9 @@ class JobTests(TestCase):
             name="Dejavu Sans",
             family="Dejavu Sans",
             variant=FontAsset.Variant.REGULAR,
-            file=SimpleUploadedFile("DejaVuSans.ttf", font_path.read_bytes(), content_type="font/ttf"),
+            file=SimpleUploadedFile(
+                "DejaVuSans.ttf", font_path.read_bytes(), content_type="font/ttf"
+            ),
         )
 
     @classmethod
@@ -65,7 +66,11 @@ class JobTests(TestCase):
         workbook.save(xlsx_path)
         content = xlsx_path.read_bytes()
         shutil.rmtree(temp_dir, ignore_errors=True)
-        return SimpleUploadedFile("dados.xlsx", content, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        return SimpleUploadedFile(
+            "dados.xlsx",
+            content,
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
 
     def _build_template(self):
         template = DocumentTemplate.objects.create(
@@ -132,7 +137,10 @@ class JobTests(TestCase):
         self.assertEqual(job.success_rows, 2)
         self.assertEqual(job.items.count(), 2)
         first_item = job.items.order_by("id").first()
-        with first_item.output_pdf.open("rb") as output_file, pikepdf.Pdf.open(output_file) as output_pdf:
+        with (
+            first_item.output_pdf.open("rb") as output_file,
+            pikepdf.Pdf.open(output_file) as output_pdf,
+        ):
             media_box = [float(value) for value in output_pdf.pages[0].MediaBox]
         self.assertEqual(media_box[2] - media_box[0], 400.0)
         self.assertEqual(media_box[3] - media_box[1], 120.0)

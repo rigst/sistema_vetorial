@@ -11,7 +11,6 @@ from jobs.models import GenerationItem, GenerationJob
 from .files import delete_field_file, iter_file_fields
 from .models import UserProfile
 
-
 FILE_MODELS = (DocumentTemplate, TemplatePreviewPage, FontAsset, GenerationJob, GenerationItem)
 
 

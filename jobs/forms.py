@@ -20,7 +20,9 @@ class GenerationJobForm(forms.ModelForm):
             workbook.close()
         except Exception as exc:
             uploaded.seek(0)
-            raise forms.ValidationError("Não foi possível ler o Excel. Verifique se o arquivo está íntegro e com formato válido.") from exc
+            raise forms.ValidationError(
+                "Não foi possível ler o Excel. Verifique se o arquivo está íntegro e com formato válido."
+            ) from exc
         finally:
             uploaded.seek(0)
 
@@ -29,7 +31,9 @@ class GenerationJobForm(forms.ModelForm):
 
         headers = [str(value).strip() if value is not None else "" for value in rows[0]]
         if not any(headers):
-            raise forms.ValidationError("A primeira linha do Excel está vazia. Informe um cabeçalho válido.")
+            raise forms.ValidationError(
+                "A primeira linha do Excel está vazia. Informe um cabeçalho válido."
+            )
         self._uploaded_headers = headers
         return uploaded
 
@@ -50,7 +54,9 @@ class GenerationJobForm(forms.ModelForm):
         user = kwargs.pop("user")
         template_id = kwargs.pop("template_id", None)
         super().__init__(*args, **kwargs)
-        self.fields["template"].queryset = DocumentTemplate.objects.filter(user=user, is_active=True).order_by("name")
+        self.fields["template"].queryset = DocumentTemplate.objects.filter(
+            user=user, is_active=True
+        ).order_by("name")
         if template_id:
             self.fields["template"].initial = template_id
 

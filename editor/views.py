@@ -20,8 +20,9 @@ from .forms import DocumentTemplateForm
 from .models import DocumentTemplate, TemplateField, TemplatePreviewPage
 from .services import update_template_pdf_metadata
 
-
-DEFAULT_EXCEPTIONS = "a, as, o, os, de, da, das, do, dos, e, em, com, para, por, na, nas, no, nos, à, às"
+DEFAULT_EXCEPTIONS = (
+    "a, as, o, os, de, da, das, do, dos, e, em, com, para, por, na, nas, no, nos, à, às"
+)
 
 
 def field_to_dict(field: TemplateField) -> dict:
@@ -108,7 +109,10 @@ class DocumentTemplateCreateView(LoginRequiredMixin, CreateView):
         try:
             update_template_pdf_metadata(self.object)
         except Exception:
-            messages.error(self.request, "O template foi salvo, mas a pré-visualização do PDF não pôde ser gerada.")
+            messages.error(
+                self.request,
+                "O template foi salvo, mas a pré-visualização do PDF não pôde ser gerada.",
+            )
         else:
             messages.success(self.request, "Template criado com sucesso.")
         return response
@@ -128,7 +132,10 @@ class DocumentTemplateUpdateView(UserOwnedQuerysetMixin, UpdateView):
             try:
                 update_template_pdf_metadata(self.object)
             except Exception:
-                messages.error(self.request, "As alterações foram salvas, mas a nova pré-visualização não pôde ser gerada.")
+                messages.error(
+                    self.request,
+                    "As alterações foram salvas, mas a nova pré-visualização não pôde ser gerada.",
+                )
             else:
                 messages.success(self.request, "Template atualizado com sucesso.")
         return response
@@ -160,8 +167,12 @@ def _template_editor_context(template_obj, user):
             }
             for font in fonts
         ],
-        "page_width_cm": round(float(template_obj.page_width or 0) * 2.54 / 72, 2) if template_obj.page_width else 0,
-        "page_height_cm": round(float(template_obj.page_height or 0) * 2.54 / 72, 2) if template_obj.page_height else 0,
+        "page_width_cm": round(float(template_obj.page_width or 0) * 2.54 / 72, 2)
+        if template_obj.page_width
+        else 0,
+        "page_height_cm": round(float(template_obj.page_height or 0) * 2.54 / 72, 2)
+        if template_obj.page_height
+        else 0,
     }
 
 
@@ -208,7 +219,9 @@ class DocumentTemplateDuplicateView(LoginRequiredMixin, View):
                 name=clone_name,
                 slug=clone_slug,
                 description=source.description,
-                background_pdf=ContentFile(pdf_file.read(), name=source.background_pdf.name.split("/")[-1]),
+                background_pdf=ContentFile(
+                    pdf_file.read(), name=source.background_pdf.name.split("/")[-1]
+                ),
                 page_width=source.page_width,
                 page_height=source.page_height,
                 page_count=1,
@@ -239,7 +252,10 @@ class TemplateFieldsApiView(LoginRequiredMixin, View):
 
     def get(self, request, *args, **kwargs):
         template_obj = self.get_template(request, kwargs["pk"])
-        data = [field_to_dict(field) for field in template_obj.fields.select_related("font").order_by("order_index", "id")]
+        data = [
+            field_to_dict(field)
+            for field in template_obj.fields.select_related("font").order_by("order_index", "id")
+        ]
         return JsonResponse({"fields": data})
 
     def post(self, request, *args, **kwargs):
@@ -292,7 +308,11 @@ class TemplateFieldsApiView(LoginRequiredMixin, View):
 
 class TemplateFieldApiView(LoginRequiredMixin, View):
     def get_object(self, request, pk):
-        return get_object_or_404(TemplateField.objects.select_related("template", "font"), pk=pk, template__user=request.user)
+        return get_object_or_404(
+            TemplateField.objects.select_related("template", "font"),
+            pk=pk,
+            template__user=request.user,
+        )
 
     def patch(self, request, *args, **kwargs):
         field = self.get_object(request, kwargs["pk"])
@@ -331,7 +351,9 @@ class TemplateFieldApiView(LoginRequiredMixin, View):
             setattr(field, key, value)
             update_fields.append(key)
         if "font_id" in payload:
-            field.font = get_object_or_404(FontAsset, pk=payload["font_id"], user=request.user, is_active=True)
+            field.font = get_object_or_404(
+                FontAsset, pk=payload["font_id"], user=request.user, is_active=True
+            )
             update_fields.append("font")
         field.page_number = 1
         if "page_number" not in update_fields:
@@ -360,7 +382,18 @@ class TemplateLayoutUpdateView(LoginRequiredMixin, View):
             if item.get("font_size"):
                 field.font_size = item["font_size"]
             field.page_number = 1
-            field.save(update_fields=["x", "y", "width", "height", "rotation", "font_size", "page_number", "updated_at"])
+            field.save(
+                update_fields=[
+                    "x",
+                    "y",
+                    "width",
+                    "height",
+                    "rotation",
+                    "font_size",
+                    "page_number",
+                    "updated_at",
+                ]
+            )
         return JsonResponse({"ok": True, "updated": len(updates)})
 
 
@@ -383,11 +416,15 @@ class TemplateSampleDataView(LoginRequiredMixin, View):
                 headers, data_rows = load_excel_rows(temp.name)
         except Exception:
             return JsonResponse(
-                {"error": "Não foi possível ler o Excel. Verifique se o arquivo está íntegro e no formato .xlsx."},
+                {
+                    "error": "Não foi possível ler o Excel. Verifique se o arquivo está íntegro e no formato .xlsx."
+                },
                 status=400,
             )
         if not data_rows:
-            return JsonResponse({"error": "O Excel não possui linhas preenchidas após o cabeçalho."}, status=400)
+            return JsonResponse(
+                {"error": "O Excel não possui linhas preenchidas após o cabeçalho."}, status=400
+            )
 
         fields = list(template_obj.fields.select_related("font"))
         rows = []

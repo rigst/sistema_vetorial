@@ -20,4 +20,6 @@ def spawn_job_process(project_root: Path, job_id: int) -> None:
                 start_new_session=True,
             )
         except Exception as exc:
-            raise RuntimeError("Não foi possível iniciar o processamento em segundo plano.") from exc
+            raise RuntimeError(
+                "Não foi possível iniciar o processamento em segundo plano."
+            ) from exc

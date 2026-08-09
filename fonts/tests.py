@@ -13,7 +13,6 @@ from .forms import FontAssetForm
 from .models import FontAsset
 from .services import inspect_font_file
 
-
 TEST_MEDIA_ROOT = tempfile.mkdtemp(prefix="sistema_vetorial_fonts_tests_")
 
 
@@ -34,7 +33,9 @@ class FontTests(TestCase):
         self.assertTrue(metadata["supports_pt_br_basic"])
 
     def test_font_form_uses_filename_when_name_missing(self):
-        uploaded = SimpleUploadedFile("minha_fonte.ttf", self.font_path.read_bytes(), content_type="font/ttf")
+        uploaded = SimpleUploadedFile(
+            "minha_fonte.ttf", self.font_path.read_bytes(), content_type="font/ttf"
+        )
         form = FontAssetForm(data={"name": ""}, files={"file": uploaded})
 
         self.assertTrue(form.is_valid(), form.errors)
@@ -51,7 +52,9 @@ class FontTests(TestCase):
             name="Fonte Teste",
             family="Fonte Teste",
             variant=FontAsset.Variant.REGULAR,
-            file=SimpleUploadedFile("DejaVuSans.ttf", self.font_path.read_bytes(), content_type="font/ttf"),
+            file=SimpleUploadedFile(
+                "DejaVuSans.ttf", self.font_path.read_bytes(), content_type="font/ttf"
+            ),
         )
         self.client.force_login(self.user)
 
@@ -66,7 +69,9 @@ class FontTests(TestCase):
             user=self.user,
             name="Dejavu",
             family="Dejavu Sans",
-            file=SimpleUploadedFile("DejaVuSans.ttf", self.font_path.read_bytes(), content_type="font/ttf"),
+            file=SimpleUploadedFile(
+                "DejaVuSans.ttf", self.font_path.read_bytes(), content_type="font/ttf"
+            ),
         )
         url = reverse("fonts:file", kwargs={"pk": font.pk})
 

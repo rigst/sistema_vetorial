@@ -8,6 +8,8 @@ def app_shell(request):
     profile = ensure_user_profile(request.user)
     return {
         "app_role_label": profile.get_role_display(),
-        "app_display_name": request.user.first_name or request.user.get_full_name() or request.user.username,
+        "app_display_name": request.user.first_name
+        or request.user.get_full_name()
+        or request.user.username,
         "is_visitor_user": profile.role == UserProfile.Role.VISITOR,
     }

@@ -19,7 +19,6 @@ from editor.services import update_template_pdf_metadata
 from fonts.models import FontAsset
 from jobs.models import GenerationJob
 
-
 TEST_MEDIA_ROOT = tempfile.mkdtemp(prefix="sistema_vetorial_core_tests_")
 
 
@@ -57,7 +56,9 @@ class CoreTests(TestCase):
         response = self.client.post(reverse("login"), {"entrar_visitante": "1"}, follow=True)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "O acesso visitante está temporariamente desativado.")
-        self.assertFalse(get_user_model().objects.filter(username__startswith="visitante_").exists())
+        self.assertFalse(
+            get_user_model().objects.filter(username__startswith="visitante_").exists()
+        )
 
     def test_ensure_default_fonts_creates_builtin_fonts(self):
         user = get_user_model().objects.create_user(username="font-user", password="senha123")
@@ -72,7 +73,9 @@ class CoreTests(TestCase):
             name="Fonte",
             family="Fonte",
             variant=FontAsset.Variant.REGULAR,
-            file=SimpleUploadedFile("DejaVuSans.ttf", font_path.read_bytes(), content_type="font/ttf"),
+            file=SimpleUploadedFile(
+                "DejaVuSans.ttf", font_path.read_bytes(), content_type="font/ttf"
+            ),
         )
         template = DocumentTemplate.objects.create(
             user=user,
@@ -85,7 +88,9 @@ class CoreTests(TestCase):
             user=user,
             template=template,
             name="Job",
-            source_excel=SimpleUploadedFile("dados.xlsx", b"fake", content_type="application/octet-stream"),
+            source_excel=SimpleUploadedFile(
+                "dados.xlsx", b"fake", content_type="application/octet-stream"
+            ),
         )
         old_timestamp = timezone.now() - timezone.timedelta(days=10)
         FontAsset.objects.filter(pk=font.pk).update(created_at=old_timestamp)
