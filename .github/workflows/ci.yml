@@ -1,0 +1,46 @@
+name: CI
+
+# O pipeline vive em github.com/rigst/ci. Ajuste lá vale para todos os projetos.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: rigst/ci/.github/workflows/python-django.yml@v1
+    secrets: inherit
+    with:
+      python-version: "3.12"
+      django-settings-module: config.settings
+      source-paths: "config core editor fonts jobs legal"
+
+      # O banco cai em SQLite quando DB_ENGINE não é definido, então o job de
+      # testes não precisa de Postgres.
+      postgres: false
+
+      # Repositório privado: o plano gratuito do SonarQube Cloud cobre só
+      # público, e o Codecov exigiria token próprio. Ficam desligados até que
+      # o repositório abra ou ganhe um token.
+      run-codecov: false
+
+      # Sem DJANGO_DEBUG, os settings entram em modo produção — que é o que o
+      # check --deploy precisa auditar. Valores fictícios.
+      django-env: |
+        DJANGO_SECRET_KEY=ci-only-5d4c3b2a19087766-NaoEhUmaChaveReal-gfedcbazyx
+        DJANGO_ALLOWED_HOSTS=example.com
+
+      # DJANGO_DEBUG=1 desliga SECURE_SSL_REDIRECT, HSTS e cookies seguros, que
+      # em produção derrubariam todo request do test client em 301.
+      test-env: |
+        DJANGO_DEBUG=1
+        DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,testserver
+        CELERY_TASK_ALWAYS_EAGER=1
+
+      # Primeira adoção: tudo reporta antes de bloquear. Retire da lista
+      # conforme cada etapa zerar.
+      soft-fail: "ruff,mypy,pytest,bandit,pip-audit"
