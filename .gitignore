@@ -3,3 +3,5 @@ __pycache__/
 celerybeat-schedule*
 db.sqlite3
 .env
+e2e/.tmp/
+e2e/node_modules/

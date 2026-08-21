@@ -11,16 +11,18 @@ from tempfile import NamedTemporaryFile
 
 import pikepdf
 from django.core.files.base import ContentFile
-from django.db import transaction
+from fontTools.pens.basePen import BasePen
 from fontTools.ttLib import TTFont as FontToolsTTFont
 from openpyxl import load_workbook
-from pikepdf import Page, Pdf, Rectangle
+from pikepdf import Name, Page, Pdf
 from reportlab.lib.colors import HexColor
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
+from reportlab.pdfgen.canvas import FILL_NON_ZERO
 
 from editor.models import TemplateField
+from editor.services import PageGeometry, read_page_geometry
 
 from .models import GenerationItem, GenerationJob
 
@@ -281,8 +283,87 @@ FABRIC_FONT_SIZE_FRACTION = 0.222
 FIRST_BASELINE_FACTOR = FABRIC_FONT_SIZE_MULT * (1 - FABRIC_FONT_SIZE_FRACTION)
 
 
+class _GlyphOutlinePen(BasePen):
+    """Traduz o contorno de um glifo para um path do reportlab.
+
+    A BasePen já converte as curvas quadráticas do TrueType em cúbicas — que é
+    a única forma de curva que o PDF conhece — e resolve glifos compostos.
+    """
+
+    def __init__(self, glyph_set, path, scale: float, origin_x: float, origin_y: float):
+        super().__init__(glyph_set)
+        self._path = path
+        self._scale = scale
+        self._origin_x = origin_x
+        self._origin_y = origin_y
+
+    def _place(self, point):
+        return (
+            self._origin_x + point[0] * self._scale,
+            self._origin_y + point[1] * self._scale,
+        )
+
+    def _moveTo(self, point):
+        self._path.moveTo(*self._place(point))
+
+    def _lineTo(self, point):
+        self._path.lineTo(*self._place(point))
+
+    def _curveToOne(self, point1, point2, point3):
+        self._path.curveTo(*self._place(point1), *self._place(point2), *self._place(point3))
+
+    def _closePath(self):
+        self._path.close()
+
+    def _endPath(self):
+        pass
+
+
+@lru_cache(maxsize=32)
+def _outline_font(font_path: str):
+    """Fonte aberta pelo fontTools, pronta para extrair contornos.
+
+    O cmap é a união de todas as tabelas, igual ao usado na validação de
+    caracteres, para que validar e desenhar concordem sobre o que a fonte cobre.
+    """
+    ttfont = FontToolsTTFont(font_path)
+    codepoints = {}
+    for table in ttfont["cmap"].tables:
+        codepoints.update(table.cmap)
+    return ttfont.getGlyphSet(), codepoints, float(ttfont["head"].unitsPerEm)
+
+
+def _text_outline_path(pdf_canvas, font_path: str, font_size: float, x: float, y: float, text: str):
+    """Monta o path com os contornos de cada letra da linha.
+
+    O texto vira geometria: o PDF de saída não carrega fonte embutida nem
+    operadores de texto, só curvas — que é o que um fluxo vetorial (corte,
+    plotter, gravação) precisa receber.
+    """
+    glyph_set, codepoints, units_per_em = _outline_font(font_path)
+    scale = font_size / units_per_em
+    path = pdf_canvas.beginPath()
+    pen_x = 0.0
+    drew_any = False
+    for char in text:
+        glyph_name = codepoints.get(ord(char), ".notdef")
+        glyph = glyph_set.get(glyph_name)
+        if glyph is None:
+            continue
+        pen = _GlyphOutlinePen(glyph_set, path, scale, x + pen_x, y)
+        glyph.draw(pen)
+        # O avanço vem do hmtx, a mesma fonte de medida do stringWidth do
+        # reportlab: a linha desenhada tem exatamente a largura já calculada.
+        pen_x += glyph.width * scale
+        drew_any = True
+    return path if drew_any else None
+
+
 def _draw_field(pdf_canvas, field: TemplateField, value: str, page_height: float):
+    # A fonte é registrada só para medir (stringWidth); o desenho sai em curvas,
+    # então nenhum recurso de fonte chega ao PDF final.
     font_name = _register_font(field)
+    font_path = field.font.file.path
     validate_font_supports_text(field, value)
     font_size = float(field.font_size)
     max_width = float(field.width)
@@ -312,24 +393,32 @@ def _draw_field(pdf_canvas, field: TemplateField, value: str, page_height: float
     def draw_text_line(
         draw_x, baseline_y, line, *, fill_color=None, stroke_color=None, line_width=1, alpha=1
     ):
+        if not line:
+            return
+        path = _text_outline_path(pdf_canvas, font_path, adjusted_size, draw_x, baseline_y, line)
+        if path is None:
+            return
         pdf_canvas.saveState()
         pdf_canvas.setLineWidth(line_width)
-        text = pdf_canvas.beginText()
-        text.setTextOrigin(draw_x, baseline_y)
-        text.setFont(font_name, adjusted_size)
+        # Junções e pontas arredondadas: o contorno acompanha a curva da letra
+        # em vez de criar bicos nos vértices.
+        pdf_canvas.setLineJoin(1)
+        pdf_canvas.setLineCap(1)
         if stroke_color is not None:
-            text.setTextRenderMode(2 if fill_color is not None else 1)
-            text.setStrokeColor(stroke_color)
-            if hasattr(text, "setStrokeAlpha"):
-                text.setStrokeAlpha(alpha)
-        else:
-            text.setTextRenderMode(0)
+            pdf_canvas.setStrokeColor(stroke_color)
+            pdf_canvas.setStrokeAlpha(alpha)
         if fill_color is not None:
-            text.setFillColor(fill_color)
-            if hasattr(text, "setFillAlpha"):
-                text.setFillAlpha(1)
-        text.textLine(line)
-        pdf_canvas.drawText(text)
+            pdf_canvas.setFillColor(fill_color)
+            # A letra em si é opaca; as cópias do halo de blur é que usam alfa.
+            pdf_canvas.setFillAlpha(1 if stroke_color is not None else alpha)
+        pdf_canvas.drawPath(
+            path,
+            stroke=1 if stroke_color is not None else 0,
+            fill=1 if fill_color is not None else 0,
+            # Regra não-zero: é a que o TrueType assume para vazar contra-formas
+            # (o miolo do "o") sem furar contornos sobrepostos.
+            fillMode=FILL_NON_ZERO,
+        )
         pdf_canvas.restoreState()
 
     pdf_canvas.saveState()
@@ -377,13 +466,45 @@ def _draw_field(pdf_canvas, field: TemplateField, value: str, page_height: float
     pdf_canvas.restoreState()
 
 
-def _build_overlay_pdf(job: GenerationJob, payload: dict) -> bytes:
-    buffer = io.BytesIO()
-    page_width = float(job.template.page_width or 0)
-    page_height = float(job.template.page_height or 0)
-    pdf_canvas = canvas.Canvas(buffer, pagesize=(page_width, page_height))
+def _apply_page_rotation(pdf_canvas, geometry: PageGeometry) -> None:
+    """Leva o espaço visível (o que o editor mostra) para o espaço da página.
 
+    O /Rotate gira a página na hora de exibir, mas não mexe nas coordenadas do
+    conteúdo. Sem esta compensação, um fundo girado receberia o texto deitado.
+    """
+    if geometry.rotation == 90:
+        pdf_canvas.translate(geometry.width, 0)
+        pdf_canvas.rotate(90)
+    elif geometry.rotation == 180:
+        pdf_canvas.translate(geometry.width, geometry.height)
+        pdf_canvas.rotate(180)
+    elif geometry.rotation == 270:
+        pdf_canvas.translate(0, geometry.height)
+        pdf_canvas.rotate(-90)
+
+
+def _build_overlay_pdf(job: GenerationJob, payload: dict, geometry: PageGeometry) -> bytes:
+    buffer = io.BytesIO()
     fields = list(job.template.fields.select_related("font").order_by("order_index", "id"))
+
+    # O reportlab abre toda página com um "BT /F1 12 Tf ET" de cortesia, que
+    # arrastaria um recurso de fonte para dentro do PDF vetorial. Ele pula esse
+    # preâmbulo quando a fonte inicial é uma TTF dinâmica, então basta apontar
+    # a primeira fonte do projeto.
+    initial_font = None
+    for field in fields:
+        initial_font = _register_font(field)
+
+    # A página do overlay nasce do tamanho exato da caixa do fundo: assim a
+    # sobreposição acontece em escala 1:1 e o texto não é reamostrado.
+    pdf_canvas = canvas.Canvas(
+        buffer,
+        pagesize=(geometry.width, geometry.height),
+        initialFontName=initial_font,
+    )
+    pdf_canvas.saveState()
+    _apply_page_rotation(pdf_canvas, geometry)
+
     for field in fields:
         raw_value = ""
         if field.excel_column and str(field.excel_column).isdigit():
@@ -391,41 +512,66 @@ def _build_overlay_pdf(job: GenerationJob, payload: dict) -> bytes:
         if not raw_value:
             raw_value = payload.get(field.name) or field.empty_value or field.name
         value = format_field_value(field, raw_value)
-        _draw_field(pdf_canvas, field, value, page_height)
+        _draw_field(pdf_canvas, field, value, geometry.visible_height)
+    pdf_canvas.restoreState()
     pdf_canvas.showPage()
     pdf_canvas.save()
     return buffer.getvalue()
 
 
-def _merge_overlay(background_pdf_path: str, overlay_bytes: bytes) -> bytes:
+def _merge_overlay(background_pdf_path: str, overlay_bytes: bytes, geometry: PageGeometry) -> bytes:
+    """Sobrepõe o texto ao PDF de fundo sem tocar no fundo.
+
+    O fundo é aberto e salvo pelo pikepdf, que copia os streams como estão: as
+    imagens continuam com os mesmos bytes, resolução e compressão do arquivo
+    enviado, e as caixas da página (MediaBox/CropBox) ficam intactas.
+    """
     with NamedTemporaryFile(suffix=".pdf") as overlay_temp:
         overlay_temp.write(overlay_bytes)
         overlay_temp.flush()
 
         with Pdf.open(background_pdf_path) as base_pdf, Pdf.open(overlay_temp.name) as overlay_pdf:
-            for index, destination in enumerate(base_pdf.pages):
-                if index >= len(overlay_pdf.pages):
-                    break
-                destination_page = Page(destination)
-                overlay_page = Page(overlay_pdf.pages[index])
-                mediabox = [float(value) for value in destination_page.obj.MediaBox]
-                destination_page.add_overlay(
-                    overlay_page,
-                    Rectangle(mediabox[0], mediabox[1], mediabox[2], mediabox[3]),
+            destination_page = Page(base_pdf.pages[0])
+            overlay_page = Page(overlay_pdf.pages[0])
+            overlay_box = [float(value) for value in overlay_page.obj.MediaBox]
+            overlay_width = overlay_box[2] - overlay_box[0]
+            overlay_height = overlay_box[3] - overlay_box[1]
+            if (
+                abs(overlay_width - geometry.width) > 0.01
+                or abs(overlay_height - geometry.height) > 0.01
+            ):
+                raise ValueError(
+                    "O tamanho da página do fundo mudou desde a última leitura do template. "
+                    "Reenvie o fundo do projeto para atualizar as medidas."
                 )
+
+            # A colocação é feita à mão em vez de por add_overlay: o cálculo do
+            # qpdf reencaixa o overlay quando a página tem /Rotate ou quando as
+            # medidas não batem, e qualquer reencaixe significaria escalar o
+            # texto. Aqui a matriz é sempre uma translação pura — escala 1:1.
+            form = overlay_page.as_form_xobject()
+            name = destination_page.add_resource(form, Name.XObject)
+            destination_page.contents_add(b"q\n", prepend=True)
+            destination_page.contents_add(
+                f"Q\nq\n1 0 0 1 {geometry.x0:.4f} {geometry.y0:.4f} cm\n{name} Do\nQ\n".encode(),
+                prepend=False,
+            )
+            destination_page.contents_coalesce()
 
             output = io.BytesIO()
             base_pdf.save(output)
             return output.getvalue()
 
 
-def _create_item_pdf(job: GenerationJob, row_number: int, payload: dict) -> GenerationItem:
+def _create_item_pdf(
+    job: GenerationJob, row_number: int, payload: dict, geometry: PageGeometry
+) -> GenerationItem:
     item = GenerationItem.objects.create(
         job=job, row_number=row_number, payload=payload, status=GenerationItem.Status.PROCESSING
     )
     try:
-        overlay_bytes = _build_overlay_pdf(job, payload)
-        output_bytes = _merge_overlay(job.template.background_pdf.path, overlay_bytes)
+        overlay_bytes = _build_overlay_pdf(job, payload, geometry)
+        output_bytes = _merge_overlay(job.template.background_pdf.path, overlay_bytes, geometry)
         filename = f"{job.name.lower().replace(' ', '_')}-linha-{row_number}.pdf"
         item.output_pdf.save(filename, ContentFile(output_bytes), save=False)
         item.status = GenerationItem.Status.COMPLETED
@@ -452,7 +598,9 @@ def _build_zip_for_job(job: GenerationJob) -> None:
     )
 
 
-@transaction.atomic
+# Sem transação envolvendo o job inteiro: cada save de progresso precisa ficar
+# visível para a conexão que responde o polling de status (jobs:status) — dentro
+# de uma transaction.atomic o card de geração ficaria parado até o commit final.
 def process_job(job: GenerationJob) -> GenerationJob:
     try:
         headers, data_rows = load_excel_rows(job.source_excel.path)
@@ -533,8 +681,9 @@ def process_job(job: GenerationJob) -> GenerationJob:
     )
     job.items.all().delete()
 
+    geometry = read_page_geometry(job.template.background_pdf.path)
     for row_number, payload in selected_rows:
-        item = _create_item_pdf(job, row_number, payload)
+        item = _create_item_pdf(job, row_number, payload, geometry)
         job.processed_rows += 1
         if item.status == GenerationItem.Status.COMPLETED:
             job.success_rows += 1

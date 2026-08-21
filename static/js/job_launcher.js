@@ -1,0 +1,237 @@
+/* Card "Gerar arquivos" da bancada.
+ *
+ * Fluxo: escolher o Excel -> lançar o job (jobs:launch) -> acompanhar o
+ * progresso pelo status JSON (jobs:status) -> listar os PDFs prontos.
+ * O card vive fora do editor Fabric, então não depende de template_editor.js.
+ */
+(() => {
+  "use strict";
+
+  const POLL_INTERVAL = 1200;
+  const TERMINAL_STATUS = new Set(["completed", "failed"]);
+
+  const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
+
+  function init() {
+    const card = document.getElementById("generate-card");
+    if (!card) return;
+
+    const launchUrl = card.dataset.launchUrl;
+    const templateId = card.dataset.templateId;
+    const csrfToken = card.querySelector("[name=csrfmiddlewaretoken]")?.value;
+
+    const fileInput = document.getElementById("generate-excel-input");
+    const fileLabel = document.getElementById("generate-file-label");
+    const fileLabelText = document.getElementById("generate-file-name");
+    const previewButton = document.getElementById("generate-preview-button");
+    const fullButton = document.getElementById("generate-full-button");
+    const progressBox = document.getElementById("generate-progress");
+    const progressText = document.getElementById("generate-progress-text");
+    const progressTrack = document.getElementById("generate-progress-track");
+    const progressFill = document.getElementById("generate-progress-fill");
+    const errorBox = document.getElementById("generate-error");
+    const resultBox = document.getElementById("generate-result");
+    const zipLink = document.getElementById("generate-zip-link");
+    const itemsList = document.getElementById("generate-items");
+
+    const EMPTY_LABEL = fileLabelText ? fileLabelText.textContent : "";
+    let pollTimer = null;
+    let running = false;
+
+    const show = (element, visible) => {
+      if (element) element.hidden = !visible;
+    };
+
+    const setError = (message) => {
+      if (!errorBox) return;
+      errorBox.textContent = message || "";
+      show(errorBox, Boolean(message));
+    };
+
+    const setBusy = (busy) => {
+      // Os botões só saem do ar enquanto o job está no ar. Fora disso ficam
+      // clicáveis: clicar sem planilha responde com o motivo, que é mais útil
+      // do que um botão apagado sem explicação.
+      running = busy;
+      [previewButton, fullButton].forEach((button) => {
+        if (button) button.disabled = busy;
+      });
+      if (fileInput) fileInput.disabled = busy;
+      if (card) card.setAttribute("aria-busy", busy ? "true" : "false");
+    };
+
+    const syncButtons = () => {
+      const hasFile = Boolean(fileInput?.files?.length);
+      if (fileLabel) fileLabel.classList.toggle("has-file", hasFile);
+      if (fileLabelText) {
+        fileLabelText.textContent = hasFile ? fileInput.files[0].name : EMPTY_LABEL;
+      }
+    };
+
+    const setProgress = (data) => {
+      const total = Number(data.total_rows) || 0;
+      const processed = Number(data.processed_rows) || 0;
+      const ratio = total ? Math.round((processed / total) * 100) : 0;
+      if (progressFill) progressFill.style.transform = `scaleX(${ratio / 100})`;
+      if (progressTrack) progressTrack.setAttribute("aria-valuenow", String(ratio));
+      if (!progressText) return;
+      if (data.status === "queued") {
+        progressText.textContent = "Na fila…";
+      } else if (TERMINAL_STATUS.has(data.status)) {
+        progressText.textContent = data.success_rows
+          ? `${plural(data.success_rows, "arquivo pronto", "arquivos prontos")}${data.failed_rows ? ` · ${plural(data.failed_rows, "linha com erro", "linhas com erro")}` : ""}`
+          : "Nenhum arquivo foi gerado.";
+      } else {
+        progressText.textContent = total
+          ? `Gerando ${processed} de ${plural(total, "linha", "linhas")}…`
+          : "Lendo a planilha…";
+      }
+    };
+
+    const itemNode = (item) => {
+      const li = document.createElement("li");
+      const label = document.createElement("span");
+      label.textContent = `Linha ${item.row_number}`;
+      li.appendChild(label);
+
+      if (item.output_url) {
+        const link = document.createElement("a");
+        link.href = item.output_url;
+        link.textContent = "Baixar PDF";
+        li.appendChild(link);
+      } else if (item.error_message) {
+        const error = document.createElement("span");
+        error.className = "item-error";
+        error.textContent = item.error_message;
+        li.appendChild(error);
+      } else {
+        const pending = document.createElement("span");
+        pending.className = "item-error";
+        pending.textContent = item.status_display;
+        li.appendChild(pending);
+      }
+      return li;
+    };
+
+    const renderResult = (data) => {
+      const items = data.items || [];
+      if (itemsList) itemsList.replaceChildren(...items.map(itemNode));
+      if (zipLink) {
+        zipLink.href = data.zip_url || "#";
+        show(zipLink, Boolean(data.zip_url));
+      }
+      show(resultBox, items.length > 0 || Boolean(data.zip_url));
+    };
+
+    const poll = async (statusUrl) => {
+      let data;
+      try {
+        const response = await fetch(statusUrl, {
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+        });
+        if (!response.ok) throw new Error(`Erro ${response.status}`);
+        data = await response.json();
+      } catch (err) {
+        setBusy(false);
+        setError("Perdemos o contato com o servidor. Recarregue a página para ver o andamento.");
+        return;
+      }
+
+      setProgress(data);
+      renderResult(data);
+
+      if (TERMINAL_STATUS.has(data.status)) {
+        setBusy(false);
+        setError(data.status === "failed" ? data.last_error : "");
+        return;
+      }
+      pollTimer = window.setTimeout(() => poll(statusUrl), POLL_INTERVAL);
+    };
+
+    const launch = async (kind) => {
+      if (!fileInput?.files?.length) {
+        setError("Escolha o Excel com os dados antes de gerar.");
+        return;
+      }
+      window.clearTimeout(pollTimer);
+      setError("");
+      setBusy(true);
+      show(progressBox, true);
+      show(resultBox, false);
+      if (itemsList) itemsList.replaceChildren();
+      if (progressFill) progressFill.style.transform = "scaleX(0)";
+      if (progressTrack) progressTrack.setAttribute("aria-valuenow", "0");
+      if (progressText) progressText.textContent = "Enviando a planilha…";
+
+      const payload = new FormData();
+      payload.append("template", templateId);
+      payload.append("kind", kind);
+      payload.append("source_excel", fileInput.files[0]);
+
+      let data;
+      try {
+        const response = await fetch(launchUrl, {
+          method: "POST",
+          headers: { "X-CSRFToken": csrfToken },
+          body: payload,
+        });
+        data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || `Erro ${response.status}`);
+      } catch (err) {
+        setBusy(false);
+        show(progressBox, false);
+        setError(err.message || "Não foi possível enviar a planilha.");
+        return;
+      }
+
+      if (progressText) progressText.textContent = "Na fila…";
+      poll(data.status_url);
+    };
+
+    fileInput?.addEventListener("change", () => {
+      setError("");
+      syncButtons();
+    });
+
+    if (fileLabel && fileInput) {
+      const stop = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      };
+      ["dragenter", "dragover"].forEach((name) =>
+        fileLabel.addEventListener(name, (event) => {
+          stop(event);
+          fileLabel.classList.add("is-dragging");
+        })
+      );
+      ["dragleave", "dragend"].forEach((name) =>
+        fileLabel.addEventListener(name, (event) => {
+          stop(event);
+          fileLabel.classList.remove("is-dragging");
+        })
+      );
+      fileLabel.addEventListener("drop", (event) => {
+        stop(event);
+        fileLabel.classList.remove("is-dragging");
+        const [file] = event.dataTransfer?.files || [];
+        if (!file) return;
+        const transfer = new DataTransfer();
+        transfer.items.add(file);
+        fileInput.files = transfer.files;
+        fileInput.dispatchEvent(new Event("change"));
+      });
+    }
+
+    previewButton?.addEventListener("click", () => launch("preview"));
+    fullButton?.addEventListener("click", () => launch("full"));
+
+    syncButtons();
+    window.__vetorialJobLauncher = { launch, syncButtons };
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();

@@ -1,20 +1,24 @@
 from __future__ import annotations
 
+import io
 import shutil
 import tempfile
 from pathlib import Path
+
+import pikepdf
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from PIL import Image, ImageChops, ImageDraw
 from reportlab.pdfgen import canvas
 
 from fonts.models import FontAsset
 
-from .forms import DocumentTemplateForm
+from .forms import DocumentTemplateForm, _image_to_pdf
 from .models import DocumentTemplate, TemplateField
-from .services import update_template_pdf_metadata
+from .services import read_page_geometry, update_template_pdf_metadata
 
 TEST_MEDIA_ROOT = tempfile.mkdtemp(prefix="sistema_vetorial_editor_tests_")
 
@@ -53,6 +57,58 @@ class EditorFlowTests(TestCase):
         content = pdf_path.read_bytes()
         shutil.rmtree(temp_dir, ignore_errors=True)
         return SimpleUploadedFile(filename, content, content_type="application/pdf")
+
+    def test_detail_page_wires_the_generate_card(self):
+        template = DocumentTemplate.objects.create(
+            user=self.user,
+            name="Bancada",
+            slug="bancada",
+            background_pdf=self._build_pdf_upload(),
+        )
+        update_template_pdf_metadata(template)
+        TemplateField.objects.create(
+            template=template,
+            name="nome",
+            excel_column="1",
+            x=10,
+            y=10,
+            width=100,
+            height=20,
+            font=self.font,
+            font_size=12,
+            order_index=1,
+        )
+        self.client.force_login(self.user)
+
+        html = self.client.get(
+            reverse("editor:detail", kwargs={"pk": template.pk})
+        ).content.decode()
+
+        # O card só funciona com os quatro elos: URL de lançamento, id do
+        # projeto, token CSRF e o script que escuta os botões.
+        self.assertIn(f'data-launch-url="{reverse("jobs:launch")}"', html)
+        self.assertIn(f'data-template-id="{template.pk}"', html)
+        self.assertIn("csrfmiddlewaretoken", html.split('id="generate-card"', 1)[1])
+        self.assertIn("js/job_launcher.js", html)
+        self.assertIn('id="generate-excel-input"', html)
+
+    def test_detail_page_offers_the_sample_data_input(self):
+        template = DocumentTemplate.objects.create(
+            user=self.user,
+            name="Bancada Amostra",
+            slug="bancada-amostra",
+            background_pdf=self._build_pdf_upload(),
+        )
+        update_template_pdf_metadata(template)
+        self.client.force_login(self.user)
+
+        html = self.client.get(
+            reverse("editor:detail", kwargs={"pk": template.pk})
+        ).content.decode()
+
+        # template_editor.js escuta este id para carregar os dados no canvas.
+        self.assertIn('id="sample-file-input"', html)
+        self.assertIn('for="sample-file-input"', html)
 
     def test_template_form_rejects_pdf_with_multiple_pages(self):
         form = DocumentTemplateForm(
@@ -355,3 +411,124 @@ class FieldRotationAndSampleTests(TestCase):
         self.client.force_login(self.user)
         response = self.client.post(reverse("editor:sample-data", kwargs={"pk": template.pk}))
         self.assertEqual(response.status_code, 400)
+
+
+class BackgroundImageFidelityTests(TestCase):
+    """Um fundo enviado como imagem vira PDF sem reamostrar nem recomprimir:
+    o que sai do gerador precisa ter os pixels do arquivo original."""
+
+    def _sharp_image(self, mode: str = "RGB") -> Image.Image:
+        image = Image.new("RGB", (240, 90), (255, 255, 255))
+        draw = ImageDraw.Draw(image)
+        for x in range(0, 240, 5):
+            draw.line([(x, 0), (x, 90)], fill=(0, 0, 0), width=1)
+        draw.rectangle([30, 20, 110, 70], fill=(200, 30, 40))
+        return image.convert(mode)
+
+    def _decode_background(self, pdf_bytes: bytes):
+        with pikepdf.Pdf.open(io.BytesIO(pdf_bytes)) as pdf:
+            page = pdf.pages[0]
+            image = page.Resources.XObject.Im0
+            box = [float(value) for value in page.MediaBox]
+            filter_name = str(image.get("/Filter"))
+            if filter_name == "/DCTDecode":
+                decoded = Image.open(io.BytesIO(image.read_raw_bytes()))
+                raw = image.read_raw_bytes()
+            else:
+                colorspace = str(image.ColorSpace)
+                mode = "L" if colorspace == "/DeviceGray" else "RGB"
+                decoded = Image.frombytes(
+                    mode, (int(image.Width), int(image.Height)), image.read_bytes()
+                )
+                raw = None
+            return decoded, filter_name, box, raw
+
+    def test_png_background_keeps_every_pixel(self):
+        source = self._sharp_image()
+        buffer = io.BytesIO()
+        source.save(buffer, format="PNG")
+
+        converted = _image_to_pdf(SimpleUploadedFile("fundo.png", buffer.getvalue()), "fundo")
+        decoded, filter_name, box, _ = self._decode_background(converted.read())
+
+        self.assertEqual(filter_name, "/FlateDecode", "PNG não pode virar JPEG")
+        self.assertEqual(box, [0.0, 0.0, 240.0, 90.0], "1 pixel vira 1 ponto")
+        self.assertIsNone(
+            ImageChops.difference(source, decoded.convert("RGB")).getbbox(),
+            "a imagem embutida precisa ser idêntica à enviada",
+        )
+
+    def test_grayscale_png_stays_grayscale(self):
+        source = self._sharp_image("L")
+        buffer = io.BytesIO()
+        source.save(buffer, format="PNG")
+
+        converted = _image_to_pdf(SimpleUploadedFile("fundo.png", buffer.getvalue()), "fundo")
+        decoded, filter_name, _, _ = self._decode_background(converted.read())
+
+        self.assertEqual(filter_name, "/FlateDecode")
+        self.assertEqual(decoded.mode, "L")
+        self.assertIsNone(ImageChops.difference(source, decoded).getbbox())
+
+    def test_jpeg_background_reuses_the_original_bytes(self):
+        buffer = io.BytesIO()
+        self._sharp_image().save(buffer, format="JPEG", quality=93)
+        original = buffer.getvalue()
+
+        converted = _image_to_pdf(SimpleUploadedFile("fundo.jpg", original), "fundo")
+        _, filter_name, box, raw = self._decode_background(converted.read())
+
+        # Sem recodificar: o JPEG entra no PDF exatamente como chegou.
+        self.assertEqual(filter_name, "/DCTDecode")
+        self.assertEqual(raw, original)
+        self.assertEqual(box, [0.0, 0.0, 240.0, 90.0])
+
+    def test_transparent_png_is_flattened_over_white(self):
+        source = Image.new("RGBA", (20, 10), (0, 0, 0, 0))
+        source.putpixel((5, 5), (255, 0, 0, 255))
+        buffer = io.BytesIO()
+        source.save(buffer, format="PNG")
+
+        converted = _image_to_pdf(SimpleUploadedFile("fundo.png", buffer.getvalue()), "fundo")
+        decoded, _, _, _ = self._decode_background(converted.read())
+
+        self.assertEqual(decoded.getpixel((0, 0)), (255, 255, 255))
+        self.assertEqual(decoded.getpixel((5, 5)), (255, 0, 0))
+
+
+class PageGeometryTests(TestCase):
+    def _pdf(self, *, size=(400, 120), rotation=0, cropbox=None) -> str:
+        temp_dir = Path(tempfile.mkdtemp(prefix="geometry-"))
+        self.addCleanup(shutil.rmtree, temp_dir, True)
+        path = temp_dir / "page.pdf"
+        with pikepdf.Pdf.new() as pdf:
+            page = pdf.add_blank_page(page_size=size)
+            if rotation:
+                page.Rotate = rotation
+            if cropbox:
+                page.CropBox = pikepdf.Array([float(value) for value in cropbox])
+            pdf.save(path)
+        return str(path)
+
+    def test_geometry_falls_back_to_the_mediabox(self):
+        geometry = read_page_geometry(self._pdf())
+
+        self.assertEqual((geometry.x0, geometry.y0, geometry.x1, geometry.y1), (0, 0, 400, 120))
+        self.assertEqual((geometry.visible_width, geometry.visible_height), (400, 120))
+
+    def test_geometry_prefers_the_cropbox(self):
+        geometry = read_page_geometry(self._pdf(cropbox=[20, 10, 380, 110]))
+
+        self.assertEqual((geometry.x0, geometry.y0), (20, 10))
+        self.assertEqual((geometry.visible_width, geometry.visible_height), (360, 100))
+
+    def test_geometry_clips_a_cropbox_larger_than_the_mediabox(self):
+        geometry = read_page_geometry(self._pdf(cropbox=[-50, -50, 900, 900]))
+
+        self.assertEqual((geometry.x0, geometry.y0, geometry.x1, geometry.y1), (0, 0, 400, 120))
+
+    def test_rotation_swaps_the_visible_measures(self):
+        for rotation, expected in ((90, (120, 400)), (180, (400, 120)), (270, (120, 400))):
+            with self.subTest(rotation=rotation):
+                geometry = read_page_geometry(self._pdf(rotation=rotation))
+                self.assertEqual((geometry.visible_width, geometry.visible_height), expected)

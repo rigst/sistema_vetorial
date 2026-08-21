@@ -34,6 +34,13 @@
   padding: 0;
 }
 
+/* Vários blocos abaixo usam display: grid/flex, que sozinhos vencem o
+ * atributo hidden. Sem esta regra, painéis marcados como hidden no HTML
+ * ficam visíveis (era o caso do "Preparando…" do card de geração). */
+[hidden] {
+  display: none !important;
+}
+
 html {
   scroll-behavior: smooth;
 }
@@ -203,6 +210,7 @@ textarea {
 .button,
 button[type="submit"] {
   display: inline-flex;
+  touch-action: manipulation;
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
@@ -221,6 +229,12 @@ button[type="submit"] {
 button[type="submit"]:hover {
   background: #196860;
   border-color: #196860;
+}
+
+.button:focus-visible,
+button[type="submit"]:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
 }
 
 .nav-logout {
@@ -1579,6 +1593,7 @@ textarea:focus {
 
 .file-drop {
   display: flex;
+  touch-action: manipulation;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
@@ -1597,6 +1612,21 @@ textarea:focus {
   background: var(--accent-soft);
 }
 
+/* O input fica visualmente escondido mas focável: o anel precisa aparecer na
+   área de envio, que é o que o usuário enxerga. */
+.file-drop:focus-within,
+label.toolbar-button:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.file-drop.is-dragging {
+  border-style: solid;
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
 .file-drop.has-file {
   border-style: solid;
   border-color: var(--accent);
@@ -1605,9 +1635,28 @@ textarea:focus {
 }
 
 .generate-actions {
+  /* O card vive na coluna estreita da bancada: lado a lado os rótulos quebram
+     em três linhas. Empilhados, cada ação cabe em uma linha e a ordem lê como
+     o fluxo real — conferir a amostra antes de rodar o lote. */
   display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 0.5rem;
+}
+
+.button:disabled,
+.toolbar-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.button:disabled:hover,
+.toolbar-button:disabled:hover {
+  background: inherit;
+  color: inherit;
+}
+
+label.toolbar-button {
+  display: inline-flex;
+  align-items: center;
 }
 
 .generate-progress {
@@ -1615,6 +1664,9 @@ textarea:focus {
   gap: 0.35rem;
   font-size: 0.85rem;
   color: var(--text-soft);
+  /* Contagem que sobe linha a linha: dígitos de largura fixa não fazem o texto
+     dançar a cada atualização. */
+  font-variant-numeric: tabular-nums;
 }
 
 .progress-track {
@@ -1626,10 +1678,14 @@ textarea:focus {
 
 .progress-fill {
   height: 100%;
-  width: 0%;
+  width: 100%;
   border-radius: 999px;
   background: var(--accent);
-  transition: width 300ms ease;
+  /* Escala em vez de largura: transform roda no compositor e não relayoutiza a
+     cada resposta do polling. */
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 300ms ease;
 }
 
 .generate-result {
@@ -1643,6 +1699,9 @@ textarea:focus {
   gap: 0.3rem;
   max-height: 220px;
   overflow-y: auto;
+  /* Um lote grande enche esta lista: o scroll não vaza para a página e as
+     linhas fora de vista não custam layout. */
+  overscroll-behavior: contain;
   font-size: 0.85rem;
 }
 
@@ -1655,11 +1714,16 @@ textarea:focus {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface-2);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 2rem;
 }
 
 .generate-items .item-error {
   color: var(--danger);
   font-size: 0.78rem;
+  /* Mensagem de erro pode ser longa: quebra dentro da linha em vez de esticá-la. */
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .generate-items a {
@@ -1671,6 +1735,7 @@ textarea:focus {
 .generate-error {
   color: var(--danger);
   font-size: 0.85rem;
+  overflow-wrap: anywhere;
 }
 
 .auth-shell {
@@ -1683,11 +1748,7 @@ textarea:focus {
   width: min(100%, 400px);
 }
 
-@media (max-width: 860px) {
-  .generate-actions {
-    grid-template-columns: 1fr;
-  }
-}
+
 
 .editor-shell-single {
   grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
@@ -2116,5 +2177,9 @@ textarea:focus {
 .confirmacao-texto a:hover { color: var(--legal-accent); }
 
 @media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
   .confirmacao { transition: none; }
+  .progress-fill,
+  .progress-bar-fill { transition: none; }
+  .file-drop { transition: none; }
 }

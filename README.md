@@ -9,6 +9,8 @@ Sistema Django para edição visual de templates em PDF e geração de arquivos 
 - templates com fundo em PDF de uma página ou imagem (PNG/JPG/WebP, convertida para PDF);
 - editor visual baseado em Fabric.js: arraste, redimensione, gire, multi-seleção, snap com guias, zoom, undo/redo, atalhos de teclado e edição de texto com duplo clique;
 - pré-visualização fiel: as fontes do usuário são carregadas no navegador e a métrica de texto do editor é replicada na geração do PDF;
+- saída vetorial fiel: o fundo é copiado sem recompressão e o texto vira curva, sem fonte embutida (ver `docs/GERACAO-PDF.md`);
+- geração direto da bancada: envie o Excel, gere uma amostra de 3 linhas ou o lote completo e acompanhe o progresso sem sair do editor;
 - teste com dados reais no editor: envio de um Excel de amostra e navegação linha a linha;
 - campos configurados por nome, coluna numérica do Excel, fonte, cor, rotação, contorno e opções avançadas;
 - fontes ativas e inativas por usuário;
@@ -21,6 +23,7 @@ Sistema Django para edição visual de templates em PDF e geração de arquivos 
 - `editor`: templates, preview do PDF e editor visual.
 - `fonts`: cadastro e inativação de fontes.
 - `jobs`: processamento de planilhas e geração de arquivos.
+- `legal`: termos, política de privacidade e registro de aceite.
 
 ## Como rodar
 
@@ -51,6 +54,17 @@ python manage.py cleanup_expired_files
 ```bash
 .venv/bin/python manage.py test
 ```
+
+Ponta a ponta (Playwright + Chromium), em banco, mídia e fila descartáveis:
+
+```bash
+cd e2e && npm install && npx playwright install chromium
+./e2e/run.sh
+```
+
+O `run.sh` migra um SQLite temporário, popula um projeto de exemplo, sobe um
+worker Celery e o runserver, roda a suíte e derruba tudo. Nada toca o banco, a
+mídia ou a fila de produção. Screenshots e relatório ficam em `e2e/.tmp/`.
 
 ## Conformidade legal (LGPD / Marco Civil)
 

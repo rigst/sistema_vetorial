@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import re
 import shutil
 import tempfile
 from pathlib import Path
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
@@ -107,3 +109,31 @@ class CoreTests(TestCase):
         storage = PrivateMediaStorage(location=TEST_MEDIA_ROOT)
         with self.assertRaises(ValueError):
             storage.url("arquivo.pdf")
+
+
+class StaticAssetTests(TestCase):
+    """Regressões de asset que quebram a UI sem quebrar nenhuma view."""
+
+    def test_hidden_attribute_wins_over_the_layout_display(self):
+        css = (Path(settings.BASE_DIR) / "static/css/style.css").read_text(encoding="utf-8")
+        rule = re.search(r"\[hidden\]\s*\{([^}]*)\}", css)
+
+        # Sem esta regra, .generate-progress { display: grid } deixa o
+        # "Enviando a planilha…" visível para sempre no card de geração.
+        self.assertIsNotNone(rule, "style.css precisa neutralizar o atributo hidden")
+        self.assertIn("display: none", rule.group(1))
+        self.assertIn("!important", rule.group(1))
+
+    def test_job_launcher_script_is_shipped(self):
+        script = Path(settings.BASE_DIR) / "static/js/job_launcher.js"
+        self.assertTrue(script.exists())
+        source = script.read_text(encoding="utf-8")
+        for element_id in (
+            "generate-card",
+            "generate-excel-input",
+            "generate-preview-button",
+            "generate-full-button",
+            "generate-progress-text",
+            "generate-items",
+        ):
+            self.assertIn(element_id, source)
