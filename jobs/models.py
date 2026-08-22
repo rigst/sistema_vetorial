@@ -64,6 +64,11 @@ class GenerationItem(TimeStampedModel):
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     payload = models.JSONField(default=dict, blank=True)
     output_pdf = models.FileField(upload_to=item_pdf_upload_to, blank=True)
+    # Nome mostrado ao usuário (download avulso e dentro do ZIP). Separado do
+    # nome de armazenamento porque o Storage do Django sempre troca espaço
+    # por "_" no disco — sem esse campo a opção "manter espaços" não teria
+    # efeito nenhum no que a pessoa baixa.
+    display_filename = models.CharField(max_length=255, blank=True)
     error_message = models.TextField(blank=True)
 
     class Meta:

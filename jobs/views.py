@@ -315,7 +315,7 @@ class GenerationItemDownloadView(LoginRequiredMixin, View):
         return FileResponse(
             item.output_pdf.open("rb"),
             as_attachment=True,
-            filename=item.output_pdf.name.split("/")[-1],
+            filename=item.display_filename or item.output_pdf.name.split("/")[-1],
         )
 
 

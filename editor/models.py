@@ -17,6 +17,11 @@ def preview_page_upload_to(instance: "TemplatePreviewPage", filename: str) -> st
 
 
 class DocumentTemplate(OwnedModel):
+    class FilenameSpaceMode(models.TextChoices):
+        KEEP = "keep", "Manter como estão no texto"
+        STRIP = "strip", "Remover"
+        REPLACE = "replace", "Substituir por"
+
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255)
     description = models.TextField(blank=True)
@@ -27,6 +32,17 @@ class DocumentTemplate(OwnedModel):
     page_count = models.PositiveIntegerField(default=1)
     editor_state = models.JSONField(default=dict, blank=True)
     is_active = models.BooleanField(default=True)
+    # Nome de cada PDF gerado, com variáveis {1}, {2}... para colunas do
+    # Excel (ex.: "{1}_{2}"). Em branco, cai no nome padrão (nome do job +
+    # linha) — ver jobs/services.py:_create_item_pdf.
+    filename_pattern = models.CharField(max_length=255, blank=True)
+    # Só decide o que fazer com espaços vindos do TEXTO das colunas dentro de
+    # filename_pattern — sem escolher nada, o espaço vai pro nome do arquivo
+    # igual está no Excel (sistemas de arquivo atuais aceitam espaço no nome).
+    filename_space_mode = models.CharField(
+        max_length=10, choices=FilenameSpaceMode.choices, default=FilenameSpaceMode.KEEP
+    )
+    filename_space_replacement = models.CharField(max_length=5, blank=True, default="-")
 
     class Meta:
         ordering = ["name", "-updated_at"]
@@ -65,6 +81,10 @@ class TemplateField(TimeStampedModel):
         SHRINK = "shrink", "Reduzir fonte"
         ERROR = "error", "Gerar erro"
 
+    class GrowDirection(models.TextChoices):
+        DOWN = "down", "Para baixo"
+        UP = "up", "Para cima"
+
     template = models.ForeignKey(DocumentTemplate, on_delete=models.CASCADE, related_name="fields")
     name = models.CharField(max_length=100)
     excel_column = models.CharField(max_length=255, blank=True)
@@ -94,6 +114,13 @@ class TemplateField(TimeStampedModel):
     border_blur = models.DecimalField(max_digits=6, decimal_places=2, default=0)
     line_height = models.DecimalField(max_digits=6, decimal_places=2, default=1.2)
     max_lines = models.PositiveIntegerField(default=1)
+    # Só importa quando overflow_mode = WRAP: para onde o texto cresce ao
+    # ganhar mais linhas do que cabiam antes. "down" mantém o topo da caixa
+    # fixo (comportamento de sempre); "up" mantém a base fixa, para não
+    # atropelar um campo colocado logo abaixo.
+    grow_direction = models.CharField(
+        max_length=10, choices=GrowDirection.choices, default=GrowDirection.DOWN
+    )
     integer_min_digits = models.PositiveIntegerField(default=0)
     integer_keep_sign = models.BooleanField(default=True)
     empty_value = models.CharField(max_length=255, blank=True)

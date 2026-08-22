@@ -23,9 +23,9 @@
         {% if preview_pages %}
         <div class="editor-toolbar" id="editor-toolbar">
             <div class="toolbar-group">
-                <button type="button" class="toolbar-button" id="new-field-button" title="Novo campo">+ Campo</button>
-                <button type="button" class="toolbar-button" id="duplicate-field-button" title="Duplicar seleção (Ctrl+D)">Duplicar</button>
-                <button type="button" class="toolbar-button toolbar-button-danger" id="delete-field-button" title="Excluir seleção (Delete)">Excluir</button>
+                <button type="button" class="toolbar-button" id="new-field-button" title="Novo campo" aria-label="Novo campo">+</button>
+                <button type="button" class="toolbar-button" id="duplicate-field-button" title="Duplicar seleção (Ctrl+D)" aria-label="Duplicar seleção">⧉</button>
+                <button type="button" class="toolbar-button toolbar-button-danger" id="delete-field-button" title="Excluir seleção (Delete)" aria-label="Excluir seleção">🗑</button>
             </div>
             <div class="toolbar-group">
                 <button type="button" class="toolbar-button" id="undo-button" title="Desfazer (Ctrl+Z)">↶</button>
@@ -36,17 +36,17 @@
                 <button type="button" class="toolbar-button" id="align-center-v" title="Centralizar na altura da página">Centrar ↕</button>
             </div>
             <div class="toolbar-group">
-                <button type="button" class="toolbar-button" id="zoom-out-button" title="Reduzir zoom">−</button>
+                <button type="button" class="toolbar-button" id="zoom-out-button" title="Reduzir zoom" aria-label="Reduzir zoom">−</button>
                 <span class="toolbar-label" id="editor-zoom-label">100%</span>
-                <button type="button" class="toolbar-button" id="zoom-in-button" title="Ampliar zoom">+</button>
+                <button type="button" class="toolbar-button" id="zoom-in-button" title="Ampliar zoom" aria-label="Ampliar zoom">+</button>
                 <button type="button" class="toolbar-button" id="zoom-fit-button" title="Ajustar à tela">Ajustar</button>
             </div>
             <div class="toolbar-group" id="sample-controls">
                 <label class="toolbar-button" for="sample-file-input" title="Ver o layout com os dados do seu Excel">Ver com meus dados</label>
                 <input type="file" class="visually-hidden" id="sample-file-input" accept=".xlsx,.xlsm">
-                <button type="button" class="toolbar-button sample-only" id="sample-prev" title="Linha anterior">◀</button>
+                <button type="button" class="toolbar-button sample-only" id="sample-prev" title="Linha anterior" aria-label="Linha anterior">◀</button>
                 <span class="toolbar-label sample-only" id="sample-row-label"></span>
-                <button type="button" class="toolbar-button sample-only" id="sample-next" title="Próxima linha">▶</button>
+                <button type="button" class="toolbar-button sample-only" id="sample-next" title="Próxima linha" aria-label="Próxima linha">▶</button>
                 <button type="button" class="toolbar-button sample-only" id="sample-exit" title="Voltar aos textos base">Ocultar dados</button>
             </div>
         </div>
@@ -84,8 +84,12 @@
                 </div>
                 <div class="field-group">
                     <label for="field-excel-column">Coluna do Excel</label>
-                    <input id="field-excel-column" name="excel_column" type="number" min="1">
-                    <p class="field-hint">Posição da coluna na planilha: A = 1, B = 2, C = 3…</p>
+                    <input id="field-excel-column" name="excel_column" type="text" inputmode="text" placeholder="1">
+                    <p class="field-hint">
+                        Posição da coluna na planilha: A = 1, B = 2, C = 3…
+                        Para juntar colunas, use chaves com um conector entre elas —
+                        <code>{3}-{5}</code> junta a coluna 3 e a 5 com um traço no meio.
+                    </p>
                 </div>
             </div>
 
@@ -172,16 +176,6 @@
                             <option value="integer">Inteiro</option>
                         </select>
                     </div>
-                    <div class="field-group-row">
-                        <div class="field-group">
-                            <label for="field-line-height">Altura de linha</label>
-                            <input id="field-line-height" name="line_height" type="number" min="0.5" step="0.1">
-                        </div>
-                        <div class="field-group">
-                            <label for="field-max-lines">Máx. linhas</label>
-                            <input id="field-max-lines" name="max_lines" type="number" min="1" step="1">
-                        </div>
-                    </div>
                     <div class="field-group">
                         <label for="field-overflow-mode">Quando o texto não couber</label>
                         <select id="field-overflow-mode" name="overflow_mode">
@@ -190,6 +184,28 @@
                             <option value="wrap">Quebrar linha</option>
                             <option value="error">Gerar erro</option>
                         </select>
+                    </div>
+                    <div class="field-group-row">
+                        <div class="field-group">
+                            <label for="field-line-height">Altura de linha</label>
+                            <input id="field-line-height" name="line_height" type="number" min="0.5" step="0.1">
+                        </div>
+                        <div class="field-group" id="field-max-lines-group">
+                            <label for="field-max-lines">Máx. linhas</label>
+                            <input id="field-max-lines" name="max_lines" type="number" min="1" step="1">
+                        </div>
+                    </div>
+                    <div class="field-group" id="field-grow-direction-group" hidden>
+                        <label for="field-grow-direction">Linhas novas crescem para</label>
+                        <select id="field-grow-direction" name="grow_direction">
+                            <option value="down">Baixo (o topo da caixa não se move)</option>
+                            <option value="up">Cima (a base da caixa não se move)</option>
+                        </select>
+                        <p class="field-hint">
+                            O texto sempre lê de cima para baixo — isto só decide para que lado a
+                            caixa cresce quando ganha mais linhas, para não atropelar um campo
+                            vizinho.
+                        </p>
                     </div>
                 </div>
             </details>
@@ -236,14 +252,55 @@
             </details>
         </form>
     </aside>
+    </div>
+</section>
 
-    <section class="panel generate-card" id="generate-card"
-        data-launch-url="{% url 'jobs:launch' %}"
-        data-template-id="{{ template_obj.pk }}">
-        <div class="section-header">
-            <h2 class="section-title">Gerar arquivos</h2>
+<section class="panel generate-card" id="generate-card"
+    data-launch-url="{% url 'jobs:launch' %}"
+    data-template-id="{{ template_obj.pk }}"
+    data-filename-pattern-url="{% url 'editor:filename-pattern-update' template_obj.pk %}">
+    <div class="section-header">
+        <h2 class="section-title">Gerar arquivos</h2>
+    </div>
+    {% csrf_token %}
+    <div class="generate-layout">
+        <div class="filename-pattern-config">
+            <h3 class="field-section-label">Nome dos arquivos</h3>
+            <div class="field-group">
+                <label for="filename-pattern-input">Padrão do nome de cada PDF</label>
+                <input type="text" id="filename-pattern-input" name="filename_pattern"
+                       placeholder="{1}_{2}" value="{{ template_obj.filename_pattern }}">
+                <p class="field-hint">
+                    Use <code>{1}</code>, <code>{2}</code>… para o texto de cada coluna da planilha.
+                    <code>{1}_{2}</code> junta a coluna 1 e a 2 com um "_" no meio;
+                    <code>{3}-{5}</code> junta a coluna 3 e a 5 com um traço.
+                    A extensão <code>.pdf</code> é adicionada sozinha no final.
+                    Em branco, usa o nome padrão (nome do lote + número da linha).
+                </p>
+                <span class="save-state" id="filename-pattern-save-state"></span>
+            </div>
+            <div class="field-group">
+                <label for="filename-space-mode">Espaços em branco no nome do arquivo</label>
+                <div class="filename-space-row">
+                    <select id="filename-space-mode" name="filename_space_mode">
+                        {% for value, label in filename_space_mode_choices %}
+                        <option value="{{ value }}"{% if template_obj.filename_space_mode == value %} selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="text" id="filename-space-replacement" name="filename_space_replacement"
+                           maxlength="5" placeholder="-"
+                           value="{{ template_obj.filename_space_replacement }}"
+                           {% if template_obj.filename_space_mode != "replace" %}hidden{% endif %}
+                           aria-label="Caractere para substituir espaços">
+                </div>
+                <p class="field-hint">
+                    Só afeta o texto vindo das colunas do Excel dentro do padrão acima. Sem
+                    escolher nada, os espaços do texto aparecem normalmente no nome do arquivo.
+                </p>
+                <span class="save-state" id="filename-space-save-state"></span>
+            </div>
         </div>
-        {% csrf_token %}
+
         <div class="generate-steps">
             <label class="file-drop" id="generate-file-label" for="generate-excel-input">
                 <span id="generate-file-name">Escolher o Excel com os dados (.xlsx)</span>
@@ -253,6 +310,10 @@
             do teclado para que a área de envio seja alcançável sem mouse.
             {% endcomment %}
             <input type="file" class="visually-hidden" id="generate-excel-input" accept=".xlsx,.xlsm">
+            <p class="field-hint">
+                A primeira linha da planilha é lida como cabeçalho (nome das colunas) e não vira
+                um arquivo — os dados precisam começar na linha 2.
+            </p>
             <div class="generate-actions">
                 <button type="button" class="button button-secondary" id="generate-preview-button">Gerar amostra (3 linhas)</button>
                 <button type="button" class="button" id="generate-full-button">Gerar lote completo</button>
@@ -277,7 +338,6 @@
                 <ul class="generate-items" id="generate-items"></ul>
             </div>
         </div>
-    </section>
     </div>
 </section>
 
@@ -286,10 +346,10 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/job_launcher.js' %}?v=20260822-01"></script>
+<script src="{% static 'js/job_launcher.js' %}?v=20260822-02"></script>
 {% if preview_pages %}
 <script src="{% static 'js/fabric.min.js' %}?v=6.7.1"></script>
-<script src="{% static 'js/template_editor.js' %}?v=20260822-01"></script>
+<script src="{% static 'js/template_editor.js' %}?v=20260822-02"></script>
 <script>
 VetorialTemplateEditor.init({
   canvasId: "editor-canvas",

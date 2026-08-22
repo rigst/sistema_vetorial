@@ -808,16 +808,18 @@ textarea:focus {
   margin-bottom: 1rem;
 }
 
+/* A moldura desta regra (padding/border/background) foi removida de
+ * propósito: era um resquício de uma versão anterior da barra de
+ * ferramentas, e ainda vencia a definição "de verdade" mais abaixo por pura
+ * ordem no arquivo (mesma especificidade, .editor-toolbar contra
+ * .editor-toolbar) — a barra ficava presa dentro de um retângulo com fundo
+ * e borda que ninguém pediu. */
 .editor-toolbar {
   display: flex;
   align-items: center;
   gap: 0.85rem;
   flex-wrap: wrap;
   margin-bottom: 1rem;
-  padding: 0.8rem 0.95rem;
-  border-radius: 16px;
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.7);
 }
 
 .editor-toggle {
@@ -1507,14 +1509,19 @@ details[open] > summary .field-advanced-title::before {
   margin-bottom: 0.7rem;
 }
 
+/* Sem caixa: um traço fino separa os grupos, a barra inteira lê como uma
+ * linha só de controles, não uma fileira de blocos empilhados. */
 .toolbar-group {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  background: var(--surface-strong);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 0.25rem 0.35rem;
+  gap: 0.2rem;
+  padding-right: 0.7rem;
+  border-right: 1px solid var(--border);
+}
+
+.toolbar-group:last-child {
+  padding-right: 0;
+  border-right: 0;
 }
 
 .toolbar-button {
@@ -2033,8 +2040,70 @@ label.toolbar-button {
   border-radius: 6px;
 }
 
-.generate-card {
-  flex: 0 0 auto;
+/* O card de geração virou uma seção de largura cheia, fora da coluna
+ * estreita da bancada — cabe lado a lado com a configuração de nome de
+ * arquivo, uma bem mais larga que a outra. */
+.generate-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.filename-pattern-config {
+  display: grid;
+  gap: 0.7rem;
+  align-content: start;
+  padding-right: 1.5rem;
+  border-right: 1px solid var(--border);
+}
+
+.filename-pattern-config .field-hint code,
+.field-hint code {
+  background: var(--surface-strong-2);
+  border-radius: 4px;
+  padding: 0.05rem 0.35rem;
+  font-size: 0.85em;
+}
+
+.filename-space-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.filename-space-row select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.filename-space-row input[type="text"] {
+  flex: 0 0 4.5rem;
+  min-width: 0;
+  text-align: center;
+}
+
+.filename-pattern-config .save-state {
+  font-size: 0.78rem;
+  color: var(--muted);
+  min-height: 1.1em;
+  font-weight: 600;
+}
+
+.filename-pattern-config .save-state[data-tone="ok"] { color: var(--success); }
+.filename-pattern-config .save-state[data-tone="busy"] { color: var(--warning); }
+.filename-pattern-config .save-state[data-tone="error"] { color: var(--danger); }
+
+@media (max-width: 860px) {
+  .generate-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .filename-pattern-config {
+    padding-right: 0;
+    border-right: 0;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+  }
 }
 
 @media (max-width: 980px) {

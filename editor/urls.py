@@ -10,6 +10,7 @@ from .views import (
     DocumentTemplateUpdateView,
     TemplateFieldApiView,
     TemplateFieldsApiView,
+    TemplateFilenamePatternUpdateView,
     TemplateLayoutUpdateView,
     TemplatePreviewPageImageView,
     TemplateSampleDataView,
@@ -33,5 +34,10 @@ urlpatterns = [
     path("<int:pk>/layout/", TemplateLayoutUpdateView.as_view(), name="layout-update"),
     path("<int:pk>/campos/", TemplateFieldsApiView.as_view(), name="fields-api"),
     path("<int:pk>/amostra/", TemplateSampleDataView.as_view(), name="sample-data"),
+    path(
+        "<int:pk>/nome-arquivo/",
+        TemplateFilenamePatternUpdateView.as_view(),
+        name="filename-pattern-update",
+    ),
     path("campos/<int:pk>/", TemplateFieldApiView.as_view(), name="field-api"),
 ]

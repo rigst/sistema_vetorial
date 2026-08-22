@@ -21,10 +21,49 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 from reportlab.pdfgen.canvas import FILL_NON_ZERO
 
-from editor.models import TemplateField
+from editor.models import DocumentTemplate, TemplateField
 from editor.services import PageGeometry, read_page_geometry
 
 from .models import GenerationItem, GenerationJob
+
+# Sintaxe compartilhada por dois lugares: a coluna de origem de um campo
+# ("{3}-{5}" junta a coluna 3 e a 5 com um traço no meio) e o nome do
+# arquivo gerado (DocumentTemplate.filename_pattern, ex.: "{1}_{2}"). Um
+# número solto sem chaves ("3") continua valendo — é o formato antigo, uma
+# coluna só, sem conector.
+COLUMN_REF_RE = re.compile(r"\{(\d+)\}")
+
+
+def extract_column_refs(pattern: str) -> list[int]:
+    """Todo número de coluna citado num padrão — usado para validar que o
+    Excel enviado tem colunas suficientes antes de gerar qualquer arquivo."""
+    if not pattern:
+        return []
+    pattern = str(pattern).strip()
+    if pattern.isdigit():
+        return [int(pattern)]
+    return [int(match) for match in COLUMN_REF_RE.findall(pattern)]
+
+
+def render_column_template(pattern: str, payload: dict) -> str:
+    """Resolve um padrão de colunas contra os valores de uma linha do Excel.
+
+    "{3}-{5}" com coluna 3 = "Recife" e coluna 5 = "PE" vira "Recife-PE": o
+    texto entre chaves é copiado como está (o conector), só o que está
+    dentro de `{}` é trocado pelo valor da coluna. Um número solto ("3")
+    continua funcionando como antes — uma coluna só, sem chaves.
+    """
+    if not pattern:
+        return ""
+    pattern = str(pattern).strip()
+    if pattern.isdigit():
+        return str(payload.get(f"coluna_{int(pattern)}", "") or "")
+
+    def _substitute(match: re.Match) -> str:
+        column_number = int(match.group(1))
+        return str(payload.get(f"coluna_{column_number}", "") or "")
+
+    return COLUMN_REF_RE.sub(_substitute, pattern)
 
 
 def _humanize_generation_error(exc: Exception) -> str:
@@ -214,7 +253,9 @@ def load_excel_rows(excel_path: str):
 
 def get_template_expected_headers(job: GenerationJob) -> list[str]:
     return [
-        f"Coluna {field.excel_column}" for field in job.template.fields.all() if field.excel_column
+        f"Coluna {column_number}"
+        for field in job.template.fields.all()
+        for column_number in extract_column_refs(field.excel_column)
     ]
 
 
@@ -224,8 +265,14 @@ def _fit_text_lines(
     if not text:
         return [""], font_size
 
+    # "Quebrar linha" existe para mostrar o texto inteiro — limitar a
+    # max_lines aqui derrubaria o resto do texto e o efeito seria idêntico a
+    # "Cortar". max_lines só governa este modo indiretamente, via a caixa
+    # ficar maior (grow_direction, calculado depois em _draw_field).
+    line_cap = None if mode == TemplateField.OverflowMode.WRAP else max_lines
+
     if max_width <= 0:
-        return text.splitlines()[:max_lines], font_size
+        return text.splitlines()[:line_cap], font_size
 
     def wrap(current_size: float):
         words = text.split()
@@ -244,8 +291,7 @@ def _fit_text_lines(
         return lines
 
     if mode == TemplateField.OverflowMode.WRAP:
-        lines = wrap(font_size)
-        return lines[:max_lines], font_size
+        return wrap(font_size), font_size
 
     if mode == TemplateField.OverflowMode.SHRINK:
         size = font_size
@@ -388,7 +434,14 @@ def _draw_field(pdf_canvas, field: TemplateField, value: str, page_height: float
         return draw_x
 
     def baseline_y(index):
-        return -((FIRST_BASELINE_FACTOR * adjusted_size) + (index * line_height))
+        offset = -((FIRST_BASELINE_FACTOR * adjusted_size) + (index * line_height))
+        if field.grow_direction == TemplateField.GrowDirection.UP:
+            # A última linha fica onde a única linha ficaria numa caixa que
+            # nunca precisou crescer (a "base" original) — linhas extras
+            # empurram o bloco para cima, sem inverter a ordem de leitura:
+            # a primeira linha do texto continua sendo a de cima.
+            offset += (len(lines) - 1) * line_height
+        return offset
 
     def draw_text_line(
         draw_x, baseline_y, line, *, fill_color=None, stroke_color=None, line_width=1, alpha=1
@@ -433,7 +486,7 @@ def _draw_field(pdf_canvas, field: TemplateField, value: str, page_height: float
         blur_factor = max(float(field.border_blur or 0), 0)
         border_alpha = min(max(float(field.border_opacity or 1), 0), 1)
         border_color = HexColor(field.border_color or "#000000")
-        for index, line in enumerate(lines[:max_lines]):
+        for index, line in enumerate(lines):
             line_baseline = baseline_y(index)
             x = aligned_x(0, line)
             if blur_factor > 0:
@@ -461,7 +514,7 @@ def _draw_field(pdf_canvas, field: TemplateField, value: str, page_height: float
         return
 
     fill_color = HexColor(field.color or "#000000")
-    for index, line in enumerate(lines[:max_lines]):
+    for index, line in enumerate(lines):
         draw_text_line(aligned_x(0, line), baseline_y(index), line, fill_color=fill_color)
     pdf_canvas.restoreState()
 
@@ -506,9 +559,7 @@ def _build_overlay_pdf(job: GenerationJob, payload: dict, geometry: PageGeometry
     _apply_page_rotation(pdf_canvas, geometry)
 
     for field in fields:
-        raw_value = ""
-        if field.excel_column and str(field.excel_column).isdigit():
-            raw_value = payload.get(f"coluna_{int(field.excel_column)}", "")
+        raw_value = render_column_template(field.excel_column, payload)
         if not raw_value:
             raw_value = payload.get(field.name) or field.empty_value or field.name
         value = format_field_value(field, raw_value)
@@ -563,8 +614,64 @@ def _merge_overlay(background_pdf_path: str, overlay_bytes: bytes, geometry: Pag
             return output.getvalue()
 
 
+_UNSAFE_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|\r\n\t]+')
+
+
+def _sanitize_filename_component(
+    value: str,
+    *,
+    space_mode: str = DocumentTemplate.FilenameSpaceMode.KEEP,
+    space_replacement: str = "-",
+) -> str:
+    value = unicodedata.normalize("NFC", value or "").strip()
+    # Caracteres proibidos em nome de arquivo viram espaço; o que fazer com
+    # espaço (inclusive os que já vinham do texto) é decidido só depois, pelo
+    # space_mode escolhido no template — por padrão o app não mexe neles.
+    value = _UNSAFE_FILENAME_CHARS.sub(" ", value)
+    value = re.sub(r"\s+", " ", value).strip()
+    if space_mode == DocumentTemplate.FilenameSpaceMode.STRIP:
+        value = value.replace(" ", "")
+    elif space_mode == DocumentTemplate.FilenameSpaceMode.REPLACE:
+        value = value.replace(" ", (space_replacement or "-").strip() or "-")
+    return value
+
+
+def build_item_filename(
+    job: GenerationJob, row_number: int, payload: dict, used_names: set[str]
+) -> str:
+    """Nome do PDF de uma linha: o padrão do template (com variáveis {1},
+    {2}...) quando configurado, senão o nome antigo (nome do job + linha).
+
+    `used_names` acompanha o que já foi usado NESTE job — um padrão como
+    "{1}" gera o mesmo nome para duas pessoas com o mesmo valor na coluna 1,
+    e sem desempate uma sobrescreveria a outra dentro do ZIP.
+    """
+    pattern = job.template.filename_pattern
+    base = (
+        _sanitize_filename_component(
+            render_column_template(pattern, payload),
+            space_mode=job.template.filename_space_mode,
+            space_replacement=job.template.filename_space_replacement,
+        )
+        if pattern
+        else ""
+    )
+    if not base:
+        base = f"{job.name.lower().replace(' ', '_')}-linha-{row_number}"
+
+    filename = f"{base}.pdf"
+    if filename.lower() in used_names:
+        filename = f"{base}-{row_number}.pdf"
+    used_names.add(filename.lower())
+    return filename
+
+
 def _create_item_pdf(
-    job: GenerationJob, row_number: int, payload: dict, geometry: PageGeometry
+    job: GenerationJob,
+    row_number: int,
+    payload: dict,
+    geometry: PageGeometry,
+    used_filenames: set[str],
 ) -> GenerationItem:
     item = GenerationItem.objects.create(
         job=job, row_number=row_number, payload=payload, status=GenerationItem.Status.PROCESSING
@@ -572,7 +679,11 @@ def _create_item_pdf(
     try:
         overlay_bytes = _build_overlay_pdf(job, payload, geometry)
         output_bytes = _merge_overlay(job.template.background_pdf.path, overlay_bytes, geometry)
-        filename = f"{job.name.lower().replace(' ', '_')}-linha-{row_number}.pdf"
+        filename = build_item_filename(job, row_number, payload, used_filenames)
+        # O Storage do Django troca espaço por "_" no nome salvo em disco —
+        # display_filename guarda o nome como o padrão realmente pediu, para
+        # o download avulso e o ZIP mostrarem exatamente isso.
+        item.display_filename = filename
         item.output_pdf.save(filename, ContentFile(output_bytes), save=False)
         item.status = GenerationItem.Status.COMPLETED
         item.error_message = ""
@@ -592,7 +703,8 @@ def _build_zip_for_job(job: GenerationJob) -> None:
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
         for item in completed_items:
             with item.output_pdf.open("rb") as generated:
-                archive.writestr(Path(item.output_pdf.name).name, generated.read())
+                entry_name = item.display_filename or Path(item.output_pdf.name).name
+                archive.writestr(entry_name, generated.read())
     job.zip_file.save(
         f"{job.name.lower().replace(' ', '_')}.zip", ContentFile(buffer.getvalue()), save=False
     )
@@ -620,10 +732,9 @@ def process_job(job: GenerationJob) -> GenerationJob:
     max_column = len(headers)
     missing_headers = []
     for field in job.template.fields.all():
-        if not field.excel_column or not str(field.excel_column).isdigit():
-            continue
-        if int(field.excel_column) > max_column:
-            missing_headers.append(f"Coluna {field.excel_column}")
+        for column_number in extract_column_refs(field.excel_column):
+            if column_number > max_column:
+                missing_headers.append(f"Coluna {column_number}")
 
     limit = 3 if job.kind == GenerationJob.Kind.PREVIEW else len(data_rows)
     selected_rows = data_rows[:limit]
@@ -682,8 +793,9 @@ def process_job(job: GenerationJob) -> GenerationJob:
     job.items.all().delete()
 
     geometry = read_page_geometry(job.template.background_pdf.path)
+    used_filenames: set[str] = set()
     for row_number, payload in selected_rows:
-        item = _create_item_pdf(job, row_number, payload, geometry)
+        item = _create_item_pdf(job, row_number, payload, geometry, used_filenames)
         job.processed_rows += 1
         if item.status == GenerationItem.Status.COMPLETED:
             job.success_rows += 1

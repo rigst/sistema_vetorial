@@ -149,7 +149,9 @@ test.describe("Bancada: gerar arquivos a partir do Excel", () => {
     expect(firstRow.active).toBe(true);
     expect(firstRow.total).toBe(5);
 
-    await page.getByRole("button", { name: "▶" }).click();
+    // aria-label="Próxima linha" substitui o glifo "▶" como nome acessível
+    // (leitor de tela não lê símbolo solto) — é o que getByRole busca agora.
+    await page.getByRole("button", { name: "Próxima linha" }).click();
     await expect(page.locator("#sample-row-label")).toContainText("2/5");
 
     await page.screenshot({ path: path.join(TMP, "bancada-amostra.png"), fullPage: true });

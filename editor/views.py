@@ -14,7 +14,7 @@ from django.views.generic import CreateView, DetailView, ListView, TemplateView,
 
 from core.mixins import UserOwnedQuerysetMixin
 from fonts.models import FontAsset
-from jobs.services import format_field_value, load_excel_rows
+from jobs.services import format_field_value, load_excel_rows, render_column_template
 
 from .forms import DocumentTemplateForm
 from .models import DocumentTemplate, TemplateField, TemplatePreviewPage
@@ -50,6 +50,7 @@ def field_to_dict(field: TemplateField) -> dict:
         "border_blur": float(field.border_blur),
         "line_height": float(field.line_height),
         "max_lines": field.max_lines,
+        "grow_direction": field.grow_direction,
         "integer_min_digits": field.integer_min_digits,
         "integer_keep_sign": field.integer_keep_sign,
         "empty_value": field.empty_value,
@@ -193,6 +194,7 @@ def _template_editor_context(template_obj, user):
         "page_height_cm": round(float(template_obj.page_height or 0) * 2.54 / 72, 2)
         if template_obj.page_height
         else 0,
+        "filename_space_mode_choices": DocumentTemplate.FilenameSpaceMode.choices,
     }
 
 
@@ -246,6 +248,7 @@ class DocumentTemplateDuplicateView(LoginRequiredMixin, View):
                 page_height=source.page_height,
                 page_count=1,
                 editor_state=deepcopy(source.editor_state),
+                filename_pattern=source.filename_pattern,
                 is_active=True,
             )
         update_template_pdf_metadata(duplicated)
@@ -315,6 +318,7 @@ class TemplateFieldsApiView(LoginRequiredMixin, View):
             border_blur=payload.get("border_blur") or 0,
             line_height=payload.get("line_height") or 1.1,
             max_lines=payload.get("max_lines") or 1,
+            grow_direction=payload.get("grow_direction") or TemplateField.GrowDirection.DOWN,
             integer_min_digits=payload.get("integer_min_digits") or 0,
             integer_keep_sign=payload.get("integer_keep_sign", True),
             empty_value=payload.get("empty_value") or name,
@@ -358,6 +362,7 @@ class TemplateFieldApiView(LoginRequiredMixin, View):
             "border_blur",
             "line_height",
             "max_lines",
+            "grow_direction",
             "integer_min_digits",
             "integer_keep_sign",
             "empty_value",
@@ -417,6 +422,42 @@ class TemplateLayoutUpdateView(LoginRequiredMixin, View):
         return JsonResponse({"ok": True, "updated": len(updates)})
 
 
+class TemplateFilenamePatternUpdateView(LoginRequiredMixin, View):
+    """Salva as opções de nome dos PDFs gerados (card "Gerar arquivos"): o
+    padrão com variáveis {N} e o que fazer com espaços do texto no nome."""
+
+    VALID_SPACE_MODES = {choice for choice, _label in DocumentTemplate.FilenameSpaceMode.choices}
+
+    def post(self, request, *args, **kwargs):
+        template_obj = get_object_or_404(DocumentTemplate, pk=kwargs["pk"], user=request.user)
+        payload = _parse_json_body(request)
+        update_fields = ["updated_at"]
+        if "filename_pattern" in payload:
+            template_obj.filename_pattern = (payload.get("filename_pattern") or "").strip()
+            update_fields.append("filename_pattern")
+        if "filename_space_mode" in payload:
+            space_mode = (
+                payload.get("filename_space_mode") or DocumentTemplate.FilenameSpaceMode.KEEP
+            )
+            if space_mode in self.VALID_SPACE_MODES:
+                template_obj.filename_space_mode = space_mode
+                update_fields.append("filename_space_mode")
+        if "filename_space_replacement" in payload:
+            template_obj.filename_space_replacement = (
+                payload.get("filename_space_replacement") or ""
+            ).strip()[:5]
+            update_fields.append("filename_space_replacement")
+        template_obj.save(update_fields=update_fields)
+        return JsonResponse(
+            {
+                "ok": True,
+                "filename_pattern": template_obj.filename_pattern,
+                "filename_space_mode": template_obj.filename_space_mode,
+                "filename_space_replacement": template_obj.filename_space_replacement,
+            }
+        )
+
+
 class TemplateSampleDataView(LoginRequiredMixin, View):
     """Recebe um Excel de amostra e devolve os valores formatados por campo,
     para o editor pré-visualizar o layout com dados reais, linha a linha."""
@@ -451,9 +492,7 @@ class TemplateSampleDataView(LoginRequiredMixin, View):
         for row_number, payload in data_rows[: self.MAX_ROWS]:
             values = {}
             for field in fields:
-                raw_value = ""
-                if field.excel_column and str(field.excel_column).isdigit():
-                    raw_value = payload.get(f"coluna_{int(field.excel_column)}", "")
+                raw_value = render_column_template(field.excel_column, payload)
                 if not raw_value:
                     raw_value = payload.get(field.name) or field.empty_value or field.name
                 try:

@@ -485,6 +485,189 @@ class FieldRotationAndSampleTests(TestCase):
         response = self.client.post(reverse("editor:sample-data", kwargs={"pk": template.pk}))
         self.assertEqual(response.status_code, 400)
 
+    def test_patch_persists_grow_direction(self):
+        template = self._build_template()
+        field = TemplateField.objects.create(
+            template=template,
+            name="nome",
+            excel_column="1",
+            x=20,
+            y=20,
+            width=160,
+            height=24,
+            font=self.font,
+            font_size=18,
+            overflow_mode=TemplateField.OverflowMode.WRAP,
+        )
+        self.client.force_login(self.user)
+        response = self.client.patch(
+            reverse("editor:field-api", kwargs={"pk": field.pk}),
+            data='{"grow_direction": "up"}',
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["field"]["grow_direction"], "up")
+        field.refresh_from_db()
+        self.assertEqual(field.grow_direction, TemplateField.GrowDirection.UP)
+
+    def test_sample_endpoint_resolves_multi_column_concatenation(self):
+        from io import BytesIO
+
+        from openpyxl import Workbook
+
+        template = self._build_template()
+        field = TemplateField.objects.create(
+            template=template,
+            name="cidade-estado",
+            excel_column="{1}-{2}",
+            x=20,
+            y=20,
+            width=160,
+            height=24,
+            font=self.font,
+            font_size=18,
+        )
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.append(["Cidade", "Estado"])
+        sheet.append(["Recife", "PE"])
+        buffer = BytesIO()
+        workbook.save(buffer)
+
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("editor:sample-data", kwargs={"pk": template.pk}),
+            data={"excel": SimpleUploadedFile("amostra.xlsx", buffer.getvalue())},
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["rows"][0]["values"][str(field.pk)], "Recife-PE")
+
+
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
+class TemplateFilenamePatternTests(TestCase):
+    """A seção "Nome dos arquivos" (card "Gerar arquivos") salva o padrão em
+    `DocumentTemplate.filename_pattern`; a validação de sintaxe (colunas
+    existem na planilha) fica a cargo do form de lançamento do job."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = get_user_model().objects.create_user(
+            username="editor-filename", password="senha123"
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(TEST_MEDIA_ROOT, ignore_errors=True)
+
+    def _build_template(self) -> DocumentTemplate:
+        buffer = io.BytesIO()
+        canvas_obj = canvas.Canvas(buffer, pagesize=(400, 120))
+        canvas_obj.showPage()
+        canvas_obj.save()
+        return DocumentTemplate.objects.create(
+            user=self.user,
+            name="Crachá",
+            slug="cracha-filename",
+            background_pdf=SimpleUploadedFile(
+                "fundo.pdf", buffer.getvalue(), content_type="application/pdf"
+            ),
+            page_width=400,
+            page_height=120,
+        )
+
+    def test_post_saves_filename_pattern(self):
+        template = self._build_template()
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("editor:filename-pattern-update", kwargs={"pk": template.pk}),
+            data='{"filename_pattern": "{1}_{2}"}',
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["filename_pattern"], "{1}_{2}")
+        template.refresh_from_db()
+        self.assertEqual(template.filename_pattern, "{1}_{2}")
+
+    def test_post_strips_whitespace_and_allows_clearing(self):
+        template = self._build_template()
+        template.filename_pattern = "{1}"
+        template.save(update_fields=["filename_pattern"])
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("editor:filename-pattern-update", kwargs={"pk": template.pk}),
+            data='{"filename_pattern": "   "}',
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        template.refresh_from_db()
+        self.assertEqual(template.filename_pattern, "")
+
+    def test_post_saves_space_mode_and_replacement_independently(self):
+        # O select de espaço tem seu próprio ciclo de salvar, sem reenviar
+        # filename_pattern — a view precisa aceitar payload parcial.
+        template = self._build_template()
+        template.filename_pattern = "{1}_{2}"
+        template.save(update_fields=["filename_pattern"])
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("editor:filename-pattern-update", kwargs={"pk": template.pk}),
+            data='{"filename_space_mode": "replace", "filename_space_replacement": "."}',
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["filename_space_mode"], "replace")
+        self.assertEqual(payload["filename_space_replacement"], ".")
+        template.refresh_from_db()
+        self.assertEqual(template.filename_space_mode, "replace")
+        self.assertEqual(template.filename_space_replacement, ".")
+        # Não mexeu no padrão, que não veio no payload desta chamada.
+        self.assertEqual(template.filename_pattern, "{1}_{2}")
+
+    def test_post_rejects_unknown_space_mode(self):
+        template = self._build_template()
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("editor:filename-pattern-update", kwargs={"pk": template.pk}),
+            data='{"filename_space_mode": "capitalize"}',
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        template.refresh_from_db()
+        self.assertEqual(template.filename_space_mode, DocumentTemplate.FilenameSpaceMode.KEEP)
+
+    def test_post_requires_login(self):
+        template = self._build_template()
+        response = self.client.post(
+            reverse("editor:filename-pattern-update", kwargs={"pk": template.pk}),
+            data='{"filename_pattern": "{1}"}',
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_rejects_other_users_template(self):
+        template = self._build_template()
+        other = get_user_model().objects.create_user(username="outro", password="senha123")
+        self.client.force_login(other)
+        response = self.client.post(
+            reverse("editor:filename-pattern-update", kwargs={"pk": template.pk}),
+            data='{"filename_pattern": "{1}"}',
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_duplicate_copies_filename_pattern(self):
+        template = self._build_template()
+        template.filename_pattern = "{1}_{2}"
+        template.save(update_fields=["filename_pattern"])
+        self.client.force_login(self.user)
+        response = self.client.post(reverse("editor:duplicate", kwargs={"pk": template.pk}))
+        self.assertEqual(response.status_code, 302)
+        duplicated = DocumentTemplate.objects.exclude(pk=template.pk).get(user=self.user)
+        self.assertEqual(duplicated.filename_pattern, "{1}_{2}")
+
 
 class BackgroundImageFidelityTests(TestCase):
     """Um fundo enviado como imagem vira PDF sem reamostrar nem recomprimir:

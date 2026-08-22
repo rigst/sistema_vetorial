@@ -264,6 +264,25 @@
       return { stroke: null, strokeWidth: 0, paintFirst: "fill", shadow: null };
     };
 
+    // "Quebrar linha" + crescer para cima: o Textbox do Fabric sempre ancora o
+    // TOPO (originY: "top") e estica a altura para baixo ao ganhar linhas. Para
+    // o oposto, a última linha tem que ficar exatamente onde a única linha de
+    // uma caixa de 1 linha ficaria — o mesmo ponto fixo que jobs/services.py
+    // usa em baseline_y() — e as linhas extras empurram o topo para cima. Por
+    // isso o deslocamento usa font_size/line_height (a mesma conta do PDF),
+    // nunca field.height: no servidor a altura salva não entra nessa posição.
+    const growOffset = (obj, field) => {
+      if (!field || field.overflow_mode !== "wrap" || field.grow_direction !== "up") return 0;
+      const numLines = (obj._textLines && obj._textLines.length) || 1;
+      const perLine = (Number(field.font_size) || 24) * (Number(field.line_height) || 1.1);
+      return (numLines - 1) * perLine;
+    };
+
+    const applyGrowDirection = (obj, field) => {
+      obj.set("top", Number(field.y) - growOffset(obj, field));
+      obj.setCoords();
+    };
+
     const applyFieldToObject = (obj, field) => {
       obj.set({
         left: Number(field.x) || 0,
@@ -280,6 +299,7 @@
         ...strokeProps(field),
       });
       obj.set("text", textFor(field));
+      applyGrowDirection(obj, field);
       obj.setCoords();
     };
 
@@ -313,6 +333,12 @@
       if (!readOnly) {
         obj.on("editing:entered", () => {
           if (sample.active) obj.exitEditing();
+        });
+        obj.on("changed", () => {
+          // Enquanto o usuário digita, cresce para cima em tempo real (o
+          // commit em "editing:exited" já sabe reverter isso para field.y).
+          applyGrowDirection(obj, fieldsById.get(field.id));
+          canvas.requestRenderAll();
         });
         obj.on("editing:exited", () => {
           const current = fieldsById.get(field.id);
@@ -363,7 +389,11 @@
       }
       const geo = absoluteGeometry(obj);
       field.x = round2(geo.left);
-      field.y = round2(geo.top);
+      // O "top" visível já vem deslocado por applyGrowDirection quando a
+      // caixa cresce para cima; para não acumular esse deslocamento a cada
+      // arrasto, field.y guarda a âncora original (soma de volta o quanto
+      // applyGrowDirection subtraiu).
+      field.y = round2(geo.top + growOffset(obj, field));
       field.rotation = round2(((geo.angle % 360) + 360) % 360);
       field.width = round2(obj.width);
       field.height = round2(obj.height);
@@ -418,6 +448,11 @@
             field.preview_value = result.field.preview_value;
             if (obj && !sample.active && !obj.isEditing) {
               obj.set("text", textFor(field));
+              // O servidor pode mudar o texto (transformação, valor padrão
+              // etc.) sem que nenhum outro campo do painel tenha disparado
+              // applyFieldToObject — sem isto, "crescer para cima" ficaria
+              // parado na posição de antes da resposta chegar.
+              applyGrowDirection(obj, field);
               field.height = round2(obj.height);
             }
           }
@@ -581,7 +616,15 @@
         const target = opt.target;
         if (!target) return;
         const objs = target instanceof fabric.ActiveSelection ? target.getObjects() : [target];
-        objs.forEach((obj) => { if (obj.vetFieldId) commitObject(obj); });
+        objs.forEach((obj) => {
+          if (!obj.vetFieldId) return;
+          // Redimensionar a largura pode ter feito o texto quebrar em mais
+          // (ou menos) linhas durante o arrasto, sem que "top" acompanhasse o
+          // crescimento para cima (só applyFieldToObject faz isso). Reencaixa
+          // antes de ler a geometria para o commit não gravar uma âncora errada.
+          applyGrowDirection(obj, fieldsById.get(obj.vetFieldId));
+          commitObject(obj);
+        });
         pushHistory();
         syncPanel();
       });
@@ -675,8 +718,8 @@
     const PANEL_KEYS = [
       "name", "excel_column", "font_id", "color", "font_size", "rotation", "width",
       "text_align", "text_transform", "value_type", "line_height", "max_lines",
-      "overflow_mode", "empty_value", "transform_exceptions", "border_enabled",
-      "border_color", "border_size_ratio", "border_opacity", "border_blur",
+      "overflow_mode", "grow_direction", "empty_value", "transform_exceptions",
+      "border_enabled", "border_color", "border_size_ratio", "border_opacity", "border_blur",
     ];
     PANEL_KEYS.forEach((key) => {
       panelInputs[key] = document.getElementById(`field-${key.replaceAll("_", "-")}`);
@@ -705,6 +748,21 @@
     };
     panelInputs.border_enabled?.addEventListener("change", syncOutlineDependentInputs);
 
+    // "Máx. linhas" só existe para os modos que de fato limitam a altura
+    // (Reduzir fonte, Cortar); em "Quebrar linha" o texto cresce até caber
+    // tudo, e o número deixaria de significar algo. "Direção de crescimento"
+    // é o oposto: só faz sentido quando há mais de uma linha possível.
+    const maxLinesGroup = document.getElementById("field-max-lines-group");
+    const growDirectionGroup = document.getElementById("field-grow-direction-group");
+    const syncOverflowDependentInputs = () => {
+      const isWrap = panelInputs.overflow_mode?.value === "wrap";
+      if (maxLinesGroup) maxLinesGroup.hidden = isWrap;
+      if (panelInputs.max_lines) panelInputs.max_lines.disabled = isWrap;
+      if (growDirectionGroup) growDirectionGroup.hidden = !isWrap;
+      if (panelInputs.grow_direction) panelInputs.grow_direction.disabled = !isWrap;
+    };
+    panelInputs.overflow_mode?.addEventListener("change", syncOverflowDependentInputs);
+
     const selectedFields = () =>
       canvas.getActiveObjects().map((obj) => fieldsById.get(obj.vetFieldId)).filter(Boolean);
 
@@ -726,6 +784,7 @@
       if (!field) {
         formEl.reset();
         syncOutlineDependentInputs();
+        syncOverflowDependentInputs();
         setStatus("Crie ou selecione um campo.");
         return;
       }
@@ -741,6 +800,7 @@
         if (input) input.value = field[key] ?? input.min ?? 0;
       });
       syncOutlineDependentInputs();
+      syncOverflowDependentInputs();
       setStatus(selected.length > 1 ? `${selected.length} campos selecionados` : `${field.name} selecionado`);
     }
 
@@ -815,6 +875,7 @@
       border_blur: field.border_blur,
       line_height: field.line_height,
       max_lines: field.max_lines,
+      grow_direction: field.grow_direction,
       empty_value: field.empty_value,
       overflow_mode: field.overflow_mode,
     });

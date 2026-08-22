@@ -241,6 +241,103 @@
       });
     }
 
+    const filenamePatternInput = document.getElementById("filename-pattern-input");
+    const filenamePatternSaveState = document.getElementById("filename-pattern-save-state");
+    const filenamePatternUrl = card.dataset.filenamePatternUrl;
+
+    if (filenamePatternInput && filenamePatternUrl) {
+      let saveTimer = null;
+      let lastSaved = filenamePatternInput.value;
+
+      const setSaveState = (tone, text) => {
+        if (!filenamePatternSaveState) return;
+        filenamePatternSaveState.textContent = text || "";
+        if (tone) filenamePatternSaveState.dataset.tone = tone;
+        else delete filenamePatternSaveState.dataset.tone;
+      };
+
+      const saveFilenamePattern = async () => {
+        const value = filenamePatternInput.value;
+        if (value === lastSaved) return;
+        setSaveState("busy", "Salvando…");
+        try {
+          const response = await fetch(filenamePatternUrl, {
+            method: "POST",
+            headers: { "X-CSRFToken": csrfToken, "Content-Type": "application/json" },
+            body: JSON.stringify({ filename_pattern: value }),
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(data.error || `Erro ${response.status}`);
+          lastSaved = data.filename_pattern ?? value;
+          setSaveState("ok", "Salvo");
+        } catch (err) {
+          setSaveState("error", err.message || "Não foi possível salvar o nome dos arquivos.");
+        }
+      };
+
+      filenamePatternInput.addEventListener("input", () => {
+        setSaveState(null, "");
+        window.clearTimeout(saveTimer);
+        saveTimer = window.setTimeout(saveFilenamePattern, 600);
+      });
+      filenamePatternInput.addEventListener("blur", () => {
+        window.clearTimeout(saveTimer);
+        saveFilenamePattern();
+      });
+    }
+
+    const spaceModeSelect = document.getElementById("filename-space-mode");
+    const spaceReplacementInput = document.getElementById("filename-space-replacement");
+    const spaceSaveState = document.getElementById("filename-space-save-state");
+
+    if (spaceModeSelect && filenamePatternUrl) {
+      let spaceSaveTimer = null;
+
+      const setSpaceSaveState = (tone, text) => {
+        if (!spaceSaveState) return;
+        spaceSaveState.textContent = text || "";
+        if (tone) spaceSaveState.dataset.tone = tone;
+        else delete spaceSaveState.dataset.tone;
+      };
+
+      const syncReplacementVisibility = () => {
+        if (spaceReplacementInput) spaceReplacementInput.hidden = spaceModeSelect.value !== "replace";
+      };
+
+      const saveSpaceMode = async () => {
+        setSpaceSaveState("busy", "Salvando…");
+        try {
+          const response = await fetch(filenamePatternUrl, {
+            method: "POST",
+            headers: { "X-CSRFToken": csrfToken, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              filename_space_mode: spaceModeSelect.value,
+              filename_space_replacement: spaceReplacementInput?.value || "",
+            }),
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(data.error || `Erro ${response.status}`);
+          setSpaceSaveState("ok", "Salvo");
+        } catch (err) {
+          setSpaceSaveState("error", err.message || "Não foi possível salvar.");
+        }
+      };
+
+      spaceModeSelect.addEventListener("change", () => {
+        syncReplacementVisibility();
+        saveSpaceMode();
+      });
+      spaceReplacementInput?.addEventListener("input", () => {
+        setSpaceSaveState(null, "");
+        window.clearTimeout(spaceSaveTimer);
+        spaceSaveTimer = window.setTimeout(saveSpaceMode, 600);
+      });
+      spaceReplacementInput?.addEventListener("blur", () => {
+        window.clearTimeout(spaceSaveTimer);
+        saveSpaceMode();
+      });
+    }
+
     previewButton?.addEventListener("click", () => launch("preview"));
     fullButton?.addEventListener("click", () => launch("full"));
 

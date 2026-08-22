@@ -4,6 +4,7 @@ from openpyxl import load_workbook
 from editor.models import DocumentTemplate
 
 from .models import GenerationJob
+from .services import extract_column_refs
 
 
 class GenerationJobForm(forms.ModelForm):
@@ -68,11 +69,9 @@ class GenerationJobForm(forms.ModelForm):
             invalid_columns = []
             max_column = len(headers)
             for field in template.fields.all():
-                if not field.excel_column or not str(field.excel_column).isdigit():
-                    continue
-                column_number = int(field.excel_column)
-                if column_number < 1 or column_number > max_column:
-                    invalid_columns.append(f"{field.name} -> coluna {column_number}")
+                for column_number in extract_column_refs(field.excel_column):
+                    if column_number < 1 or column_number > max_column:
+                        invalid_columns.append(f"{field.name} -> coluna {column_number}")
             if invalid_columns:
                 raise forms.ValidationError(
                     "O Excel não possui todas as colunas numéricas esperadas pelo template: "

@@ -912,3 +912,364 @@ class PortugueseCopyTests(TestCase):
         self.assertEqual(GenerationJob._meta.verbose_name, "lote")
         self.assertEqual(GenerationJob._meta.verbose_name_plural, "lotes")
         self.assertEqual(GenerationItem._meta.verbose_name, "item do lote")
+
+
+class ColumnTemplateTests(TestCase):
+    """`extract_column_refs`/`render_column_template` são a mini-sintaxe {N}
+    compartilhada entre "colunas do Excel" de um campo (concatenar colunas com
+    um conector) e o padrão de nome de arquivo do template."""
+
+    def test_extract_column_refs_bare_digit(self):
+        self.assertEqual(services.extract_column_refs("3"), [3])
+
+    def test_extract_column_refs_multiple_braces(self):
+        self.assertEqual(services.extract_column_refs("{1}_{2}"), [1, 2])
+
+    def test_extract_column_refs_repeated_column(self):
+        self.assertEqual(services.extract_column_refs("{3}-{3}"), [3, 3])
+
+    def test_extract_column_refs_blank(self):
+        self.assertEqual(services.extract_column_refs(""), [])
+        self.assertEqual(services.extract_column_refs(None), [])
+
+    def test_render_column_template_bare_digit(self):
+        self.assertEqual(services.render_column_template("1", {"coluna_1": "Ana"}), "Ana")
+
+    def test_render_column_template_concatenates_with_connector(self):
+        payload = {"coluna_3": "Recife", "coluna_5": "PE"}
+        self.assertEqual(services.render_column_template("{3}-{5}", payload), "Recife-PE")
+
+    def test_render_column_template_missing_column_becomes_empty(self):
+        self.assertEqual(services.render_column_template("{9}", {}), "")
+
+    def test_render_column_template_blank_pattern(self):
+        self.assertEqual(services.render_column_template("", {"coluna_1": "Ana"}), "")
+
+
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
+class FilenamePatternTests(TestCase):
+    """`DocumentTemplate.filename_pattern` decide o nome de cada PDF gerado; sem
+    padrão, cai no nome antigo (lote + linha). Colisões (o mesmo nome vindo de
+    duas linhas) ganham um sufixo para não se sobrescreverem dentro do ZIP."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = get_user_model().objects.create_user(
+            username="filenames-user", password="senha123"
+        )
+        font_path = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+        cls.font = FontAsset.objects.create(
+            user=cls.user,
+            name="Dejavu Sans",
+            family="Dejavu Sans",
+            variant="Regular",
+            file=SimpleUploadedFile(
+                "DejaVuSans.ttf", font_path.read_bytes(), content_type="font/ttf"
+            ),
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(TEST_MEDIA_ROOT, ignore_errors=True)
+
+    def _build_pdf_upload(self) -> SimpleUploadedFile:
+        buffer = io.BytesIO()
+        pdf_canvas = canvas.Canvas(buffer, pagesize=(400, 120))
+        pdf_canvas.showPage()
+        pdf_canvas.save()
+        return SimpleUploadedFile(
+            "background.pdf", buffer.getvalue(), content_type="application/pdf"
+        )
+
+    def _build_excel_upload(self, rows) -> SimpleUploadedFile:
+        temp_dir = Path(tempfile.mkdtemp(prefix="filenames-xlsx-"))
+        xlsx_path = temp_dir / "dados.xlsx"
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.append(["Nome", "Empresa"])
+        for row in rows:
+            sheet.append(row)
+        workbook.save(xlsx_path)
+        content = xlsx_path.read_bytes()
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        return SimpleUploadedFile(
+            "dados.xlsx",
+            content,
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+    def _build_template(
+        self,
+        filename_pattern="",
+        filename_space_mode=DocumentTemplate.FilenameSpaceMode.KEEP,
+        filename_space_replacement="-",
+    ) -> DocumentTemplate:
+        slug_bits = f"{filename_pattern or 'padrao'}-{filename_space_mode}"
+        template = DocumentTemplate.objects.create(
+            user=self.user,
+            name="Crachá",
+            slug=f"cracha-{re.sub(r'[^a-z0-9]+', '-', slug_bits.lower())}",
+            background_pdf=self._build_pdf_upload(),
+            filename_pattern=filename_pattern,
+            filename_space_mode=filename_space_mode,
+            filename_space_replacement=filename_space_replacement,
+        )
+        update_template_pdf_metadata(template)
+        TemplateField.objects.create(
+            template=template,
+            name="nome",
+            excel_column="1",
+            x=20,
+            y=80,
+            width=200,
+            height=24,
+            font=self.font,
+            font_size=18,
+            order_index=1,
+        )
+        return template
+
+    def test_sanitize_filename_component_strips_unsafe_chars(self):
+        # Caractere proibido em nome de arquivo vira espaço mesmo no modo
+        # padrão "manter espaços" — só o texto original é preservado.
+        self.assertEqual(
+            services._sanitize_filename_component('a/b:c*d?"e<f>g|h'), "a b c d e f g h"
+        )
+
+    def test_sanitize_filename_component_keeps_spaces_by_default(self):
+        self.assertEqual(services._sanitize_filename_component("  Ana   Paula  "), "Ana Paula")
+
+    def test_sanitize_filename_component_strip_mode_removes_spaces(self):
+        self.assertEqual(
+            services._sanitize_filename_component(
+                "Ana Paula", space_mode=DocumentTemplate.FilenameSpaceMode.STRIP
+            ),
+            "AnaPaula",
+        )
+
+    def test_sanitize_filename_component_replace_mode_uses_custom_separator(self):
+        self.assertEqual(
+            services._sanitize_filename_component(
+                "Ana Paula da Silva",
+                space_mode=DocumentTemplate.FilenameSpaceMode.REPLACE,
+                space_replacement=".",
+            ),
+            "Ana.Paula.da.Silva",
+        )
+
+    def test_sanitize_filename_component_replace_mode_falls_back_to_hyphen(self):
+        self.assertEqual(
+            services._sanitize_filename_component(
+                "Ana Paula",
+                space_mode=DocumentTemplate.FilenameSpaceMode.REPLACE,
+                space_replacement="",
+            ),
+            "Ana-Paula",
+        )
+
+    def test_build_item_filename_keeps_spaces_by_default(self):
+        template = self._build_template(filename_pattern="{1}_{2}")
+        job = GenerationJob(template=template, name="Lote")
+        name = services.build_item_filename(
+            job, 1, {"coluna_1": "Ana", "coluna_2": "Empresa A"}, set()
+        )
+        self.assertEqual(name, "Ana_Empresa A.pdf")
+
+    def test_build_item_filename_strip_mode(self):
+        template = self._build_template(
+            filename_pattern="{1}_{2}",
+            filename_space_mode=DocumentTemplate.FilenameSpaceMode.STRIP,
+        )
+        job = GenerationJob(template=template, name="Lote")
+        name = services.build_item_filename(
+            job, 1, {"coluna_1": "Ana", "coluna_2": "Empresa A"}, set()
+        )
+        self.assertEqual(name, "Ana_EmpresaA.pdf")
+
+    def test_build_item_filename_replace_mode(self):
+        template = self._build_template(
+            filename_pattern="{1}_{2}",
+            filename_space_mode=DocumentTemplate.FilenameSpaceMode.REPLACE,
+            filename_space_replacement=".",
+        )
+        job = GenerationJob(template=template, name="Lote")
+        name = services.build_item_filename(
+            job, 1, {"coluna_1": "Ana", "coluna_2": "Empresa A"}, set()
+        )
+        self.assertEqual(name, "Ana_Empresa.A.pdf")
+
+    def test_build_item_filename_falls_back_without_pattern(self):
+        template = self._build_template(filename_pattern="")
+        job = GenerationJob(template=template, name="Meu Lote")
+        name = services.build_item_filename(job, 3, {"coluna_1": "Ana"}, set())
+        self.assertEqual(name, "meu_lote-linha-3.pdf")
+
+    def test_build_item_filename_avoids_collision(self):
+        template = self._build_template(filename_pattern="{1}")
+        job = GenerationJob(template=template, name="Lote")
+        used = set()
+        first = services.build_item_filename(job, 1, {"coluna_1": "Ana"}, used)
+        second = services.build_item_filename(job, 2, {"coluna_1": "Ana"}, used)
+        self.assertEqual(first, "Ana.pdf")
+        self.assertEqual(second, "Ana-2.pdf")
+
+    def test_process_job_names_output_files_by_pattern(self):
+        # display_filename é o nome como o usuário vê (download avulso e
+        # ZIP); output_pdf.name é só o caminho interno no Storage, que o
+        # Django sempre normaliza (troca espaço por "_") — não é o que este
+        # teste quer verificar.
+        template = self._build_template(filename_pattern="{1}_{2}")
+        job = GenerationJob.objects.create(
+            user=self.user,
+            template=template,
+            name="Job",
+            source_excel=self._build_excel_upload([["Ana", "Empresa A"], ["Ana", "Empresa A"]]),
+            kind=GenerationJob.Kind.PREVIEW,
+            status=GenerationJob.Status.QUEUED,
+        )
+        process_job(job)
+        job.refresh_from_db()
+        names = sorted(item.display_filename for item in job.items.order_by("id"))
+        # Linha 1 da planilha é o cabeçalho, então as duas linhas de dados são
+        # numeradas 2 e 3 — o sufixo de desempate usa esse número de linha.
+        self.assertEqual(names, ["Ana_Empresa A-3.pdf", "Ana_Empresa A.pdf"])
+
+
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
+class WrapGrowDirectionTests(TestCase):
+    """ "Quebrar linha" não podia se comportar como "Cortar": sem limite de
+    linhas, e a caixa cresce para cima ou para baixo sem sobrescrever um campo
+    vizinho — a base (modo "cima") ou o topo (modo "baixo") fica parado
+    enquanto o outro lado se move conforme o texto ganha linhas."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = get_user_model().objects.create_user(username="wrap-user", password="senha123")
+        font_path = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+        cls.font = FontAsset.objects.create(
+            user=cls.user,
+            name="Dejavu Sans",
+            family="Dejavu Sans",
+            variant="Regular",
+            file=SimpleUploadedFile(
+                "DejaVuSans.ttf", font_path.read_bytes(), content_type="font/ttf"
+            ),
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(TEST_MEDIA_ROOT, ignore_errors=True)
+
+    def test_fit_text_lines_does_not_cap_wrap_mode(self):
+        lines, size = services._fit_text_lines(
+            "uma frase razoavelmente longa para quebrar em varias linhas de texto",
+            "Helvetica",
+            18,
+            120,
+            TemplateField.OverflowMode.WRAP,
+            1,
+        )
+        self.assertGreater(len(lines), 1)
+        self.assertEqual(size, 18)
+
+    def test_fit_text_lines_truncate_still_caps_at_max_lines(self):
+        lines, _size = services._fit_text_lines(
+            "uma frase razoavelmente longa para quebrar em varias linhas de texto",
+            "Helvetica",
+            18,
+            120,
+            TemplateField.OverflowMode.TRUNCATE,
+            1,
+        )
+        self.assertEqual(len(lines), 1)
+
+    def _build_excel_upload(self, rows) -> SimpleUploadedFile:
+        temp_dir = Path(tempfile.mkdtemp(prefix="wrap-xlsx-"))
+        xlsx_path = temp_dir / "dados.xlsx"
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.append(["Texto"])
+        for row in rows:
+            sheet.append(row)
+        workbook.save(xlsx_path)
+        content = xlsx_path.read_bytes()
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        return SimpleUploadedFile(
+            "dados.xlsx",
+            content,
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+    def _render(self, *, grow_direction, text):
+        buffer = io.BytesIO()
+        pdf_canvas = canvas.Canvas(buffer, pagesize=(400, 200))
+        pdf_canvas.showPage()
+        pdf_canvas.save()
+        template = DocumentTemplate.objects.create(
+            user=self.user,
+            name="Wrap",
+            slug=f"wrap-{grow_direction}-{len(text)}",
+            background_pdf=SimpleUploadedFile(
+                "background.pdf", buffer.getvalue(), content_type="application/pdf"
+            ),
+        )
+        update_template_pdf_metadata(template)
+        TemplateField.objects.create(
+            template=template,
+            name="texto",
+            excel_column="1",
+            x=20,
+            y=100,
+            width=80,
+            height=24,
+            font=self.font,
+            font_size=16,
+            line_height=1.2,
+            order_index=1,
+            overflow_mode=TemplateField.OverflowMode.WRAP,
+            grow_direction=grow_direction,
+        )
+        job = GenerationJob.objects.create(
+            user=self.user,
+            template=template,
+            name="Job",
+            source_excel=self._build_excel_upload([[text]]),
+            kind=GenerationJob.Kind.PREVIEW,
+            status=GenerationJob.Status.QUEUED,
+        )
+        process_job(job)
+        job.refresh_from_db()
+        item = job.items.get()
+        with item.output_pdf.open("rb") as output_file:
+            bbox, _size = _ink_bbox(output_file.read(), resolution=150)
+        self.assertIsNotNone(bbox, f"nada desenhado para {text!r} ({grow_direction})")
+        return bbox
+
+    # A mesma palavra repetida em todas as linhas (em vez de palavras
+    # diferentes) mantém ascendentes/descendentes idênticos entre a versão
+    # curta e a longa — senão a caixa de tinta varia com as letras da linha,
+    # não só com a posição, e o teste vira falso positivo/negativo.
+    _SHORT_TEXT = "um"
+    _LONG_TEXT = "um " * 8
+
+    def test_grow_down_keeps_top_fixed_and_extends_bottom(self):
+        short_bbox = self._render(
+            grow_direction=TemplateField.GrowDirection.DOWN, text=self._SHORT_TEXT
+        )
+        long_bbox = self._render(
+            grow_direction=TemplateField.GrowDirection.DOWN, text=self._LONG_TEXT
+        )
+        self.assertAlmostEqual(short_bbox[1], long_bbox[1], delta=2)
+        self.assertGreater(long_bbox[3], short_bbox[3] + 5)
+
+    def test_grow_up_keeps_bottom_fixed_and_extends_top(self):
+        short_bbox = self._render(
+            grow_direction=TemplateField.GrowDirection.UP, text=self._SHORT_TEXT
+        )
+        long_bbox = self._render(
+            grow_direction=TemplateField.GrowDirection.UP, text=self._LONG_TEXT
+        )
+        self.assertAlmostEqual(short_bbox[3], long_bbox[3], delta=2)
+        self.assertLess(long_bbox[1], short_bbox[1] - 5)
