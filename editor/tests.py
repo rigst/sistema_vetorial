@@ -33,7 +33,7 @@ class EditorFlowTests(TestCase):
             user=cls.user,
             name="Dejavu Sans",
             family="Dejavu Sans",
-            variant=FontAsset.Variant.REGULAR,
+            variant="Regular",
             file=SimpleUploadedFile(
                 "DejaVuSans.ttf", font_path.read_bytes(), content_type="font/ttf"
             ),

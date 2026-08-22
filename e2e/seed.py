@@ -23,6 +23,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile  # noqa: E402
 from openpyxl import Workbook  # noqa: E402
 from PIL import Image, ImageDraw  # noqa: E402
 
+from core.auth import ensure_default_fonts  # noqa: E402
 from editor.forms import _image_to_pdf  # noqa: E402
 from editor.models import DocumentTemplate, TemplateField  # noqa: E402
 from editor.services import update_template_pdf_metadata  # noqa: E402
@@ -31,7 +32,6 @@ from fonts.models import FontAsset  # noqa: E402
 USERNAME = "e2e"
 PASSWORD = "e2e-senha-123"
 TMP_DIR = Path(__file__).resolve().parent / ".tmp"
-FONT_PATH = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
 
 
 def build_excel(path: Path, rows: list[list[str]]) -> None:
@@ -80,13 +80,11 @@ def main() -> None:
     DocumentTemplate.objects.filter(user=user).delete()
     FontAsset.objects.filter(user=user).delete()
 
-    font = FontAsset.objects.create(
-        user=user,
-        name="DejaVu Sans",
-        family="DejaVu Sans",
-        variant=FontAsset.Variant.REGULAR,
-        file=SimpleUploadedFile("DejaVuSans.ttf", FONT_PATH.read_bytes()),
-    )
+    # As mesmas fontes padrão que qualquer usuário ganha no primeiro login
+    # (Regular + Bold de Sans/Serif/Mono) — exercita o agrupamento por
+    # família no seletor da bancada com dados reais, não uma fonte solta.
+    ensure_default_fonts(user)
+    font = FontAsset.objects.get(user=user, name="Dejavu Sans")
 
     template = DocumentTemplate.objects.create(
         user=user,

@@ -1723,6 +1723,20 @@ details[open] > summary .field-advanced-title::before {
   font-size: 1.2rem;
 }
 
+.font-variant-tag {
+  display: inline-block;
+  margin-left: 0.6rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+
 .page-head-search input[type="text"] {
   width: 220px;
   padding: 0.55rem 0.8rem;

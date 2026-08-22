@@ -150,14 +150,34 @@ class DocumentTemplateUpdateView(UserOwnedQuerysetMixin, UpdateView):
         return context
 
 
+def _font_groups(fonts):
+    """Agrupa por família, na ordem em que a query já veio (família, depois
+    peso, depois itálico) — é o que deixa Regular e Bold da mesma fonte
+    juntos num único <optgroup>, em vez de duas entradas soltas e sem
+    relação aparente no seletor."""
+    groups = []
+    current_family = object()
+    for font in fonts:
+        if font.family != current_family:
+            current_family = font.family
+            groups.append({"family": font.family, "fonts": []})
+        groups[-1]["fonts"].append(font)
+    return groups
+
+
 def _template_editor_context(template_obj, user):
     fields = list(template_obj.fields.select_related("font").order_by("order_index", "id"))
-    fonts = list(FontAsset.objects.filter(user=user, is_active=True).order_by("name"))
+    fonts = list(
+        FontAsset.objects.filter(user=user, is_active=True).order_by(
+            "family", "weight", "is_italic", "name"
+        )
+    )
     return {
         "template_obj": template_obj,
         "preview_pages": template_obj.preview_pages.all(),
         "field_json": [field_to_dict(field) for field in fields],
         "font_options": fonts,
+        "font_groups": _font_groups(fonts),
         "font_json": [
             {
                 "id": font.id,

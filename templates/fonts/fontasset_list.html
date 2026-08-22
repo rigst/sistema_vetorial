@@ -43,6 +43,7 @@ bancada de um projeto que já a usasse.
                 <thead>
                     <tr>
                         <th>Fonte</th>
+                        <th>Família</th>
                         <th>Ações</th>
                     </tr>
                 </thead>
@@ -51,7 +52,9 @@ bancada de um projeto que já a usasse.
                         <tr>
                             <td class="font-preview-cell" style="font-family: 'vetorial-font-{{ font.id }}', ui-sans-serif, system-ui, sans-serif;">
                                 {{ font.name }}
+                                <span class="font-variant-tag muted">{{ font.variant }}</span>
                             </td>
+                            <td class="muted">{{ font.family }}</td>
                             <td class="inline-actions icon-actions">
                                 <a class="icon-button" href="{% url 'fonts:update' font.pk %}" title="Editar" aria-label="Editar {{ font.name }}">✎</a>
                                 <form method="post" action="{% url 'fonts:delete' font.pk %}">

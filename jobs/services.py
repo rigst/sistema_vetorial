@@ -152,7 +152,7 @@ def validate_font_supports_text(field: TemplateField, text: str) -> None:
     if missing_chars:
         chars_display = ", ".join(repr(char) for char in missing_chars[:10])
         raise ValueError(
-            f"A fonte '{field.font.family}' nao suporta todos os caracteres exigidos pelo texto. Faltando: {chars_display}."
+            f"A fonte '{field.font.name}' nao suporta todos os caracteres exigidos pelo texto. Faltando: {chars_display}."
         )
 
 

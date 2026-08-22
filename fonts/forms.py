@@ -65,12 +65,14 @@ class FontAssetForm(forms.ModelForm):
     def clean(self):
         cleaned = super().clean()
         if not cleaned.get("name") and cleaned.get("file"):
-            cleaned["name"] = (
+            metadata = getattr(self, "_font_metadata", None)
+            # O nome que a própria fonte declara ("DejaVu Sans Bold") é mais
+            # confiável que adivinhar a partir do nome do arquivo — só cai
+            # para o nome do arquivo quando a fonte não informa nada.
+            full_name = metadata.get("full_name") if metadata else ""
+            cleaned["name"] = full_name or (
                 Path(cleaned["file"].name).stem.replace("_", " ").replace("-", " ").title()
             )
-        metadata = getattr(self, "_font_metadata", None)
-        if metadata and not cleaned.get("name") and metadata.get("full_name"):
-            cleaned["name"] = metadata["full_name"]
         return cleaned
 
     def save(self, commit=True):
@@ -78,8 +80,15 @@ class FontAssetForm(forms.ModelForm):
         metadata = getattr(self, "_font_metadata", None)
         if metadata:
             instance.metadata = metadata
-        instance.family = instance.name
-        instance.variant = FontAsset.Variant.REGULAR
+            # Família e peso vêm do próprio arquivo (tabelas name/OS2): é o
+            # que permite que Regular e Bold da mesma fonte apareçam juntos,
+            # agrupados, em vez de virarem duas fontes "família" distintas.
+            instance.family = metadata.get("detected_family") or instance.name
+            instance.variant = metadata.get("detected_variant") or "Regular"
+            instance.weight = metadata.get("weight") or 400
+            instance.is_italic = bool(metadata.get("is_italic"))
+        else:
+            instance.family = instance.name
         instance.is_active = True
         if commit:
             instance.save()

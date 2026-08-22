@@ -83,7 +83,7 @@ class CoreTests(TestCase):
             user=user,
             name="Fonte",
             family="Fonte",
-            variant=FontAsset.Variant.REGULAR,
+            variant="Regular",
             file=SimpleUploadedFile(
                 "DejaVuSans.ttf", font_path.read_bytes(), content_type="font/ttf"
             ),

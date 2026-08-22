@@ -3,6 +3,7 @@ from __future__ import annotations
 import shutil
 import tempfile
 from pathlib import Path
+from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -32,7 +33,9 @@ class FontTests(TestCase):
         metadata = inspect_font_file(str(self.font_path))
         self.assertTrue(metadata["supports_pt_br_basic"])
 
-    def test_font_form_uses_filename_when_name_missing(self):
+    def test_font_form_uses_the_fonts_own_name_when_name_missing(self):
+        """A fonte diz o próprio nome (nameID 4) — mais confiável que
+        adivinhar a partir de como a pessoa nomeou o arquivo."""
         uploaded = SimpleUploadedFile(
             "minha_fonte.ttf", self.font_path.read_bytes(), content_type="font/ttf"
         )
@@ -43,15 +46,31 @@ class FontTests(TestCase):
         instance.user = self.user
         instance.save()
 
-        self.assertEqual(instance.name, "Minha Fonte")
+        self.assertEqual(instance.name, "DejaVu Sans")
         self.assertTrue(instance.is_active)
+
+    def test_font_form_falls_back_to_the_filename_without_font_metadata(self):
+        # Simula uma fonte sem nameID 4 legível (utilitária, corrompida etc.):
+        # sem nome próprio para usar, cai para o nome do arquivo.
+        with mock.patch("fonts.forms.inspect_font_file", return_value={}):
+            form = FontAssetForm(
+                data={"name": ""},
+                files={
+                    "file": SimpleUploadedFile(
+                        "minha_fonte.ttf", self.font_path.read_bytes(), content_type="font/ttf"
+                    )
+                },
+            )
+            self.assertTrue(form.is_valid(), form.errors)
+
+        self.assertEqual(form.cleaned_data["name"], "Minha Fonte")
 
     def test_delete_view_marks_font_inactive(self):
         font = FontAsset.objects.create(
             user=self.user,
             name="Fonte Teste",
             family="Fonte Teste",
-            variant=FontAsset.Variant.REGULAR,
+            variant="Regular",
             file=SimpleUploadedFile(
                 "DejaVuSans.ttf", self.font_path.read_bytes(), content_type="font/ttf"
             ),
@@ -151,3 +170,131 @@ class FontListPreviewTests(TestCase):
         self.assertNotIn(">File<", html)
         self.assertIn(">Nome<", html)
         self.assertIn("Arquivo (TTF ou OTF)", html)
+
+
+class FontWeightDetectionTests(TestCase):
+    """A fonte já diz o próprio peso e estilo (tabela OS/2) — o app parou de
+    ignorar isso e passou a usar para agrupar família e ordenar por peso."""
+
+    def test_regular_file_is_detected_as_weight_400(self):
+        metadata = inspect_font_file("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+
+        self.assertEqual(metadata["weight"], 400)
+        self.assertFalse(metadata["is_italic"])
+        self.assertEqual(metadata["detected_family"], "DejaVu Sans")
+        # A DejaVu chama a própria variante regular de "Book" (nameID 17) —
+        # normalizado para "Regular", que qualquer pessoa reconhece.
+        self.assertEqual(metadata["detected_variant"], "Regular")
+
+    def test_bold_file_is_detected_as_weight_700(self):
+        metadata = inspect_font_file("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
+
+        self.assertEqual(metadata["weight"], 700)
+        self.assertFalse(metadata["is_italic"])
+        self.assertEqual(metadata["detected_variant"], "Bold")
+        # A mesma família do arquivo regular: é o que deixa os dois lados
+        # (Regular e Bold) agrupados como uma fonte só no seletor.
+        self.assertEqual(metadata["detected_family"], "DejaVu Sans")
+
+    def test_bold_oblique_file_is_detected_as_bold_and_italic(self):
+        metadata = inspect_font_file(
+            "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-BoldOblique.ttf"
+        )
+
+        self.assertEqual(metadata["weight"], 700)
+        self.assertTrue(metadata["is_italic"])
+
+
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
+class FontFamilyGroupingTests(TestCase):
+    """Upload de Regular e Bold da mesma fonte: os dois precisam cair na
+    mesma família em vez de virarem duas fontes sem relação (o bug que o
+    formulário tinha antes — `family = name` sempre, `variant` sempre
+    "regular", não importa o que o arquivo dissesse)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = get_user_model().objects.create_user(
+            username="fonts-grouping", password="senha123"
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(TEST_MEDIA_ROOT, ignore_errors=True)
+
+    def _upload(self, filename: str, source: str) -> FontAsset:
+        form = FontAssetForm(
+            data={"name": ""},
+            files={
+                "file": SimpleUploadedFile(
+                    filename, Path(source).read_bytes(), content_type="font/ttf"
+                )
+            },
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        instance = form.save(commit=False)
+        instance.user = self.user
+        instance.save()
+        return instance
+
+    def test_regular_and_bold_uploads_share_the_same_family(self):
+        regular = self._upload("DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+        bold = self._upload(
+            "DejaVuSans-Bold.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+        )
+
+        self.assertEqual(regular.family, bold.family)
+        self.assertNotEqual(regular.variant, bold.variant)
+        self.assertLess(regular.weight, bold.weight)
+        self.assertEqual(bold.weight, 700)
+        self.assertEqual(bold.variant, "Bold")
+
+    def test_editor_context_groups_fonts_by_family(self):
+        from editor.forms import DocumentTemplateForm
+        from editor.services import update_template_pdf_metadata
+        from editor.views import _template_editor_context
+        from reportlab.pdfgen import canvas as rl_canvas
+
+        self._upload("DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+        self._upload("DejaVuSans-Bold.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
+
+        buffer_path = Path(tempfile.mkdtemp(prefix="grouping-pdf-")) / "fundo.pdf"
+        pdf_canvas = rl_canvas.Canvas(str(buffer_path), pagesize=(400, 120))
+        pdf_canvas.showPage()
+        pdf_canvas.save()
+        form = DocumentTemplateForm(
+            data={"name": "Grouping", "description": ""},
+            files={
+                "background_pdf": SimpleUploadedFile(
+                    "fundo.pdf", buffer_path.read_bytes(), content_type="application/pdf"
+                )
+            },
+        )
+        form.instance.user = self.user
+        self.assertTrue(form.is_valid(), form.errors)
+        template = form.save()
+        update_template_pdf_metadata(template)
+
+        context = _template_editor_context(template, self.user)
+        groups = {group["family"]: group["fonts"] for group in context["font_groups"]}
+
+        self.assertIn("DejaVu Sans", groups)
+        self.assertEqual(len(groups["DejaVu Sans"]), 2)
+        # Regular (peso 400) vem antes de Bold (peso 700) dentro do grupo.
+        self.assertEqual([font.weight for font in groups["DejaVu Sans"]], [400, 700])
+
+
+class DefaultFontsIncludeBoldTests(TestCase):
+    def test_ensure_default_fonts_creates_bold_variants(self):
+        from core.auth import ensure_default_fonts
+
+        user = get_user_model().objects.create_user(username="fonts-defaults", password="x")
+
+        ensure_default_fonts(user)
+
+        bold = FontAsset.objects.get(user=user, name="Dejavu Sans Bold")
+        regular = FontAsset.objects.get(user=user, name="Dejavu Sans")
+        self.assertEqual(bold.weight, 700)
+        self.assertEqual(bold.family, regular.family)
+        self.assertTrue(bold.is_builtin)

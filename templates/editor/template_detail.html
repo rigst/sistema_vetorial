@@ -94,8 +94,16 @@
                 <div class="field-group">
                     <label for="field-font-id">Fonte</label>
                     <select id="field-font-id" name="font_id">
-                        {% for font in font_options %}
-                            <option value="{{ font.id }}">{{ font.name }}</option>
+                        {% for group in font_groups %}
+                            {% if group.fonts|length > 1 %}
+                                <optgroup label="{{ group.family }}">
+                                    {% for font in group.fonts %}
+                                        <option value="{{ font.id }}">{{ font.variant }}</option>
+                                    {% endfor %}
+                                </optgroup>
+                            {% else %}
+                                <option value="{{ group.fonts.0.id }}">{{ group.family }}</option>
+                            {% endif %}
                         {% endfor %}
                     </select>
                 </div>

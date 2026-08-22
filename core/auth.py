@@ -16,8 +16,11 @@ from .models import UserProfile
 
 DEFAULT_FONT_SOURCES = [
     ("Dejavu Sans", Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")),
+    ("Dejavu Sans Bold", Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")),
     ("Dejavu Serif", Path("/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf")),
+    ("Dejavu Serif Bold", Path("/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf")),
     ("Dejavu Mono", Path("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf")),
+    ("Dejavu Mono Bold", Path("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf")),
 ]
 
 
@@ -27,19 +30,33 @@ def ensure_user_profile(user) -> UserProfile:
 
 
 def ensure_default_fonts(user) -> None:
+    from fonts.services import inspect_font_file
+
     for font_name, font_path in DEFAULT_FONT_SOURCES:
         if not font_path.exists():
             continue
         if FontAsset.objects.filter(user=user, name=font_name, is_builtin=True).exists():
             continue
+        # Peso, itálico e a família de agrupamento vêm do próprio arquivo —
+        # a mesma leitura que o upload manual usa (fonts/services.py) — para
+        # que "Dejavu Sans" e "Dejavu Sans Bold" caiam na mesma família em
+        # vez de virarem duas fontes sem relação nenhuma entre si.
+        metadata = inspect_font_file(str(font_path))
         with font_path.open("rb") as font_file:
             font = FontAsset(
-                user=user, name=font_name, family=font_name, is_builtin=True, is_active=True
+                user=user,
+                name=font_name,
+                family=metadata.get("detected_family") or font_name,
+                variant=metadata.get("detected_variant") or "Regular",
+                weight=metadata.get("weight") or 400,
+                is_italic=bool(metadata.get("is_italic")),
+                is_builtin=True,
+                is_active=True,
             )
             font.file.save(font_path.name, font_file, save=False)
             font.metadata = {
+                **metadata,
                 "builtin": True,
-                "supports_pt_br_basic": True,
                 "source": str(font_path),
             }
             font.save()
