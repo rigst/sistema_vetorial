@@ -5,17 +5,13 @@
 {% block content %}
 {% if not show_inactive %}
 <section class="hero-shell">
-    <div class="eyebrow">{{ greeting }}</div>
-    <h1 class="hero-title">{{ display_name }}</h1>
+    <h1 class="hero-title">{{ greeting }}, {{ display_name }}.</h1>
     <p class="hero-copy">{{ motivational_phrase }}</p>
 </section>
 {% endif %}
 
 <div class="section-header projects-header">
-    <div>
-        <div class="eyebrow">Projetos</div>
-        <h2 class="section-title">{% if show_inactive %}Projetos inativos{% else %}Seus projetos{% endif %}</h2>
-    </div>
+    <h2 class="section-title">{% if show_inactive %}Projetos inativos{% else %}Seus projetos{% endif %}</h2>
     <a class="button button-cta" href="{% url 'editor:create' %}">+ Novo projeto</a>
 </div>
 

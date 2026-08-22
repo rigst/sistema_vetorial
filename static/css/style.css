@@ -694,6 +694,7 @@ main {
 
 .form-grid {
   display: grid;
+  align-items: start;
   gap: 1rem;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
@@ -1212,10 +1213,11 @@ a.icon-button:focus-visible {
 }
 
 .upload-preview-frame img,
-.upload-preview-frame embed {
+.upload-preview-frame iframe {
   width: 100%;
   min-height: 320px;
   display: block;
+  border: 0;
 }
 
 .editor-shell-single {
@@ -2804,16 +2806,6 @@ label.toolbar-button {
  * vez de duas manchetes gigantes brigando pela atenção. ---- */
 .projects-header {
   margin: 0.5rem 0 1.5rem;
-}
-
-/* Direto sobre o fundo da página (sem cartão branco por baixo), a pílula da
- * versalete padrão pesa demais — mesmo achatamento do .hero-shell .eyebrow. */
-.projects-header .eyebrow {
-  background: transparent;
-  padding: 0;
-  font-size: 0.78rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
 }
 
 /* ---- "+ Novo projeto": único CTA em degradê da tela — a mesma dupla de

@@ -34,7 +34,7 @@
             {% if template_obj.preview_image %}
                 <img id="background-upload-preview" src="{% url 'editor:preview-page' template_obj.pk 1 %}" alt="Pré-visualização atual do template">
             {% else %}
-                <embed id="background-upload-preview" src="" type="application/pdf">
+                <iframe id="background-upload-preview" title="Pré-visualização do fundo enviado"></iframe>
             {% endif %}
         </div>
         {% if template_obj.page_width and template_obj.page_height %}
@@ -58,12 +58,17 @@
       if (!file) return;
       const url = URL.createObjectURL(file);
       const isImage = (file.type || "").startsWith("image/");
+      // <embed type="application/pdf"> depende do plugin de PDF do navegador,
+      // que a CSP bloqueia de propósito (object-src 'none' — a mesma diretiva
+      // que impede um PDF malicioso de rodar plugin nativo). <iframe> não
+      // entra nessa regra e os navegadores atuais já abrem PDF nativamente
+      // dentro de um iframe, então a pré-visualização troca pra ele em vez.
       let target = document.getElementById("background-upload-preview");
-      const wantedTag = isImage ? "IMG" : "EMBED";
+      const wantedTag = isImage ? "IMG" : "IFRAME";
       if (target.tagName !== wantedTag) {
         const replacement = document.createElement(wantedTag.toLowerCase());
         replacement.id = target.id;
-        if (!isImage) replacement.type = "application/pdf";
+        if (!isImage) replacement.title = "Pré-visualização do fundo enviado";
         target.replaceWith(replacement);
         target = replacement;
       }
