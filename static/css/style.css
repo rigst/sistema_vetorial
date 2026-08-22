@@ -1850,13 +1850,183 @@ details[open] > summary .field-advanced-title::before {
   display: none;
 }
 
+/* Popover de edição rápida do campo: menuzinho escuro e compacto (mesma
+ * paleta "base de corte" da bancada) em vez do cartão claro/grande do resto
+ * do app — é pra abrir, ajustar 2-3 coisas e fechar, não uma tela de
+ * formulário. Mantém os mesmos IDs/estrutura; só a apresentação muda, com
+ * os tokens abaixo sobrepondo os estilos claros herdados de .panel/.field-*. */
 .field-popover {
+  --fp-bg: #182420;
+  --fp-bg-2: #0f1815;
+  --fp-field: rgba(234, 244, 240, 0.06);
+  --fp-field-border: rgba(234, 244, 240, 0.14);
+  --fp-border: rgba(234, 244, 240, 0.12);
+  --fp-text: #eaf4f0;
+  --fp-text-soft: #b9cdc7;
+  --fp-muted: #7f9992;
+  --fp-accent: #4fd8c4;
+
   position: absolute;
   z-index: 30;
-  width: min(340px, calc(100% - 20px));
-  max-height: min(640px, calc(100% - 20px));
+  width: min(300px, calc(100% - 20px));
+  max-height: min(560px, calc(100% - 20px));
   overflow-y: auto;
-  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.45);
+  background: var(--fp-bg);
+  border: 1px solid rgba(234, 244, 240, 0.12);
+  border-radius: var(--radius-xl);
+  padding: 0.75rem 0.9rem;
+  color: var(--fp-text);
+}
+
+.field-popover .section-header {
+  margin-bottom: 0.6rem;
+}
+
+.field-popover .section-title {
+  font-size: 0.95rem;
+}
+
+.field-popover .field-panel-name {
+  color: var(--fp-accent);
+}
+
+.field-popover .icon-button.icon-button {
+  width: 1.7rem;
+  height: 1.7rem;
+  background: rgba(234, 244, 240, 0.08);
+  border-color: rgba(234, 244, 240, 0.16);
+  color: var(--fp-text-soft);
+}
+
+.field-popover .icon-button.icon-button:hover {
+  background: rgba(234, 244, 240, 0.14);
+  border-color: var(--fp-accent);
+  color: var(--fp-accent);
+}
+
+.field-popover .field-config-form {
+  gap: 0.7rem;
+}
+
+.field-popover .field-section {
+  gap: 0.45rem;
+}
+
+.field-popover .field-section + .field-section {
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--fp-border);
+}
+
+.field-popover .field-section-label {
+  font-size: 0.64rem;
+  color: var(--fp-muted);
+}
+
+.field-popover .field-group {
+  gap: 0.25rem;
+}
+
+.field-popover .field-group-row {
+  gap: 0.4rem;
+}
+
+.field-popover label,
+.field-popover .field-group-label {
+  font-size: 0.76rem;
+  color: var(--fp-text-soft);
+}
+
+.field-popover .field-hint {
+  font-size: 0.68rem;
+  color: var(--fp-muted);
+  margin-top: -0.05rem;
+}
+
+.field-popover .field-hint code {
+  background: rgba(234, 244, 240, 0.1);
+  color: var(--fp-text);
+}
+
+.field-popover input[type="text"],
+.field-popover input[type="number"],
+.field-popover select {
+  padding: 0.4rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid var(--fp-field-border);
+  background: var(--fp-field);
+  color: var(--fp-text);
+  font-size: 0.8rem;
+}
+
+.field-popover select option {
+  color: var(--text);
+}
+
+.field-popover input:focus,
+.field-popover select:focus {
+  border-color: var(--fp-accent);
+  box-shadow: 0 0 0 3px rgba(79, 216, 196, 0.18);
+}
+
+.field-popover .color-input-row input[type="color"] {
+  min-height: 2rem;
+  border-color: var(--fp-field-border);
+  background: var(--fp-bg-2);
+}
+
+.field-popover .style-toggle {
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 7px;
+  border-color: var(--fp-field-border);
+  background: var(--fp-field);
+  color: var(--fp-text-soft);
+}
+
+.field-popover .style-toggle:hover {
+  border-color: var(--fp-accent);
+  color: var(--fp-accent);
+}
+
+.field-popover .style-toggle-input:checked + .style-toggle {
+  background: var(--fp-accent);
+  border-color: var(--fp-accent);
+  color: #0f1815;
+}
+
+.field-popover .field-advanced {
+  padding-top: 0.6rem;
+  border-color: var(--fp-border);
+}
+
+.field-popover .field-advanced-title {
+  font-size: 0.8rem;
+  color: var(--fp-text);
+}
+
+.field-popover .field-advanced-title::before {
+  border-color: var(--fp-text-soft);
+}
+
+.field-popover .field-advanced-hint {
+  font-size: 0.68rem;
+  color: var(--fp-muted);
+}
+
+.field-popover .field-advanced-body {
+  gap: 0.5rem;
+  margin-top: 0.55rem;
+}
+
+.field-popover .field-transform-column-toggle,
+.field-popover .field-toggle-row label {
+  color: var(--fp-text-soft);
+  font-size: 0.76rem;
+}
+
+.field-popover .slider-input-row input[type="number"] {
+  padding: 0.3rem 0.4rem;
 }
 
 .editor-statusbar {
