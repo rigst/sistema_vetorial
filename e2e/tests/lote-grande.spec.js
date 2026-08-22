@@ -23,12 +23,23 @@ async function openBancada(page) {
   await expect(page.locator("#generate-card")).toBeVisible();
 }
 
+// "Gerar lote completo" só libera depois de uma amostra pronta — passo
+// obrigatório em toda planilha nova, mesmo nestes testes de lote grande.
+async function runSampleThenFullBatch(page) {
+  await page.getByRole("button", { name: /Gerar amostra/i }).click();
+  await expect(page.locator("#generate-progress-text")).toHaveText(/3 arquivos prontos/, {
+    timeout: 60_000,
+  });
+  await expect(page.locator("#generate-full-button")).toBeEnabled();
+  await page.getByRole("button", { name: /Gerar lote completo/i }).click();
+}
+
 test.describe("Lote grande: a bancada aponta para a página do job", () => {
   test("30 linhas viram resumo + link, não uma lista de 30 itens na coluna", async ({ page }) => {
     await openBancada(page);
     await page.locator("#generate-excel-input").setInputFiles(EXCEL_GRANDE);
 
-    await page.getByRole("button", { name: /Gerar lote completo/i }).click();
+    await runSampleThenFullBatch(page);
 
     // A contagem final é anunciada pela barra de progresso (role=status),
     // que fica no ar até o fim; o link é o único elemento novo em #generate-result.
@@ -47,7 +58,7 @@ test.describe("Lote grande: a bancada aponta para a página do job", () => {
   test("o link leva à página do job com estatísticas, chips e paginação", async ({ page }) => {
     await openBancada(page);
     await page.locator("#generate-excel-input").setInputFiles(EXCEL_GRANDE);
-    await page.getByRole("button", { name: /Gerar lote completo/i }).click();
+    await runSampleThenFullBatch(page);
     await expect(page.locator("#generate-detail-link")).toBeVisible({ timeout: 60_000 });
 
     await page.locator("#generate-detail-link").click();
@@ -76,7 +87,7 @@ test.describe("Lote grande: a bancada aponta para a página do job", () => {
   test("os chips filtram a tabela por estado", async ({ page }) => {
     await openBancada(page);
     await page.locator("#generate-excel-input").setInputFiles(EXCEL_GRANDE);
-    await page.getByRole("button", { name: /Gerar lote completo/i }).click();
+    await runSampleThenFullBatch(page);
     await expect(page.locator("#generate-detail-link")).toBeVisible({ timeout: 60_000 });
     await page.locator("#generate-detail-link").click();
     await expect(page).toHaveURL(/\/jobs\/\d+\/$/);

@@ -667,6 +667,37 @@ class TemplateFilenamePatternTests(TestCase):
         template.refresh_from_db()
         self.assertEqual(template.filename_space_mode, DocumentTemplate.FilenameSpaceMode.KEEP)
 
+    def test_post_saves_strip_accents_and_case_options(self):
+        template = self._build_template()
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("editor:filename-pattern-update", kwargs={"pk": template.pk}),
+            data='{"filename_strip_accents": true, "filename_case": "upper", '
+            '"filename_case_columns": [1, 3]}',
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["filename_strip_accents"])
+        self.assertEqual(payload["filename_case"], "upper")
+        self.assertEqual(payload["filename_case_columns"], [1, 3])
+        template.refresh_from_db()
+        self.assertTrue(template.filename_strip_accents)
+        self.assertEqual(template.filename_case, "upper")
+        self.assertEqual(template.filename_case_columns, [1, 3])
+
+    def test_post_rejects_unknown_case_mode(self):
+        template = self._build_template()
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("editor:filename-pattern-update", kwargs={"pk": template.pk}),
+            data='{"filename_case": "capitalize"}',
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        template.refresh_from_db()
+        self.assertEqual(template.filename_case, DocumentTemplate.FilenameCase.NONE)
+
     def test_post_requires_login(self):
         template = self._build_template()
         response = self.client.post(

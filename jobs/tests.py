@@ -1053,8 +1053,14 @@ class FilenamePatternTests(TestCase):
         filename_pattern="",
         filename_space_mode=DocumentTemplate.FilenameSpaceMode.KEEP,
         filename_space_replacement="-",
+        filename_strip_accents=False,
+        filename_case=DocumentTemplate.FilenameCase.NONE,
+        filename_case_columns=None,
     ) -> DocumentTemplate:
-        slug_bits = f"{filename_pattern or 'padrao'}-{filename_space_mode}"
+        slug_bits = (
+            f"{filename_pattern or 'padrao'}-{filename_space_mode}"
+            f"-{filename_strip_accents}-{filename_case}-{filename_case_columns}"
+        )
         template = DocumentTemplate.objects.create(
             user=self.user,
             name="Crachá",
@@ -1063,6 +1069,9 @@ class FilenamePatternTests(TestCase):
             filename_pattern=filename_pattern,
             filename_space_mode=filename_space_mode,
             filename_space_replacement=filename_space_replacement,
+            filename_strip_accents=filename_strip_accents,
+            filename_case=filename_case,
+            filename_case_columns=filename_case_columns or [],
         )
         update_template_pdf_metadata(template)
         TemplateField.objects.create(
@@ -1162,6 +1171,46 @@ class FilenamePatternTests(TestCase):
         second = services.build_item_filename(job, 2, {"coluna_1": "Ana"}, used)
         self.assertEqual(first, "Ana.pdf")
         self.assertEqual(second, "Ana-2.pdf")
+
+    def test_strip_accents_replaces_diacritics_with_plain_letters(self):
+        self.assertEqual(services._strip_accents("Ana Cecília Ü"), "Ana Cecilia U")
+
+    def test_build_item_filename_strips_accents_when_enabled(self):
+        template = self._build_template(filename_pattern="{1}_{2}", filename_strip_accents=True)
+        job = GenerationJob(template=template, name="Lote")
+        name = services.build_item_filename(
+            job, 1, {"coluna_1": "José Ção", "coluna_2": "São Paulo"}, set()
+        )
+        self.assertEqual(name, "Jose Cao_Sao Paulo.pdf")
+
+    def test_build_item_filename_keeps_accents_by_default(self):
+        template = self._build_template(filename_pattern="{1}")
+        job = GenerationJob(template=template, name="Lote")
+        name = services.build_item_filename(job, 1, {"coluna_1": "José"}, set())
+        self.assertEqual(name, "José.pdf")
+
+    def test_build_item_filename_uppercases_all_columns_without_selection(self):
+        template = self._build_template(
+            filename_pattern="{1}_{2}", filename_case=DocumentTemplate.FilenameCase.UPPER
+        )
+        job = GenerationJob(template=template, name="Lote")
+        name = services.build_item_filename(
+            job, 1, {"coluna_1": "ana", "coluna_2": "empresa a"}, set()
+        )
+        self.assertEqual(name, "ANA_EMPRESA A.pdf")
+
+    def test_build_item_filename_lowercases_only_selected_column(self):
+        template = self._build_template(
+            filename_pattern="{1}-{2}",
+            filename_case=DocumentTemplate.FilenameCase.LOWER,
+            filename_case_columns=[2],
+        )
+        job = GenerationJob(template=template, name="Lote")
+        name = services.build_item_filename(
+            job, 1, {"coluna_1": "ANA", "coluna_2": "EMPRESA A"}, set()
+        )
+        # Só a coluna 2 (marcada) vira minúscula; a 1 fica como veio do Excel.
+        self.assertEqual(name, "ANA-empresa a.pdf")
 
     def test_process_job_names_output_files_by_pattern(self):
         # display_filename é o nome como o usuário vê (download avulso e

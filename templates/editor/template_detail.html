@@ -308,6 +308,35 @@
                 </p>
                 <span class="save-state" id="filename-space-save-state"></span>
             </div>
+            <div class="field-group">
+                <div class="field-toggle-row">
+                    <input type="checkbox" id="filename-strip-accents" name="filename_strip_accents"
+                           {% if template_obj.filename_strip_accents %}checked{% endif %}>
+                    <label for="filename-strip-accents">Remover acentos e caracteres especiais (ç, ã, ü…)</label>
+                </div>
+                <p class="field-hint">
+                    Troca cada letra pela versão simples (ç → c, ã → a, ü → u…) só no texto
+                    vindo das colunas do Excel dentro do padrão acima.
+                </p>
+                <span class="save-state" id="filename-strip-accents-save-state"></span>
+            </div>
+            <div class="field-group">
+                <label for="filename-case">Maiúsculas / minúsculas</label>
+                <select id="filename-case" name="filename_case">
+                    {% for value, label in filename_case_choices %}
+                    <option value="{{ value }}"{% if template_obj.filename_case == value %} selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <div class="field-group" id="filename-case-columns-group" hidden>
+                    <span class="field-group-label">Aplicar a quais colunas</span>
+                    <div class="field-transform-columns" id="filename-case-columns"></div>
+                    <p class="field-hint">
+                        O padrão junta mais de uma coluna. Sem nenhuma marcada, a caixa muda em
+                        todas; marcando algumas, só nelas.
+                    </p>
+                </div>
+                <span class="save-state" id="filename-case-save-state"></span>
+            </div>
         </div>
 
         <div class="generate-steps">
@@ -325,8 +354,11 @@
             </p>
             <div class="generate-actions">
                 <button type="button" class="button button-secondary" id="generate-preview-button">Gerar amostra (3 linhas)</button>
-                <button type="button" class="button" id="generate-full-button">Gerar lote completo</button>
+                <button type="button" class="button" id="generate-full-button" disabled>Gerar lote completo</button>
             </div>
+            <p class="field-hint" id="generate-full-hint">
+                Gere a amostra (3 linhas) e confira o resultado antes de liberar o lote completo.
+            </p>
             <div class="generate-progress" id="generate-progress" role="status" aria-live="polite" hidden>
                 <span id="generate-progress-text">Enviando a planilha…</span>
                 <div class="progress-track" id="generate-progress-track" role="progressbar"
@@ -352,13 +384,14 @@
 
 {{ field_json|json_script:"editor-field-data" }}
 {{ font_json|json_script:"editor-font-data" }}
+{{ template_obj.filename_case_columns|json_script:"filename-case-columns-data" }}
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/job_launcher.js' %}?v=20260822-02"></script>
+<script src="{% static 'js/job_launcher.js' %}?v=20260822-03"></script>
 {% if preview_pages %}
 <script src="{% static 'js/fabric.min.js' %}?v=6.7.1"></script>
-<script src="{% static 'js/template_editor.js' %}?v=20260822-04"></script>
+<script src="{% static 'js/template_editor.js' %}?v=20260822-05"></script>
 <script>
 VetorialTemplateEditor.init({
   canvasId: "editor-canvas",

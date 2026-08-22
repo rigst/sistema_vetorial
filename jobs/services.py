@@ -709,6 +709,41 @@ def _merge_overlay(background_pdf_path: str, overlay_bytes: bytes, geometry: Pag
 _UNSAFE_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|\r\n\t]+')
 
 
+def _strip_accents(value: str) -> str:
+    """Troca à/ã/ç/ü... pela letra latina simples equivalente (a, a, c, u...).
+
+    NFD separa cada letra acentuada em base + marca de acento (combining
+    mark); descartando as marcas sobra só a base.
+    """
+    decomposed = unicodedata.normalize("NFD", value)
+    return "".join(char for char in decomposed if not unicodedata.combining(char))
+
+
+def _filename_column_transform(template: DocumentTemplate):
+    """Fábrica do `column_transform` de `render_column_template` para o nome
+    do arquivo: aplica remoção de acentos e maiúsculas/minúsculas só ao texto
+    vindo das colunas do Excel — o conector literal do padrão não passa por
+    aqui. A caixa respeita `filename_case_columns` do mesmo jeito que
+    `TemplateField.transform_columns`: lista vazia = todas as colunas.
+    """
+    selected_columns = set(template.filename_case_columns or [])
+
+    def _transform(column_number: int, value: str) -> str:
+        if template.filename_strip_accents:
+            value = _strip_accents(value)
+        if template.filename_case != DocumentTemplate.FilenameCase.NONE and (
+            not selected_columns or column_number in selected_columns
+        ):
+            value = (
+                value.upper()
+                if template.filename_case == DocumentTemplate.FilenameCase.UPPER
+                else value.lower()
+            )
+        return value
+
+    return _transform
+
+
 def _sanitize_filename_component(
     value: str,
     *,
@@ -741,7 +776,7 @@ def build_item_filename(
     pattern = job.template.filename_pattern
     base = (
         _sanitize_filename_component(
-            render_column_template(pattern, payload),
+            render_column_template(pattern, payload, _filename_column_transform(job.template)),
             space_mode=job.template.filename_space_mode,
             space_replacement=job.template.filename_space_replacement,
         )

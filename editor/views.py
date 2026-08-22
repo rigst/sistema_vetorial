@@ -201,6 +201,7 @@ def _template_editor_context(template_obj, user):
         if template_obj.page_height
         else 0,
         "filename_space_mode_choices": DocumentTemplate.FilenameSpaceMode.choices,
+        "filename_case_choices": DocumentTemplate.FilenameCase.choices,
     }
 
 
@@ -439,6 +440,7 @@ class TemplateFilenamePatternUpdateView(LoginRequiredMixin, View):
     padrão com variáveis {N} e o que fazer com espaços do texto no nome."""
 
     VALID_SPACE_MODES = {choice for choice, _label in DocumentTemplate.FilenameSpaceMode.choices}
+    VALID_CASE_MODES = {choice for choice, _label in DocumentTemplate.FilenameCase.choices}
 
     def post(self, request, *args, **kwargs):
         template_obj = get_object_or_404(DocumentTemplate, pk=kwargs["pk"], user=request.user)
@@ -459,6 +461,21 @@ class TemplateFilenamePatternUpdateView(LoginRequiredMixin, View):
                 payload.get("filename_space_replacement") or ""
             ).strip()[:5]
             update_fields.append("filename_space_replacement")
+        if "filename_strip_accents" in payload:
+            template_obj.filename_strip_accents = bool(payload.get("filename_strip_accents"))
+            update_fields.append("filename_strip_accents")
+        if "filename_case" in payload:
+            case = payload.get("filename_case") or DocumentTemplate.FilenameCase.NONE
+            if case in self.VALID_CASE_MODES:
+                template_obj.filename_case = case
+                update_fields.append("filename_case")
+        if "filename_case_columns" in payload:
+            columns = payload.get("filename_case_columns")
+            if isinstance(columns, list):
+                template_obj.filename_case_columns = sorted(
+                    {int(column) for column in columns if str(column).isdigit()}
+                )
+                update_fields.append("filename_case_columns")
         template_obj.save(update_fields=update_fields)
         return JsonResponse(
             {
@@ -466,6 +483,9 @@ class TemplateFilenamePatternUpdateView(LoginRequiredMixin, View):
                 "filename_pattern": template_obj.filename_pattern,
                 "filename_space_mode": template_obj.filename_space_mode,
                 "filename_space_replacement": template_obj.filename_space_replacement,
+                "filename_strip_accents": template_obj.filename_strip_accents,
+                "filename_case": template_obj.filename_case,
+                "filename_case_columns": template_obj.filename_case_columns,
             }
         )
 

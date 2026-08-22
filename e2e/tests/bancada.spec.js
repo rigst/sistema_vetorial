@@ -4,6 +4,7 @@ const { test, expect } = require("@playwright/test");
 
 const TMP = path.join(__dirname, "..", ".tmp");
 const EXCEL = path.join(TMP, "dados.xlsx");
+const EXCEL_2 = path.join(TMP, "dados_grande.xlsx");
 const NOT_EXCEL = path.join(TMP, "dados.csv");
 
 const USER = "e2e";
@@ -52,7 +53,7 @@ test.describe("Bancada: gerar arquivos a partir do Excel", () => {
     expect(focusedId).toBe("generate-excel-input");
   });
 
-  test("escolher a planilha libera os botões e mostra o nome do arquivo", async ({ page }) => {
+  test("escolher a planilha libera a amostra, mas o lote completo espera ela terminar", async ({ page }) => {
     await openBancada(page);
 
     await page.locator("#generate-excel-input").setInputFiles(EXCEL);
@@ -60,14 +61,31 @@ test.describe("Bancada: gerar arquivos a partir do Excel", () => {
     await expect(page.locator("#generate-file-name")).toHaveText("dados.xlsx");
     await expect(page.locator("#generate-file-label")).toHaveClass(/has-file/);
     await expect(page.locator("#generate-preview-button")).toBeEnabled();
+    // O lote completo é uma etapa obrigatoriamente posterior à amostra: fica
+    // desabilitado, com uma dica visível, até uma amostra terminar com sucesso.
+    await expect(page.locator("#generate-full-button")).toBeDisabled();
+    await expect(page.locator("#generate-full-hint")).toBeVisible();
+
+    await page.getByRole("button", { name: /Gerar amostra/i }).click();
+    await expect(page.locator("#generate-progress-text")).toHaveText(
+      /3 arquivos prontos/,
+      { timeout: 60_000 }
+    );
+
     await expect(page.locator("#generate-full-button")).toBeEnabled();
+    await expect(page.locator("#generate-full-hint")).toBeHidden();
+
+    // Trocar de planilha exige nova amostra: a liberação não sobrevive.
+    await page.locator("#generate-excel-input").setInputFiles(EXCEL_2);
+    await expect(page.locator("#generate-full-button")).toBeDisabled();
+    await expect(page.locator("#generate-full-hint")).toBeVisible();
   });
 
   test("a barra de progresso anuncia o avanço para leitores de tela", async ({ page }) => {
     await openBancada(page);
     await page.locator("#generate-excel-input").setInputFiles(EXCEL);
 
-    await page.getByRole("button", { name: /Gerar lote completo/i }).click();
+    await page.getByRole("button", { name: /Gerar amostra/i }).click();
 
     const bar = page.getByRole("progressbar", { name: /progresso da geração/i });
     await expect(bar).toBeVisible();
@@ -102,6 +120,14 @@ test.describe("Bancada: gerar arquivos a partir do Excel", () => {
   test("o lote completo processa todas as linhas e entrega o ZIP", async ({ page }) => {
     await openBancada(page);
     await page.locator("#generate-excel-input").setInputFiles(EXCEL);
+
+    // Passo obrigatório: sem a amostra pronta, "Gerar lote completo" continua desabilitado.
+    await page.getByRole("button", { name: /Gerar amostra/i }).click();
+    await expect(page.locator("#generate-progress-text")).toHaveText(
+      /3 arquivos prontos/,
+      { timeout: 60_000 }
+    );
+    await expect(page.locator("#generate-full-button")).toBeEnabled();
 
     await page.getByRole("button", { name: /Gerar lote completo/i }).click();
 

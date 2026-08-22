@@ -28,6 +28,7 @@
     const fileLabelText = document.getElementById("generate-file-name");
     const previewButton = document.getElementById("generate-preview-button");
     const fullButton = document.getElementById("generate-full-button");
+    const fullHint = document.getElementById("generate-full-hint");
     const progressBox = document.getElementById("generate-progress");
     const progressText = document.getElementById("generate-progress-text");
     const progressTrack = document.getElementById("generate-progress-track");
@@ -41,6 +42,10 @@
     const EMPTY_LABEL = fileLabelText ? fileLabelText.textContent : "";
     let pollTimer = null;
     let running = false;
+    // O lote completo só libera depois que a amostra (3 linhas) terminar com
+    // sucesso NESTA planilha — evita gerar tudo sem antes conferir o
+    // resultado. Escolher outro arquivo exige nova amostra.
+    let samplesReady = false;
 
     const show = (element, visible) => {
       if (element) element.hidden = !visible;
@@ -52,16 +57,21 @@
       show(errorBox, Boolean(message));
     };
 
+    const syncFullButtonState = () => {
+      if (fullButton) fullButton.disabled = running || !samplesReady;
+      show(fullHint, !running && !samplesReady);
+    };
+
     const setBusy = (busy) => {
-      // Os botões só saem do ar enquanto o job está no ar. Fora disso ficam
-      // clicáveis: clicar sem planilha responde com o motivo, que é mais útil
-      // do que um botão apagado sem explicação.
+      // O botão de amostra só sai do ar enquanto o job está no ar. Fora
+      // disso fica clicável: clicar sem planilha responde com o motivo, que
+      // é mais útil do que um botão apagado sem explicação. Já o de lote
+      // completo também depende da amostra ter sido gerada (syncFullButtonState).
       running = busy;
-      [previewButton, fullButton].forEach((button) => {
-        if (button) button.disabled = busy;
-      });
+      if (previewButton) previewButton.disabled = busy;
       if (fileInput) fileInput.disabled = busy;
       if (card) card.setAttribute("aria-busy", busy ? "true" : "false");
+      syncFullButtonState();
     };
 
     const syncButtons = () => {
@@ -141,7 +151,7 @@
       show(resultBox, total > 0 || Boolean(data.zip_url));
     };
 
-    const poll = async (statusUrl) => {
+    const poll = async (statusUrl, kind) => {
       let data;
       try {
         const response = await fetch(statusUrl, {
@@ -159,11 +169,14 @@
       renderResult(data);
 
       if (TERMINAL_STATUS.has(data.status)) {
+        if (kind === "preview" && data.status === "completed" && Number(data.success_rows) > 0) {
+          samplesReady = true;
+        }
         setBusy(false);
         setError(data.status === "failed" ? data.last_error : "");
         return;
       }
-      pollTimer = window.setTimeout(() => poll(statusUrl), POLL_INTERVAL);
+      pollTimer = window.setTimeout(() => poll(statusUrl, kind), POLL_INTERVAL);
     };
 
     const launch = async (kind) => {
@@ -171,6 +184,14 @@
         setError("Escolha o Excel com os dados antes de gerar.");
         return;
       }
+      if (kind === "full" && !samplesReady) {
+        setError("Gere a amostra (3 linhas) e confira o resultado antes do lote completo.");
+        return;
+      }
+      // Uma nova rodada de amostra some com a garantia da anterior até que
+      // esta também termine com sucesso — se ela falhar, o lote completo
+      // continua bloqueado em vez de destravar com um resultado velho.
+      if (kind === "preview") samplesReady = false;
       window.clearTimeout(pollTimer);
       setError("");
       setBusy(true);
@@ -204,11 +225,14 @@
       }
 
       if (progressText) progressText.textContent = "Na fila…";
-      poll(data.status_url);
+      poll(data.status_url, kind);
     };
 
     fileInput?.addEventListener("change", () => {
       setError("");
+      // Outra planilha ainda não passou pela amostra desta vez.
+      samplesReady = false;
+      syncFullButtonState();
       syncButtons();
     });
 
@@ -338,10 +362,126 @@
       });
     }
 
+    const stripAccentsCheckbox = document.getElementById("filename-strip-accents");
+    const stripAccentsSaveState = document.getElementById("filename-strip-accents-save-state");
+    const caseSelect = document.getElementById("filename-case");
+    const caseSaveState = document.getElementById("filename-case-save-state");
+    const caseColumnsGroup = document.getElementById("filename-case-columns-group");
+    const caseColumnsContainer = document.getElementById("filename-case-columns");
+    const caseColumnsDataEl = document.getElementById("filename-case-columns-data");
+
+    if (filenamePatternUrl) {
+      // Colunas já marcadas ao carregar a página (JSONField do template).
+      const selectedCaseColumns = new Set(
+        caseColumnsDataEl ? JSON.parse(caseColumnsDataEl.textContent || "[]") : []
+      );
+
+      const columnRefsFromPattern = (pattern) => {
+        const trimmed = String(pattern || "").trim();
+        if (!trimmed) return [];
+        if (/^\d+$/.test(trimmed)) return [Number(trimmed)];
+        const refs = [];
+        const re = /\{(\d+)\}/g;
+        let match;
+        while ((match = re.exec(trimmed))) refs.push(Number(match[1]));
+        return refs;
+      };
+
+      const setStripAccentsSaveState = (tone, text) => {
+        if (!stripAccentsSaveState) return;
+        stripAccentsSaveState.textContent = text || "";
+        if (tone) stripAccentsSaveState.dataset.tone = tone;
+        else delete stripAccentsSaveState.dataset.tone;
+      };
+
+      const setCaseSaveState = (tone, text) => {
+        if (!caseSaveState) return;
+        caseSaveState.textContent = text || "";
+        if (tone) caseSaveState.dataset.tone = tone;
+        else delete caseSaveState.dataset.tone;
+      };
+
+      const saveCaseOptions = async () => {
+        setCaseSaveState("busy", "Salvando…");
+        try {
+          const response = await fetch(filenamePatternUrl, {
+            method: "POST",
+            headers: { "X-CSRFToken": csrfToken, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              filename_case: caseSelect?.value || "none",
+              filename_case_columns: Array.from(selectedCaseColumns).sort((a, b) => a - b),
+            }),
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(data.error || `Erro ${response.status}`);
+          setCaseSaveState("ok", "Salvo");
+        } catch (err) {
+          setCaseSaveState("error", err.message || "Não foi possível salvar.");
+        }
+      };
+
+      // Só mostra "aplicar a quais colunas" quando o padrão junta 2+ colunas
+      // e a caixa não está desligada — igual ao painel de campos do editor.
+      const syncCaseColumnsUI = () => {
+        if (!caseColumnsGroup || !caseColumnsContainer || !caseSelect) return;
+        const refs = Array.from(new Set(columnRefsFromPattern(filenamePatternInput?.value)));
+        if (caseSelect.value === "none" || refs.length < 2) {
+          caseColumnsGroup.hidden = true;
+          caseColumnsContainer.innerHTML = "";
+          return;
+        }
+        caseColumnsGroup.hidden = false;
+        caseColumnsContainer.innerHTML = "";
+        refs.forEach((columnNumber) => {
+          const label = document.createElement("label");
+          label.className = "field-transform-column-toggle";
+          const input = document.createElement("input");
+          input.type = "checkbox";
+          input.checked = selectedCaseColumns.has(columnNumber);
+          input.addEventListener("change", () => {
+            if (input.checked) selectedCaseColumns.add(columnNumber);
+            else selectedCaseColumns.delete(columnNumber);
+            saveCaseOptions();
+          });
+          label.appendChild(input);
+          label.append(`Coluna ${columnNumber}`);
+          caseColumnsContainer.appendChild(label);
+        });
+      };
+
+      const saveStripAccents = async () => {
+        setStripAccentsSaveState("busy", "Salvando…");
+        try {
+          const response = await fetch(filenamePatternUrl, {
+            method: "POST",
+            headers: { "X-CSRFToken": csrfToken, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              filename_strip_accents: Boolean(stripAccentsCheckbox?.checked),
+            }),
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(data.error || `Erro ${response.status}`);
+          setStripAccentsSaveState("ok", "Salvo");
+        } catch (err) {
+          setStripAccentsSaveState("error", err.message || "Não foi possível salvar.");
+        }
+      };
+
+      stripAccentsCheckbox?.addEventListener("change", saveStripAccents);
+      caseSelect?.addEventListener("change", () => {
+        syncCaseColumnsUI();
+        saveCaseOptions();
+      });
+      filenamePatternInput?.addEventListener("input", syncCaseColumnsUI);
+
+      syncCaseColumnsUI();
+    }
+
     previewButton?.addEventListener("click", () => launch("preview"));
     fullButton?.addEventListener("click", () => launch("full"));
 
     syncButtons();
+    syncFullButtonState();
     window.__vetorialJobLauncher = { launch, syncButtons };
   }
 

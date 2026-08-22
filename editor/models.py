@@ -22,6 +22,11 @@ class DocumentTemplate(OwnedModel):
         STRIP = "strip", "Remover"
         REPLACE = "replace", "Substituir por"
 
+    class FilenameCase(models.TextChoices):
+        NONE = "none", "Sem transformação"
+        UPPER = "upper", "Maiúsculas"
+        LOWER = "lower", "Minúsculas"
+
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255)
     description = models.TextField(blank=True)
@@ -43,6 +48,16 @@ class DocumentTemplate(OwnedModel):
         max_length=10, choices=FilenameSpaceMode.choices, default=FilenameSpaceMode.KEEP
     )
     filename_space_replacement = models.CharField(max_length=5, blank=True, default="-")
+    # Troca à/ã/ç/ü... pela letra latina simples equivalente (a, a, c, u...)
+    # no texto vindo das colunas do Excel dentro de filename_pattern.
+    filename_strip_accents = models.BooleanField(default=False)
+    filename_case = models.CharField(
+        max_length=10, choices=FilenameCase.choices, default=FilenameCase.NONE
+    )
+    # Só importa com filename_case != NONE e um padrão que junta 2+ colunas:
+    # limita a caixa (maiúsculas/minúsculas) só a essas colunas, igual
+    # TemplateField.transform_columns. Lista vazia = aplica em todas.
+    filename_case_columns = models.JSONField(default=list, blank=True)
 
     class Meta:
         ordering = ["name", "-updated_at"]
