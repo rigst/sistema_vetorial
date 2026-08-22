@@ -871,7 +871,8 @@ class JobDetailAndStatusWindowingTests(TestCase):
 
         html = self.client.get(reverse("jobs:detail", kwargs={"pk": job.pk})).content.decode()
 
-        self.assertIn('<div class="eyebrow">Lote</div>', html)
+        self.assertIn(f'class="eyebrow" href="{reverse("jobs:list")}"', html)
+        self.assertIn("Lotes</a>", html)
         self.assertIn("Resumo do lote", html)
         self.assertNotIn(">Job<", html)
 

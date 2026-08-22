@@ -135,14 +135,33 @@ textarea {
 }
 
 .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
   font-weight: 800;
   letter-spacing: -0.04em;
-  font-size: 1.05rem;
+  font-size: 1.08rem;
   color: #f2f7f5;
 }
 
 .brand span {
   color: #5ec2b7;
+}
+
+.brand-mark {
+  display: block;
+  border-radius: 7px;
+  transition: transform var(--transition);
+}
+
+.brand:hover .brand-mark {
+  transform: rotate(-8deg) scale(1.06);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand:hover .brand-mark {
+    transform: none;
+  }
 }
 
 .nav-toggle {
@@ -276,11 +295,11 @@ main {
   padding-bottom: 3rem;
 }
 
-/* Avisos flutuam como toast (canto superior direito, somem sozinhos) em vez
+/* Avisos flutuam como toast (canto inferior direito, somem sozinhos) em vez
  * de empurrar o conteúdo da página como um banner fixo no fluxo. */
 .toast-stack {
   position: fixed;
-  top: 1rem;
+  bottom: 1rem;
   right: 1rem;
   z-index: 1000;
   display: grid;
@@ -310,7 +329,7 @@ main {
 @keyframes toast-in {
   from {
     opacity: 0;
-    transform: translateY(-8px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -517,67 +536,53 @@ main {
   border-bottom: 0;
 }
 
+/* Estado por cor + ponto, sem fundo em pílula: numa tabela cheia de linhas,
+ * uma pílula preenchida por linha vira confete. A cor já é a informação. */
 .status-pill {
   display: inline-flex;
   align-items: center;
-  padding: 0.24rem 0.65rem;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  background: rgba(61, 95, 140, 0.1);
+  font-size: 0.85rem;
+  font-weight: 600;
   color: var(--accent-2);
 }
 
 .status-pill.status-ready,
 .status-pill.status-completed {
-  background: rgba(70, 148, 106, 0.12);
   color: var(--success);
 }
 
 .status-pill.status-failed,
 .status-pill.status-archived {
-  background: rgba(201, 74, 74, 0.1);
   color: var(--danger);
 }
 
 .status-pill.status-processing,
 .status-pill.status-preview {
-  background: rgba(155, 109, 51, 0.12);
   color: var(--warning);
 }
 
 .status-pill.status-pending {
-  background: rgba(61, 95, 140, 0.1);
   color: var(--accent-2);
 }
 
 .status-pill .status-dot {
-  width: 0.4rem;
-  height: 0.4rem;
+  width: 0.44rem;
+  height: 0.44rem;
   border-radius: 50%;
   background: currentColor;
-  margin-right: 0.4rem;
+  margin-right: 0.5rem;
+  flex: none;
 }
 
-/* ---- Painel de estatísticas do job: uma faixa, não quatro caixas soltas ---- */
+/* ---- Faixa de estatísticas do job: números soltos dentro do hero, sem
+ * caixa própria — só um traço fino por cima separa da linha do título. ---- */
 .job-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-  margin-bottom: 1.5rem;
-}
-
-.job-stat {
-  padding: 1rem 1.25rem;
-  border-left: 1px solid var(--border);
-}
-
-.job-stat:first-child {
-  border-left: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  margin-top: 0.35rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--border);
 }
 
 .job-stat-label {
@@ -589,7 +594,7 @@ main {
 }
 
 .job-stat-value {
-  font-size: 1.7rem;
+  font-size: 1.6rem;
   font-weight: 700;
   line-height: 1.15;
   margin-top: 0.3rem;
@@ -605,38 +610,37 @@ main {
   color: var(--danger);
 }
 
-/* ---- Chips de filtro por estado ---- */
+/* ---- Chips de filtro por estado: abas discretas, sublinhado no ativo, sem
+ * pílula preenchida competindo com o cartão que as envolve. ---- */
 .filter-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-bottom: 1rem;
+  gap: 1.3rem;
+  margin-bottom: 1.1rem;
+  border-bottom: 1px solid var(--border);
 }
 
 .filter-chip {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.3rem 0.8rem;
-  border-radius: 999px;
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
+  padding: 0.1rem 0.05rem 0.7rem;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
   color: var(--text-soft);
-  font-size: 0.82rem;
+  font-size: 0.86rem;
   font-weight: 600;
   text-decoration: none;
-  transition: background var(--transition), color var(--transition), border-color var(--transition);
+  transition: color var(--transition), border-color var(--transition);
 }
 
 .filter-chip:hover {
-  border-color: var(--accent);
   color: var(--accent);
 }
 
 .filter-chip.is-active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+  color: var(--accent);
+  border-bottom-color: var(--accent);
 }
 
 .filter-chip-count {
@@ -732,6 +736,10 @@ textarea {
 
 textarea {
   resize: vertical;
+}
+
+input[type="range"] {
+  accent-color: var(--accent);
 }
 
 input:focus,
@@ -1013,23 +1021,59 @@ textarea:focus {
   transition: width 220ms ease;
 }
 
-.template-meta {
+/* ---- Página do lote: um cartão só, resumo e arquivos lado a lado com um
+ * traço fino entre eles em vez de dois cartões empilhando sombra e borda. ---- */
+.job-panel {
   display: grid;
-  gap: 0.9rem;
+  grid-template-columns: minmax(200px, 290px) minmax(0, 1fr);
+  gap: 1.75rem;
 }
 
-.template-meta dl {
+.job-summary-col {
   display: grid;
-  grid-template-columns: 140px 1fr;
+  gap: 0.9rem;
+  align-content: start;
+  padding-right: 1.75rem;
+  border-right: 1px solid var(--border);
+}
+
+.job-summary-col dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
   gap: 0.55rem 1rem;
 }
 
-.template-meta dt {
+.job-summary-col dt {
   color: var(--muted);
 }
 
-.template-meta dd {
+.job-summary-col dd {
   margin: 0;
+}
+
+.job-summary-note {
+  font-size: 0.85rem;
+}
+
+.job-files-col {
+  min-width: 0;
+}
+
+.job-files-col .section-title {
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 860px) {
+  .job-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .job-summary-col {
+    padding-right: 0;
+    padding-bottom: 1.5rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
 }
 
 .empty-state {
@@ -1188,7 +1232,7 @@ a.icon-button:focus-visible {
 }
 
 .editor-config-panel {
-  padding: 0.9rem 1rem;
+  padding: 1.1rem 1.3rem;
 }
 
 .field-config-form {
@@ -1202,6 +1246,54 @@ a.icon-button:focus-visible {
 .field-section {
   display: grid;
   gap: 0.7rem;
+}
+
+/* Um traço fino separa Conteúdo de Aparência — a mesma linguagem da barra de
+ * ferramentas (.toolbar-group) e das seções avançadas logo abaixo, em vez de
+ * cada bloco virar mais uma caixa com borda própria. */
+.field-section + .field-section {
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+/* Campos quietos: sem borda em repouso, só um fundo suave — o contorno só
+ * aparece no foco. Com uma dúzia de campos empilhados na coluna estreita do
+ * painel, uma borda em cada um empilhava "caixa dentro de caixa dentro de
+ * caixa"; o fundo sozinho já marca onde é editável. Vale para o painel do
+ * campo e para "Gerar arquivos" logo abaixo — a mesma bancada, o mesmo
+ * vocabulário visual dos dois lados. */
+.field-config-form input[type="text"],
+.field-config-form input[type="number"],
+.field-config-form select,
+#generate-card input[type="text"],
+#generate-card select {
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--bg-soft);
+  padding: 0.62rem 0.75rem;
+  transition: background var(--transition), border-color var(--transition), box-shadow var(--transition);
+}
+
+.field-config-form input[type="text"]:hover,
+.field-config-form input[type="number"]:hover,
+.field-config-form select:hover,
+#generate-card input[type="text"]:hover,
+#generate-card select:hover {
+  background: var(--surface-strong-2);
+}
+
+.field-config-form input[type="text"]:focus,
+.field-config-form input[type="number"]:focus,
+.field-config-form select:focus,
+#generate-card input[type="text"]:focus,
+#generate-card select:focus {
+  background: var(--surface);
+  border-color: rgba(31, 122, 114, 0.45);
+  box-shadow: 0 0 0 3px rgba(31, 122, 114, 0.1);
+}
+
+.field-config-form label {
+  font-size: 0.86rem;
 }
 
 .field-section-label {
@@ -1802,11 +1894,11 @@ details[open] > summary .field-advanced-title::before {
 .color-input-row input[type="color"] {
   width: 100%;
   height: 100%;
-  min-height: 2.9rem;
-  padding: 0.25rem;
-  border: 1px solid var(--border-strong);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.92);
+  min-height: 2.6rem;
+  padding: 0.2rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-soft);
   cursor: pointer;
 }
 
@@ -1826,6 +1918,15 @@ details[open] > summary .field-advanced-title::before {
   font-size: 0.78rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+a.eyebrow {
+  transition: color var(--transition);
+}
+
+a.eyebrow:hover {
+  color: var(--ink);
+  text-decoration: underline;
 }
 
 .page-head-search {

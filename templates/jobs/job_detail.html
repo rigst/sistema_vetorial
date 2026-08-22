@@ -4,7 +4,7 @@
 
 {% block content %}
 <section class="hero-shell">
-    <div class="eyebrow">Lote</div>
+    <a class="eyebrow" href="{% url 'jobs:list' %}">← Lotes</a>
     <div class="section-header">
         <div>
             <h1 class="hero-title">{{ job.name }}</h1>
@@ -25,47 +25,46 @@
                 {% csrf_token %}
                 <button type="submit" class="button button-secondary">Inativar</button>
             </form>
-            <a class="button button-secondary" href="{% url 'jobs:list' %}">Voltar</a>
+        </div>
+    </div>
+
+    <div class="job-stats" id="job-stats">
+        <div class="job-stat">
+            <div class="job-stat-label">Linhas</div>
+            <div class="job-stat-value" id="job-stat-total">{{ job.total_rows }}</div>
+        </div>
+        <div class="job-stat">
+            <div class="job-stat-label">Processadas</div>
+            <div class="job-stat-value" id="job-stat-processed">{{ job.processed_rows }}</div>
+        </div>
+        <div class="job-stat job-stat--success">
+            <div class="job-stat-label">Prontas</div>
+            <div class="job-stat-value" id="job-stat-success">{{ job.success_rows }}</div>
+        </div>
+        <div class="job-stat job-stat--danger">
+            <div class="job-stat-label">Falhas</div>
+            <div class="job-stat-value" id="job-stat-failed">{{ job.failed_rows }}</div>
+        </div>
+    </div>
+
+    <div class="progress-shell" id="job-progress-shell" {% if job.status != 'queued' and job.status != 'processing' %}hidden{% endif %}>
+        <div class="progress-bar">
+            <div class="progress-bar-fill" id="job-progress-fill" style="width: {% if job.total_rows %}{% widthratio job.processed_rows job.total_rows 100 %}{% else %}0{% endif %}%;"></div>
+        </div>
+        <p class="muted" id="job-progress-text">{{ job.processed_rows }}/{{ job.total_rows }} linhas processadas</p>
+    </div>
+
+    <div class="form-alert form-alert-error" id="job-last-error-box" {% if not job.last_error %}style="display:none;"{% endif %}>
+        <span class="ui-icon ui-icon-soft" aria-hidden="true">!</span>
+        <div>
+            <strong>Último erro</strong>
+            <span id="job-last-error-text">{{ job.last_error }}</span>
         </div>
     </div>
 </section>
 
-<div class="job-stats" id="job-stats">
-    <div class="job-stat">
-        <div class="job-stat-label">Linhas</div>
-        <div class="job-stat-value" id="job-stat-total">{{ job.total_rows }}</div>
-    </div>
-    <div class="job-stat">
-        <div class="job-stat-label">Processadas</div>
-        <div class="job-stat-value" id="job-stat-processed">{{ job.processed_rows }}</div>
-    </div>
-    <div class="job-stat job-stat--success">
-        <div class="job-stat-label">Prontas</div>
-        <div class="job-stat-value" id="job-stat-success">{{ job.success_rows }}</div>
-    </div>
-    <div class="job-stat job-stat--danger">
-        <div class="job-stat-label">Falhas</div>
-        <div class="job-stat-value" id="job-stat-failed">{{ job.failed_rows }}</div>
-    </div>
-</div>
-
-<div class="progress-shell" id="job-progress-shell" style="margin-bottom: 1.5rem;" {% if job.status != 'queued' and job.status != 'processing' %}hidden{% endif %}>
-    <div class="progress-bar">
-        <div class="progress-bar-fill" id="job-progress-fill" style="width: {% if job.total_rows %}{% widthratio job.processed_rows job.total_rows 100 %}{% else %}0{% endif %}%;"></div>
-    </div>
-    <p class="muted" id="job-progress-text">{{ job.processed_rows }}/{{ job.total_rows }} linhas processadas</p>
-</div>
-
-<div class="form-alert" id="job-last-error-box" {% if not job.last_error %}style="display:none;"{% endif %}>
-    <span class="ui-icon ui-icon-soft" aria-hidden="true">!</span>
-    <div>
-        <strong>Último erro</strong>
-        <span id="job-last-error-text">{{ job.last_error }}</span>
-    </div>
-</div>
-
-<section class="split-grid">
-    <div class="panel template-meta">
+<section class="panel job-panel">
+    <div class="job-summary-col">
         <h2 class="section-title">Resumo do lote</h2>
         <dl>
             <dt>Template</dt>
@@ -80,14 +79,14 @@
             </dd>
         </dl>
         {% if job.column_map.headers %}
-            <p class="muted" style="margin-top: 0.9rem;">Cabeçalhos detectados: {{ job.column_map.headers|join:", " }}</p>
+            <p class="muted job-summary-note">Cabeçalhos detectados: {{ job.column_map.headers|join:", " }}</p>
         {% endif %}
         {% if job.column_map.missing_headers %}
-            <p class="muted" style="margin-top: 0.4rem;">Cabeçalhos esperados ausentes: {{ job.column_map.missing_headers|join:", " }}</p>
+            <p class="muted job-summary-note">Cabeçalhos esperados ausentes: {{ job.column_map.missing_headers|join:", " }}</p>
         {% endif %}
     </div>
 
-    <aside class="panel">
+    <div class="job-files-col">
         <h2 class="section-title">Arquivos gerados</h2>
 
         <nav class="filter-chips" id="job-filter-chips" aria-label="Filtrar por estado">
@@ -165,7 +164,7 @@
                href="?{% if estado %}estado={{ estado }}&{% endif %}page={{ next_page }}"
                {% if not page_obj.has_next %}hidden{% endif %}>Próxima</a>
         </div>
-    </aside>
+    </div>
 </section>
 
 <script>
