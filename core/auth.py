@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 from django.contrib import messages
@@ -7,6 +8,7 @@ from django.contrib.auth import logout
 from django.contrib.auth.views import LoginView
 from django.shortcuts import redirect
 from django.urls import reverse
+from django.utils import timezone
 
 from editor.models import DocumentTemplate
 from fonts.models import FontAsset
@@ -24,9 +26,8 @@ DEFAULT_FONT_SOURCES = [
     ("Dejavu Serif Bold", Path("/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf")),
     ("Dejavu Mono", Path("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf")),
     ("Dejavu Mono Bold", Path("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf")),
-    # Inter: única família padrão que traz a escala inteira de peso
-    # (Thin…Black) com itálico real em cada peso — é o que dá conteúdo de
-    # verdade ao seletor de "espessura" do painel, em vez de só Regular/Bold.
+    # Cada variação é um arquivo selecionável por si só no editor. Peso e
+    # itálico são lidos do arquivo; não são simulados por controles separados.
     # Arquivos vendorizados em fonts/vendor/inter/ (SIL OFL 1.1, ver LICENSE.txt).
     ("Inter Thin", _INTER_DIR / "Inter-Thin.ttf"),
     ("Inter Thin Italic", _INTER_DIR / "Inter-ThinItalic.ttf"),
@@ -46,13 +47,10 @@ DEFAULT_FONT_SOURCES = [
     ("Inter Extra Bold Italic", _INTER_DIR / "Inter-ExtraBoldItalic.ttf"),
     ("Inter Black", _INTER_DIR / "Inter-Black.ttf"),
     ("Inter Black Italic", _INTER_DIR / "Inter-BlackItalic.ttf"),
-    # Wix Madefor Display: só existe como fonte variável no Google Fonts (um
-    # arquivo só, peso 400-800 controlado por eixo) — sem itálico. Os 5
-    # arquivos aqui são instâncias estáticas de verdade (glifo já "assado"
-    # naquele peso), geradas uma vez com fontTools.varLib.instancer a partir
-    # do .ttf variável oficial; o pipeline de contorno vetorial deste app não
-    # lê eixo de variação, só glyf estático. Ver fonts/vendor/wix-madefor-
-    # display/OFL.txt para a licença (SIL Open Font License).
+    # O Google Fonts publica a Wix Madefor Display como variável (wght
+    # 400-800), sem itálico. Estas cinco instâncias estáticas foram geradas do
+    # arquivo oficial para o pipeline vetorial usar o desenho real de cada
+    # peso. Origem e reprodução: fonts/vendor/wix-madefor-display/SOURCE.md.
     ("Wix Madefor Display", _WIX_DIR / "WixMadeforDisplay-Regular.ttf"),
     ("Wix Madefor Display Medium", _WIX_DIR / "WixMadeforDisplay-Medium.ttf"),
     ("Wix Madefor Display SemiBold", _WIX_DIR / "WixMadeforDisplay-SemiBold.ttf"),
@@ -66,37 +64,71 @@ def ensure_user_profile(user) -> UserProfile:
     return profile
 
 
-def ensure_default_fonts(user) -> None:
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def ensure_default_fonts(user) -> dict[str, int]:
     from fonts.services import inspect_font_file
 
+    result = {"created": 0, "updated": 0, "unchanged": 0}
     for font_name, font_path in DEFAULT_FONT_SOURCES:
         if not font_path.exists():
             continue
-        if FontAsset.objects.filter(user=user, name=font_name, is_builtin=True).exists():
+        source_sha256 = _file_sha256(font_path)
+        existing = FontAsset.objects.filter(
+            user=user, name=font_name, is_builtin=True
+        ).first()
+        if existing and existing.metadata.get("builtin_sha256") == source_sha256:
+            result["unchanged"] += 1
             continue
-        # Peso, itálico e a família de agrupamento vêm do próprio arquivo —
-        # a mesma leitura que o upload manual usa (fonts/services.py) — para
-        # que "Dejavu Sans" e "Dejavu Sans Bold" caiam na mesma família em
-        # vez de virarem duas fontes sem relação nenhuma entre si.
         metadata = inspect_font_file(str(font_path))
         with font_path.open("rb") as font_file:
-            font = FontAsset(
-                user=user,
-                name=font_name,
-                family=metadata.get("detected_family") or font_name,
-                variant=metadata.get("detected_variant") or "Regular",
-                weight=metadata.get("weight") or 400,
-                is_italic=bool(metadata.get("is_italic")),
-                is_builtin=True,
-                is_active=True,
-            )
+            font = existing or FontAsset(user=user, name=font_name, is_builtin=True)
+            font.family = metadata.get("detected_family") or font_name
+            font.variant = metadata.get("detected_variant") or "Regular"
+            font.weight = metadata.get("weight") or 400
+            font.is_italic = bool(metadata.get("is_italic"))
+            if not existing:
+                font.is_active = True
+            old_file_name = font.file.name if existing and font.file else ""
             font.file.save(font_path.name, font_file, save=False)
             font.metadata = {
                 **metadata,
                 "builtin": True,
                 "source": str(font_path),
+                "builtin_sha256": source_sha256,
             }
-            font.save()
+            if existing:
+                # QuerySet.update evita o sinal global de substituição, que
+                # tenta apagar o arquivo legado (pertencente ao www-data)
+                # antes de o banco apontar para a cópia nova.
+                FontAsset.objects.filter(pk=font.pk).update(
+                    family=font.family,
+                    variant=font.variant,
+                    weight=font.weight,
+                    is_italic=font.is_italic,
+                    file=font.file.name,
+                    metadata=font.metadata,
+                    updated_at=timezone.now(),
+                )
+            else:
+                font.save()
+            # Só remove depois que o banco aponta para a cópia nova. Arquivos
+            # legados podem pertencer ao www-data e não ser apagáveis pelo
+            # usuário de deploy; nesse caso ficam órfãos, mas o provisionamento
+            # e a aplicação continuam íntegros.
+            if old_file_name and old_file_name != font.file.name:
+                try:
+                    font.file.storage.delete(old_file_name)
+                except PermissionError:
+                    pass
+        result["updated" if existing else "created"] += 1
+    return result
 
 
 def cleanup_visitor_data(user) -> None:

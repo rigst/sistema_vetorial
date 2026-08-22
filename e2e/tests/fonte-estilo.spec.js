@@ -54,73 +54,49 @@ const canvasObjectFor = (page, fieldId) =>
     fieldId
   );
 
-test.describe("Painel de fonte: família, espessura e itálico", () => {
-  test("Inter aparece com a escala inteira de peso", async ({ page }) => {
+test.describe("Painel de fonte: cada variação vem do arquivo", () => {
+  test("não oferece negrito ou itálico sintético", async ({ page }) => {
     await openBancada(page);
     await clickField(page, NOME_FIELD);
     await expect(page.locator("#field-panel-name")).toContainText("Nome");
 
-    const familyOptions = await page.locator("#field-font-family option").allTextContents();
-    expect(familyOptions).toContain("Inter");
+    await expect(page.locator("#field-font-id")).toBeVisible();
+    await expect(page.locator("#field-font-weight")).toHaveCount(0);
+    await expect(page.locator("#field-style-italic")).toHaveCount(0);
+  });
 
-    const weightOptions = await page.locator("#field-font-weight option").allTextContents();
-    expect(weightOptions).toEqual([
-      "Fina",
-      "Extra leve",
-      "Leve",
-      "Normal",
-      "Média",
-      "Semi-negrito",
-      "Negrito",
-      "Extra-negrito",
-      "Preta",
+  test("Wix oferece todas as cinco variações oficiais", async ({ page }) => {
+    await openBancada(page);
+    await clickField(page, NOME_FIELD);
+
+    const wixGroup = page.locator('#field-font-id optgroup[label="Wix Madefor Display"]');
+    await expect(wixGroup.locator("option")).toHaveText([
+      "Regular",
+      "Medium",
+      "SemiBold",
+      "Bold",
+      "ExtraBold",
     ]);
   });
 
-  test("trocar peso resolve para o arquivo real da família e atualiza o canvas", async ({
-    page,
-  }) => {
+  test("selecionar Bold usa o arquivo Bold e persiste", async ({ page }) => {
     await openBancada(page);
     await clickField(page, NOME_FIELD);
 
-    await page.locator("#field-font-family").selectOption("Inter");
-    await page.locator("#field-font-weight").selectOption("900");
-    await expect
-      .poll(() => currentFontName(page))
-      .toMatch(/Inter Black/);
-  });
-
-  test("itálico sem arquivo na família mostra o aviso e continua reto", async ({ page }) => {
-    await openBancada(page);
-    await clickField(page, NOME_FIELD);
-
-    // DejaVu Sans só tem Regular/Bold no pacote padrão — sem itálico. O
-    // nome da família vem de dentro do arquivo da fonte ("DejaVu", com V
-    // maiúsculo), não do nome de exibição usado no upload padrão.
-    await page.locator("#field-font-family").selectOption("DejaVu Sans");
-    await clickToggle(page, "field-style-italic");
-
-    await expect(page.locator("#field-italic-hint")).toBeVisible();
-    const fontName = await currentFontName(page);
-    expect(fontName).not.toMatch(/Italic/);
-  });
-
-  test("recarregar a página restaura família/peso/itálico do campo salvo", async ({ page }) => {
-    await openBancada(page);
-    await clickField(page, NOME_FIELD);
-
-    await page.locator("#field-font-family").selectOption("Inter");
-    await page.locator("#field-font-weight").selectOption("700");
-    await clickToggle(page, "field-style-italic");
+    const boldId = await page.evaluate(() => {
+      const font = window.__vetorialEditor.fonts.find(
+        (item) => item.family === "Wix Madefor Display" && item.variant === "Bold"
+      );
+      return String(font.id);
+    });
+    await page.locator("#field-font-id").selectOption(boldId);
+    await expect.poll(() => currentFontName(page)).toBe("Wix Madefor Display Bold");
     await expect(page.locator("#editor-save-state")).toHaveText(/Salvo/, { timeout: 10_000 });
 
     await page.reload();
     await expect(page.locator("#editor-status-text")).not.toHaveText(/Carregando/);
     await clickField(page, NOME_FIELD);
-
-    await expect(page.locator("#field-font-family")).toHaveValue("Inter");
-    await expect(page.locator("#field-font-weight")).toHaveValue("700");
-    await expect(page.locator("#field-style-italic")).toBeChecked();
+    await expect(page.locator("#field-font-id")).toHaveValue(boldId);
   });
 });
 

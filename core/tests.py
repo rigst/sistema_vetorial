@@ -3,10 +3,12 @@ from __future__ import annotations
 import re
 import shutil
 import tempfile
+from io import StringIO
 from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -77,10 +79,8 @@ class CoreTests(TestCase):
         self.assertGreaterEqual(FontAsset.objects.filter(user=user, is_builtin=True).count(), 1)
 
     def test_ensure_default_fonts_bundles_inter_full_weight_range(self):
-        # DejaVu (as outras fontes padrão) só tem Regular/Bold — sem uma
-        # família com a escala inteira, o seletor de "espessura" do editor
-        # não tem o que oferecer além de dois pontos. Inter cobre 100-900,
-        # com itálico real em cada peso.
+        # Cada peso e itálico é um arquivo próprio e aparece diretamente no
+        # seletor de fontes, sem negrito/itálico sintético no editor.
         user = get_user_model().objects.create_user(username="inter-user", password="senha123")
         ensure_default_fonts(user)
         inter_fonts = FontAsset.objects.filter(user=user, family="Inter", is_builtin=True)
@@ -108,6 +108,29 @@ class CoreTests(TestCase):
         weights = set(wix_fonts.values_list("weight", flat=True))
         self.assertEqual(weights, {400, 500, 600, 700, 800})
         self.assertFalse(wix_fonts.filter(is_italic=True).exists())
+
+    def test_provision_default_fonts_adds_wix_to_all_users(self):
+        users = [
+            get_user_model().objects.create_user(username="wix-all-1", password="senha123"),
+            get_user_model().objects.create_user(username="wix-all-2", password="senha123"),
+        ]
+        output = StringIO()
+
+        call_command("provision_default_fonts", stdout=output)
+
+        for user in users:
+            wix_fonts = FontAsset.objects.filter(
+                user=user, family="Wix Madefor Display", is_builtin=True
+            )
+            self.assertEqual(wix_fonts.count(), 5)
+            self.assertTrue(
+                all(font.file.name.startswith(f"builtin-{user.pk}-") for font in wix_fonts)
+            )
+            self.assertEqual(
+                set(wix_fonts.values_list("variant", flat=True)),
+                {"Regular", "Medium", "SemiBold", "Bold", "ExtraBold"},
+            )
+        self.assertIn("2 usuário(s)", output.getvalue())
 
     def test_cleanup_expired_records_removes_old_files(self):
         user = get_user_model().objects.create_user(username="cleanup-user", password="senha123")

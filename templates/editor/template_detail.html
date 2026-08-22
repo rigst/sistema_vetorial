@@ -87,48 +87,28 @@
             <div class="field-section">
                 <h3 class="field-section-label">Aparência</h3>
                 <div class="field-group">
-                    <label for="field-font-family">Fonte</label>
-                    <select id="field-font-family"></select>
-                    <!-- font_id de verdade (o que é salvo) é resolvido a partir de
-                         família + peso + itálico pelo JS; este select fica fora da
-                         tela mas continua no fluxo normal de input/queueSave. -->
-                    <select id="field-font-id" name="font_id" class="visually-hidden" aria-hidden="true" tabindex="-1">
+                    <label for="field-font-id">Fonte</label>
+                    <select id="field-font-id" name="font_id">
                         {% for group in font_groups %}
-                            {% for font in group.fonts %}
-                                <option value="{{ font.id }}">{{ group.family }} — {{ font.variant }}</option>
-                            {% endfor %}
+                            {% if group.fonts|length > 1 %}
+                                <optgroup label="{{ group.family }}">
+                                    {% for font in group.fonts %}
+                                        <option value="{{ font.id }}">{{ font.variant }}</option>
+                                    {% endfor %}
+                                </optgroup>
+                            {% else %}
+                                <option value="{{ group.fonts.0.id }}">{{ group.family }}</option>
+                            {% endif %}
                         {% endfor %}
                     </select>
                 </div>
-                <div class="field-group-row">
-                    <div class="field-group">
-                        <label for="field-font-weight">Espessura</label>
-                        <select id="field-font-weight">
-                            <option value="100">Fina</option>
-                            <option value="200">Extra leve</option>
-                            <option value="300">Leve</option>
-                            <option value="400">Normal</option>
-                            <option value="500">Média</option>
-                            <option value="600">Semi-negrito</option>
-                            <option value="700">Negrito</option>
-                            <option value="800">Extra-negrito</option>
-                            <option value="900">Preta</option>
-                        </select>
-                    </div>
-                    <div class="field-group">
-                        <span class="field-group-label">Estilo</span>
-                        <div class="style-toggle-row" role="group" aria-label="Estilo do texto">
-                            <input type="checkbox" id="field-style-italic" class="visually-hidden style-toggle-input">
-                            <label for="field-style-italic" class="style-toggle" title="Itálico"><span class="style-icon style-icon-italic">I</span></label>
-                            <input type="checkbox" id="field-text-underline" name="text_underline" class="visually-hidden style-toggle-input">
-                            <label for="field-text-underline" class="style-toggle" title="Sublinhado"><span class="style-icon style-icon-underline">U</span></label>
-                            <input type="checkbox" id="field-text-strikethrough" name="text_strikethrough" class="visually-hidden style-toggle-input">
-                            <label for="field-text-strikethrough" class="style-toggle" title="Tachado"><span class="style-icon style-icon-strike">S</span></label>
-                        </div>
-                        <p class="field-hint" id="field-italic-hint" hidden>
-                            Esta família não tem um arquivo itálico enviado; o pedido fica
-                            salvo, mas o texto continua reto até alguém enviar um.
-                        </p>
+                <div class="field-group">
+                    <span class="field-group-label">Decoração</span>
+                    <div class="style-toggle-row" role="group" aria-label="Decoração do texto">
+                        <input type="checkbox" id="field-text-underline" name="text_underline" class="visually-hidden style-toggle-input">
+                        <label for="field-text-underline" class="style-toggle" title="Sublinhado"><span class="style-icon style-icon-underline">U</span></label>
+                        <input type="checkbox" id="field-text-strikethrough" name="text_strikethrough" class="visually-hidden style-toggle-input">
+                        <label for="field-text-strikethrough" class="style-toggle" title="Tachado"><span class="style-icon style-icon-strike">S</span></label>
                     </div>
                 </div>
                 <div class="field-group">
@@ -369,7 +349,7 @@
 <script src="{% static 'js/job_launcher.js' %}?v=20260822-02"></script>
 {% if preview_pages %}
 <script src="{% static 'js/fabric.min.js' %}?v=6.7.1"></script>
-<script src="{% static 'js/template_editor.js' %}?v=20260822-03"></script>
+<script src="{% static 'js/template_editor.js' %}?v=20260822-04"></script>
 <script>
 VetorialTemplateEditor.init({
   canvasId: "editor-canvas",

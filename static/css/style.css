@@ -1691,7 +1691,7 @@ details[open] > summary .field-advanced-title::before {
   font-size: 0.86rem;
 }
 
-/* B/I/U/S como numa barra de editor de texto: cada toggle é um checkbox
+/* U/S como numa barra de editor de texto: cada toggle é um checkbox
  * escondido + label estilizada, então o botão herda foco/teclado/estado do
  * input nativo sem precisar de JS dedicado por botão. */
 .style-toggle-row {
@@ -1733,10 +1733,6 @@ details[open] > summary .field-advanced-title::before {
   font-size: 0.95rem;
   font-weight: 700;
   line-height: 1;
-}
-
-.style-icon-italic {
-  font-style: italic;
 }
 
 .style-icon-underline {

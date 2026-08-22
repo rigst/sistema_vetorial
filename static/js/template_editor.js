@@ -84,7 +84,8 @@
 
     const snapGuides = [];
 
-    const fontKeys = await loadFonts(config.fonts || []);
+    const fontsList = config.fonts || [];
+    const fontKeys = await loadFonts(fontsList);
     const fontFamilyFor = (fontId) => fontKeys[fontId] || "sans-serif";
 
     const canvas = new fabric.Canvas(canvasEl, {
@@ -691,77 +692,6 @@
     };
     panelInputs.overflow_mode?.addEventListener("change", syncOverflowDependentInputs);
 
-    // ----- fonte: família / espessura / itálico -----
-    // font_id (o que de fato é salvo) é resolvido a partir destes três
-    // controles, e só existe como select escondido no HTML — troca de
-    // família/peso/itálico dispara "input" nele, reaproveitando o mesmo
-    // caminho de salvar que qualquer outro campo do painel já usa.
-    const fontsList = config.fonts || [];
-    const familySelect = document.getElementById("field-font-family");
-    if (familySelect) {
-      const familyNames = [...new Set(fontsList.map((f) => f.family))].sort((a, b) =>
-        a.localeCompare(b, "pt-BR")
-      );
-      familySelect.innerHTML = familyNames
-        .map((name) => `<option value="${name.replace(/"/g, "&quot;")}">${name}</option>`)
-        .join("");
-    }
-    const weightSelect = document.getElementById("field-font-weight");
-    const italicCheckbox = document.getElementById("field-style-italic");
-    const italicHint = document.getElementById("field-italic-hint");
-
-    const fontsForFamily = (family) => fontsList.filter((f) => f.family === family);
-
-    // Não existe garantia de que a família tenha exatamente o peso pedido
-    // (nem itálico) — casa pelo itálico primeiro (senão cai pra qualquer um
-    // da família) e, dentro disso, pelo peso numérico mais próximo.
-    const resolveFontId = (family, weight, italic) => {
-      const candidates = fontsForFamily(family);
-      if (!candidates.length) return null;
-      const italicMatches = candidates.filter((f) => Boolean(f.is_italic) === Boolean(italic));
-      const pool = italicMatches.length ? italicMatches : candidates;
-      let best = pool[0];
-      let bestDiff = Math.abs((Number(best.weight) || 400) - weight);
-      pool.forEach((font) => {
-        const diff = Math.abs((Number(font.weight) || 400) - weight);
-        if (diff < bestDiff) {
-          best = font;
-          bestDiff = diff;
-        }
-      });
-      return { id: best.id, hasItalic: italicMatches.length > 0 };
-    };
-
-    const applyFontControls = () => {
-      if (!familySelect || !weightSelect || !panelInputs.font_id) return;
-      const family = familySelect.value;
-      const weight = Number(weightSelect.value) || 400;
-      const italic = Boolean(italicCheckbox?.checked);
-      const resolved = resolveFontId(family, weight, italic);
-      if (!resolved) return;
-      if (italicHint) italicHint.hidden = !italic || resolved.hasItalic;
-      if (String(panelInputs.font_id.value) === String(resolved.id)) return;
-      panelInputs.font_id.value = resolved.id;
-      panelInputs.font_id.dispatchEvent(new Event("input", { bubbles: true }));
-    };
-
-    const syncFontControls = () => {
-      if (!familySelect || !weightSelect || !panelInputs.font_id) return;
-      const current = fontsList.find((f) => f.id === Number(panelInputs.font_id.value));
-      if (!current) return;
-      familySelect.value = current.family;
-      weightSelect.value = String(current.weight || 400);
-      if (italicCheckbox) italicCheckbox.checked = Boolean(current.is_italic);
-      if (italicHint) {
-        const hasItalic = fontsForFamily(current.family).some((f) => f.is_italic);
-        italicHint.hidden = !italicCheckbox?.checked || hasItalic;
-      }
-    };
-
-    familySelect?.addEventListener("change", applyFontControls);
-    weightSelect?.addEventListener("change", applyFontControls);
-    italicCheckbox?.addEventListener("change", applyFontControls);
-
     const selectedFields = () =>
       canvas.getActiveObjects().map((obj) => fieldsById.get(obj.vetFieldId)).filter(Boolean);
 
@@ -793,7 +723,6 @@
         if (input.type === "checkbox") input.checked = Boolean(field[key]);
         else input.value = field[key] ?? "";
       });
-      syncFontControls();
       if (colorPicker) colorPicker.value = field.color || "#000000";
       if (borderColorPicker) borderColorPicker.value = field.border_color || "#000000";
       Object.entries(rangeInputs).forEach(([key, input]) => {

@@ -4,6 +4,13 @@ from core.models import OwnedModel
 
 
 def font_upload_to(instance: "FontAsset", filename: str) -> str:
+    # Fontes padrão ficam na raiz compartilhada da mídia privada. O diretório
+    # por usuário é criado pelo processo web (www-data) com permissão 0755 e
+    # não pode ser atualizado pelo usuário de deploy. O nome inclui o dono,
+    # então continua isolado e pode ser substituído por ambos os processos no
+    # diretório raiz, que é compartilhado pelo grupo.
+    if instance.is_builtin:
+        return f"builtin-{instance.user_id}-{filename}"
     return f"users/{instance.user_id}/fonts/{filename}"
 
 
