@@ -610,13 +610,22 @@
         const target = opt.target;
         if (!target) return;
         const objs = target instanceof fabric.ActiveSelection ? target.getObjects() : [target];
+        // "drag" é um simples arrasto (top já reflete a posição solta pelo
+        // usuário); qualquer outra ação (resizing/scale/rotate) pode ter
+        // mudado a largura e, com ela, o número de linhas do texto.
+        const isPlainMove = opt.transform && opt.transform.action === "drag";
         objs.forEach((obj) => {
           if (!obj.vetFieldId) return;
-          // Redimensionar a largura pode ter feito o texto quebrar em mais
-          // (ou menos) linhas durante o arrasto, sem que "top" acompanhasse o
-          // crescimento para cima (só applyFieldToObject faz isso). Reencaixa
-          // antes de ler a geometria para o commit não gravar uma âncora errada.
-          applyGrowDirection(obj, fieldsById.get(obj.vetFieldId));
+          if (!isPlainMove) {
+            // Redimensionar a largura pode ter feito o texto quebrar em mais
+            // (ou menos) linhas durante o arrasto, sem que "top" acompanhasse o
+            // crescimento para cima (só applyFieldToObject faz isso). Reencaixa
+            // antes de ler a geometria para o commit não gravar uma âncora
+            // errada. Não roda num arrasto puro: ali "field.y" ainda é a
+            // posição ANTERIOR ao movimento, e reaplicar o offset devolveria
+            // o campo pro lugar de onde ele acabou de ser arrastado.
+            applyGrowDirection(obj, fieldsById.get(obj.vetFieldId));
+          }
           commitObject(obj);
         });
         pushHistory();
