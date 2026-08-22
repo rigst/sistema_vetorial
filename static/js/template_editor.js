@@ -161,6 +161,9 @@
     // pan: arrastar área vazia com o botão esquerdo (ou espaço/botão do meio)
     let spacePressed = false;
     let panState = null;
+    // campo sendo arrastado agora mesmo: enquanto não-nulo, after:render
+    // desenha as réguas de distância até as bordas da página (ver drawMeasurements)
+    let measureTarget = null;
     canvas.on("mouse:down", (opt) => {
       if (spacePressed || opt.e.button === 1 || !opt.target) {
         panState = { x: opt.e.clientX, y: opt.e.clientY };
@@ -205,8 +208,119 @@
         canvas.setCursor("grab");
       }
       snapGuides.length = 0;
+      measureTarget = null;
       canvas.requestRenderAll();
     });
+
+    // réguas de distância: enquanto um campo é arrastado, mostram — em cm —
+    // o vão entre cada borda da caixa e a borda correspondente da página.
+    const PT_TO_CM = 2.54 / 72;
+    const formatCm = (pt) => `${(pt * PT_TO_CM).toFixed(1)} cm`;
+
+    const drawDimension = (ctx, { x1, y1, x2, y2, tickAxis, label, labelX, labelY }) => {
+      // linha discreta com pequenos traços perpendiculares nas pontas, no
+      // estilo de cota de desenho técnico — só a marcação, sem chamar atenção.
+      ctx.strokeStyle = "rgba(232, 244, 240, 0.4)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+
+      const tick = 4;
+      ctx.strokeStyle = "rgba(232, 244, 240, 0.65)";
+      [
+        [x1, y1],
+        [x2, y2],
+      ].forEach(([x, y]) => {
+        ctx.beginPath();
+        if (tickAxis === "x") {
+          ctx.moveTo(x, y - tick);
+          ctx.lineTo(x, y + tick);
+        } else {
+          ctx.moveTo(x - tick, y);
+          ctx.lineTo(x + tick, y);
+        }
+        ctx.stroke();
+      });
+
+      ctx.font = "11px 'Segoe UI', system-ui, sans-serif";
+      const textWidth = ctx.measureText(label).width;
+      const padX = 5;
+      const padY = 3;
+      ctx.fillStyle = "rgba(15, 26, 24, 0.75)";
+      ctx.fillRect(
+        labelX - textWidth / 2 - padX,
+        labelY - 6 - padY,
+        textWidth + padX * 2,
+        12 + padY * 2
+      );
+      ctx.fillStyle = "#eaf4f0";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, labelX, labelY);
+    };
+
+    const drawMeasurements = (ctx) => {
+      if (!measureTarget || !measureTarget.canvas) return;
+      const vpt = canvas.viewportTransform;
+      const zoom = canvas.getZoom();
+      const rect = measureTarget.getBoundingRect();
+      const left = rect.left;
+      const top = rect.top;
+      const right = rect.left + rect.width;
+      const bottom = rect.top + rect.height;
+      const midX = left + rect.width / 2;
+      const midY = top + rect.height / 2;
+
+      const sx = (worldX) => worldX * zoom + vpt[4];
+      const sy = (worldY) => worldY * zoom + vpt[5];
+
+      ctx.save();
+
+      // vão até a esquerda / direita da página, numa linha na altura do
+      // meio da caixa
+      if (left > 0.5) {
+        const y = sy(midY);
+        drawDimension(ctx, {
+          x1: sx(0), y1: y, x2: sx(left), y2: y,
+          tickAxis: "x",
+          label: formatCm(left),
+          labelX: sx(left / 2), labelY: y,
+        });
+      }
+      if (page.width - right > 0.5) {
+        const y = sy(midY);
+        drawDimension(ctx, {
+          x1: sx(right), y1: y, x2: sx(page.width), y2: y,
+          tickAxis: "x",
+          label: formatCm(page.width - right),
+          labelX: sx(right + (page.width - right) / 2), labelY: y,
+        });
+      }
+
+      // vão até o topo / base da página, numa linha no meio da caixa
+      if (top > 0.5) {
+        const x = sx(midX);
+        drawDimension(ctx, {
+          x1: x, y1: sy(0), x2: x, y2: sy(top),
+          tickAxis: "y",
+          label: formatCm(top),
+          labelX: x, labelY: sy(top / 2),
+        });
+      }
+      if (page.height - bottom > 0.5) {
+        const x = sx(midX);
+        drawDimension(ctx, {
+          x1: x, y1: sy(bottom), x2: x, y2: sy(page.height),
+          tickAxis: "y",
+          label: formatCm(page.height - bottom),
+          labelX: x, labelY: sy(bottom + (page.height - bottom) / 2),
+        });
+      }
+
+      ctx.restore();
+    };
 
     // moldura da página
     canvas.on("after:render", ({ ctx }) => {
@@ -232,6 +346,7 @@
         ctx.stroke();
       });
       ctx.restore();
+      drawMeasurements(ctx);
     });
 
     // ----- criação dos objetos -----
@@ -561,6 +676,7 @@
     canvas.on("object:moving", (opt) => {
       const obj = opt.target;
       snapGuides.length = 0;
+      measureTarget = obj;
       if (opt.e && opt.e.altKey) return;
       obj.setCoords();
       const rect = obj.getBoundingRect();
