@@ -106,6 +106,11 @@ class TemplateField(TimeStampedModel):
         max_length=20, choices=TextTransform.choices, default=TextTransform.NONE
     )
     transform_exceptions = models.CharField(max_length=255, blank=True)
+    # Quando excel_column junta mais de uma coluna (ex.: "{3}-{5}"), limita a
+    # Transformação (text_transform) só às colunas listadas aqui (números
+    # 1-based, os mesmos citados entre chaves). Lista vazia = aplica em
+    # todas — mesmo comportamento de antes desta opção existir.
+    transform_columns = models.JSONField(default=list, blank=True)
     color = models.CharField(max_length=20, default="#000000")
     text_underline = models.BooleanField(default=False)
     text_strikethrough = models.BooleanField(default=False)

@@ -164,6 +164,15 @@
                             <option value="title_smart">Palavras principais</option>
                         </select>
                     </div>
+                    <div class="field-group" id="field-transform-columns-group" hidden>
+                        <span class="field-group-label">Aplicar a quais colunas</span>
+                        <div class="field-transform-columns" id="field-transform-columns"></div>
+                        <p class="field-hint">
+                            Este campo junta mais de uma coluna. Sem nenhuma marcada, a
+                            transformação roda em todas; marcando algumas, ela roda só nelas — o
+                            conector e as demais colunas ficam como vieram do Excel.
+                        </p>
+                    </div>
                     <div class="field-group">
                         <label for="field-transform-exceptions">Exceções da transformação</label>
                         <input id="field-transform-exceptions" name="transform_exceptions" type="text">

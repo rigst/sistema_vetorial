@@ -45,23 +45,33 @@ def extract_column_refs(pattern: str) -> list[int]:
     return [int(match) for match in COLUMN_REF_RE.findall(pattern)]
 
 
-def render_column_template(pattern: str, payload: dict) -> str:
+def render_column_template(pattern: str, payload: dict, column_transform=None) -> str:
     """Resolve um padrão de colunas contra os valores de uma linha do Excel.
 
     "{3}-{5}" com coluna 3 = "Recife" e coluna 5 = "PE" vira "Recife-PE": o
     texto entre chaves é copiado como está (o conector), só o que está
     dentro de `{}` é trocado pelo valor da coluna. Um número solto ("3")
     continua funcionando como antes — uma coluna só, sem chaves.
+
+    `column_transform`, quando informado, recebe (numero_da_coluna, valor) e
+    devolve o valor a usar — permite aplicar a Transformação de texto só nas
+    colunas escolhidas antes de juntá-las (ver `resolve_field_raw_value`).
     """
     if not pattern:
         return ""
     pattern = str(pattern).strip()
+
+    def _value_for(column_number: int) -> str:
+        value = str(payload.get(f"coluna_{column_number}", "") or "")
+        if column_transform:
+            value = column_transform(column_number, value)
+        return value
+
     if pattern.isdigit():
-        return str(payload.get(f"coluna_{int(pattern)}", "") or "")
+        return _value_for(int(pattern))
 
     def _substitute(match: re.Match) -> str:
-        column_number = int(match.group(1))
-        return str(payload.get(f"coluna_{column_number}", "") or "")
+        return _value_for(int(match.group(1)))
 
     return COLUMN_REF_RE.sub(_substitute, pattern)
 
@@ -195,7 +205,46 @@ def validate_font_supports_text(field: TemplateField, text: str) -> None:
         )
 
 
-def format_field_value(field: TemplateField, raw_value: str) -> str:
+def _apply_text_transform(field: TemplateField, value: str) -> str:
+    if field.text_transform == TemplateField.TextTransform.LOWER:
+        return value.lower()
+    if field.text_transform == TemplateField.TextTransform.UPPER:
+        return value.upper()
+    if field.text_transform == TemplateField.TextTransform.TITLE:
+        return " ".join(_title_word_pt_br(token.lower()) for token in value.split())
+    if field.text_transform == TemplateField.TextTransform.TITLE_SMART:
+        return _smart_title(value, field.transform_exceptions)
+    return value
+
+
+def resolve_field_raw_value(field: TemplateField, payload: dict) -> tuple[str, bool]:
+    """Junta as colunas do Excel referenciadas em `field.excel_column`.
+
+    Quando o campo junta mais de uma coluna e tem colunas escolhidas em
+    `transform_columns`, a Transformação (text_transform) é aplicada coluna a
+    coluna, antes de juntar — só nas colunas marcadas, deixando o conector e
+    as demais colunas como vieram do Excel. Sem essa escolha (lista vazia, o
+    padrão), o comportamento é o de sempre: a transformação roda depois, em
+    `format_field_value`, sobre o texto já unido.
+
+    Retorna (valor_bruto, transformacao_ja_aplicada).
+    """
+    column_refs = extract_column_refs(field.excel_column)
+    selected_columns = set(field.transform_columns or [])
+    if len(column_refs) > 1 and selected_columns:
+
+        def _column_transform(column_number: int, value: str) -> str:
+            if column_number in selected_columns:
+                return _apply_text_transform(field, value)
+            return value
+
+        return render_column_template(field.excel_column, payload, _column_transform), True
+    return render_column_template(field.excel_column, payload), False
+
+
+def format_field_value(
+    field: TemplateField, raw_value: str, *, transform_applied: bool = False
+) -> str:
     value = _normalize_unicode_text("" if raw_value is None else str(raw_value))
     if field.trim_whitespace:
         value = value.strip()
@@ -216,14 +265,8 @@ def format_field_value(field: TemplateField, raw_value: str) -> str:
             else:
                 value = number
 
-    if field.text_transform == TemplateField.TextTransform.LOWER:
-        value = value.lower()
-    elif field.text_transform == TemplateField.TextTransform.UPPER:
-        value = value.upper()
-    elif field.text_transform == TemplateField.TextTransform.TITLE:
-        value = " ".join(_title_word_pt_br(token.lower()) for token in value.split())
-    elif field.text_transform == TemplateField.TextTransform.TITLE_SMART:
-        value = _smart_title(value, field.transform_exceptions)
+    if not transform_applied:
+        value = _apply_text_transform(field, value)
 
     return _normalize_unicode_text(value)
 
@@ -607,10 +650,11 @@ def _build_overlay_pdf(job: GenerationJob, payload: dict, geometry: PageGeometry
     _apply_page_rotation(pdf_canvas, geometry)
 
     for field in fields:
-        raw_value = render_column_template(field.excel_column, payload)
+        raw_value, transform_applied = resolve_field_raw_value(field, payload)
         if not raw_value:
             raw_value = payload.get(field.name) or field.empty_value or field.name
-        value = format_field_value(field, raw_value)
+            transform_applied = False
+        value = format_field_value(field, raw_value, transform_applied=transform_applied)
         _draw_field(pdf_canvas, field, value, geometry.visible_height)
     pdf_canvas.restoreState()
     pdf_canvas.showPage()

@@ -1290,6 +1290,26 @@ details[open] > summary .field-advanced-title::before {
   cursor: pointer;
 }
 
+.field-transform-columns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.field-transform-column-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+
+.field-transform-column-toggle input[type="checkbox"] {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 /* Sem JS: o CSS já esconde visualmente que Cor/Espessura/Opacidade/Blur não
  * fazem nada com o contorno desligado. O JS (template_editor.js) reforça com
  * o atributo disabled de verdade, para teclado e leitor de tela. */

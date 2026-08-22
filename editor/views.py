@@ -14,7 +14,7 @@ from django.views.generic import CreateView, DetailView, ListView, TemplateView,
 
 from core.mixins import UserOwnedQuerysetMixin
 from fonts.models import FontAsset
-from jobs.services import format_field_value, load_excel_rows, render_column_template
+from jobs.services import format_field_value, load_excel_rows, resolve_field_raw_value
 
 from .forms import DocumentTemplateForm
 from .models import DocumentTemplate, TemplateField, TemplatePreviewPage
@@ -42,6 +42,7 @@ def field_to_dict(field: TemplateField) -> dict:
         "text_align": field.text_align,
         "text_transform": field.text_transform,
         "transform_exceptions": field.transform_exceptions,
+        "transform_columns": field.transform_columns,
         "color": field.color,
         "text_underline": field.text_underline,
         "text_strikethrough": field.text_strikethrough,
@@ -315,6 +316,7 @@ class TemplateFieldsApiView(LoginRequiredMixin, View):
             text_align=payload.get("text_align") or TemplateField.TextAlign.CENTER,
             text_transform=payload.get("text_transform") or TemplateField.TextTransform.NONE,
             transform_exceptions=payload.get("transform_exceptions") or DEFAULT_EXCEPTIONS,
+            transform_columns=payload.get("transform_columns") or [],
             color=payload.get("color") or "#000000",
             text_underline=payload.get("text_underline", False),
             text_strikethrough=payload.get("text_strikethrough", False),
@@ -361,6 +363,7 @@ class TemplateFieldApiView(LoginRequiredMixin, View):
             "text_align",
             "text_transform",
             "transform_exceptions",
+            "transform_columns",
             "color",
             "text_underline",
             "text_strikethrough",
@@ -501,11 +504,14 @@ class TemplateSampleDataView(LoginRequiredMixin, View):
         for row_number, payload in data_rows[: self.MAX_ROWS]:
             values = {}
             for field in fields:
-                raw_value = render_column_template(field.excel_column, payload)
+                raw_value, transform_applied = resolve_field_raw_value(field, payload)
                 if not raw_value:
                     raw_value = payload.get(field.name) or field.empty_value or field.name
+                    transform_applied = False
                 try:
-                    values[str(field.id)] = format_field_value(field, raw_value)
+                    values[str(field.id)] = format_field_value(
+                        field, raw_value, transform_applied=transform_applied
+                    )
                 except Exception:
                     values[str(field.id)] = str(raw_value)
             rows.append({"row_number": row_number, "values": values})

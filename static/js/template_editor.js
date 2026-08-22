@@ -707,6 +707,57 @@
     const panelEl = document.getElementById("field-panel");
     const panelNameEl = document.getElementById("field-panel-name");
 
+    // ----- Transformação por coluna (só quando o campo junta 2+ colunas) -----
+    const transformColumnsGroup = document.getElementById("field-transform-columns-group");
+    const transformColumnsContainer = document.getElementById("field-transform-columns");
+    const columnRefsFromPattern = (pattern) => {
+      const trimmed = String(pattern || "").trim();
+      if (!trimmed) return [];
+      if (/^\d+$/.test(trimmed)) return [Number(trimmed)];
+      const refs = [];
+      const re = /\{(\d+)\}/g;
+      let match;
+      while ((match = re.exec(trimmed))) refs.push(Number(match[1]));
+      return refs;
+    };
+
+    const toggleTransformColumn = (columnNumber, checked) => {
+      const selected = selectedFields();
+      if (!selected.length) return;
+      selected.forEach((field) => {
+        const columns = new Set(field.transform_columns || []);
+        if (checked) columns.add(columnNumber);
+        else columns.delete(columnNumber);
+        field.transform_columns = Array.from(columns).sort((a, b) => a - b);
+        queueSave(field.id, { transform_columns: field.transform_columns });
+      });
+      pushHistoryDebounced();
+    };
+
+    const syncTransformColumnsUI = (field) => {
+      if (!transformColumnsGroup || !transformColumnsContainer) return;
+      const refs = field ? Array.from(new Set(columnRefsFromPattern(field.excel_column))) : [];
+      if (refs.length < 2) {
+        transformColumnsGroup.hidden = true;
+        transformColumnsContainer.innerHTML = "";
+        return;
+      }
+      transformColumnsGroup.hidden = false;
+      const selectedColumns = new Set(field.transform_columns || []);
+      transformColumnsContainer.innerHTML = "";
+      refs.forEach((columnNumber) => {
+        const label = document.createElement("label");
+        label.className = "field-transform-column-toggle";
+        const input = document.createElement("input");
+        input.type = "checkbox";
+        input.checked = selectedColumns.has(columnNumber);
+        input.addEventListener("change", () => toggleTransformColumn(columnNumber, input.checked));
+        label.appendChild(input);
+        label.append(`Coluna ${columnNumber}`);
+        transformColumnsContainer.appendChild(label);
+      });
+    };
+
     function syncPanel() {
       if (readOnly || !formEl) return;
       const selected = selectedFields();
@@ -723,6 +774,7 @@
         formEl.reset();
         syncOutlineDependentInputs();
         syncOverflowDependentInputs();
+        syncTransformColumnsUI(null);
         setStatus("Crie ou selecione um campo.");
         return;
       }
@@ -739,6 +791,7 @@
       });
       syncOutlineDependentInputs();
       syncOverflowDependentInputs();
+      syncTransformColumnsUI(field);
       setStatus(selected.length > 1 ? `${selected.length} campos selecionados` : `${field.name} selecionado`);
     }
 
@@ -792,6 +845,7 @@
         if (!target.name) return;
         if (rangeInputs[target.name]) rangeInputs[target.name].value = String(target.value).replace(",", ".");
         applyPanelChange(target.name, target.type === "checkbox" ? target.checked : target.value);
+        if (target.name === "excel_column") syncTransformColumnsUI(selectedFields()[0]);
       });
     }
 
@@ -805,6 +859,7 @@
       text_align: field.text_align,
       text_transform: field.text_transform,
       transform_exceptions: field.transform_exceptions,
+      transform_columns: field.transform_columns,
       color: field.color,
       text_underline: field.text_underline,
       text_strikethrough: field.text_strikethrough,

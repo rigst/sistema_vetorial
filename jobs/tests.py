@@ -950,6 +950,51 @@ class ColumnTemplateTests(TestCase):
         self.assertEqual(services.render_column_template("", {"coluna_1": "Ana"}), "")
 
 
+class ResolveFieldRawValueTests(TestCase):
+    """`resolve_field_raw_value` decide se a Transformação roda coluna a
+    coluna (campo com 2+ colunas e `transform_columns` marcado) ou, como
+    sempre foi, sobre o texto já unido (campo de 1 coluna, ou sem escolha)."""
+
+    def _field(self, **overrides):
+        defaults = {
+            "excel_column": "1",
+            "text_transform": TemplateField.TextTransform.UPPER,
+            "transform_columns": [],
+            "trim_whitespace": True,
+        }
+        defaults.update(overrides)
+        return TemplateField(**defaults)
+
+    def test_single_column_never_splits_transform(self):
+        field = self._field(excel_column="1", transform_columns=[1])
+        raw_value, transform_applied = services.resolve_field_raw_value(
+            field, {"coluna_1": "recife"}
+        )
+        self.assertEqual(raw_value, "recife")
+        self.assertFalse(transform_applied)
+
+    def test_multi_column_without_selection_keeps_old_behavior(self):
+        field = self._field(excel_column="{3}-{5}", transform_columns=[])
+        raw_value, transform_applied = services.resolve_field_raw_value(
+            field, {"coluna_3": "recife", "coluna_5": "pe"}
+        )
+        self.assertEqual(raw_value, "recife-pe")
+        self.assertFalse(transform_applied)
+
+    def test_multi_column_with_selection_transforms_only_selected_columns(self):
+        field = self._field(excel_column="{3}-{5}", transform_columns=[5])
+        raw_value, transform_applied = services.resolve_field_raw_value(
+            field, {"coluna_3": "recife", "coluna_5": "pe"}
+        )
+        self.assertEqual(raw_value, "recife-PE")
+        self.assertTrue(transform_applied)
+
+    def test_format_field_value_skips_transform_when_already_applied(self):
+        field = self._field(excel_column="{3}-{5}", transform_columns=[5])
+        formatted = format_field_value(field, "recife-PE", transform_applied=True)
+        self.assertEqual(formatted, "recife-PE")
+
+
 @override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
 class FilenamePatternTests(TestCase):
     """`DocumentTemplate.filename_pattern` decide o nome de cada PDF gerado; sem
