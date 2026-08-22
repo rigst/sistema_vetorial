@@ -146,3 +146,24 @@ class StaticAssetTests(TestCase):
             "generate-items",
         ):
             self.assertIn(element_id, source)
+
+    def test_icon_button_wins_over_the_global_submit_button_rule(self):
+        css = (Path(settings.BASE_DIR) / "static/css/style.css").read_text(encoding="utf-8")
+
+        # `.icon-button` sozinho (uma classe) empata em especificidade com
+        # `button[type="submit"]` (elemento + atributo) — e no empate quem
+        # vem primeiro no arquivo perde. `button[type="submit"]` é definido
+        # antes, então sem uma classe repetida aqui um botão de ícone que
+        # também é `<button type="submit">` (excluir, duplicar, reprocessar)
+        # herdava o preenchimento sólido do CTA primário: a exclusão de uma
+        # fonte, por exemplo, ficava com a mesma cor forte do botão "Salvar".
+        self.assertIn(".icon-button.icon-button", css)
+
+    def test_field_panel_groups_are_labelled(self):
+        css = (Path(settings.BASE_DIR) / "static/css/style.css").read_text(encoding="utf-8")
+        self.assertIn(".field-section-label", css)
+        self.assertIn(".field-advanced-hint", css)
+
+        # Controles que só valem com o contorno ligado ficam visualmente
+        # apagados via :has() — sem depender do JS terminar de rodar.
+        self.assertIn("#field-outline-details:has(#field-border-enabled:not(:checked))", css)

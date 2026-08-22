@@ -3,13 +3,36 @@
 {% block title %}Fontes | StölbenVetorial{% endblock %}
 
 {% block content %}
+{% comment %}
+Cada fonte carrega a si mesma via @font-face e o nome é exibido no próprio
+tipo: numa tela de gerenciamento de fontes, "ver como ela é" é a informação
+que mais importa, e antes não existia nenhum jeito de saber isso sem abrir a
+bancada de um projeto que já a usasse.
+{% endcomment %}
+<style>
+{% for font in fonts %}
+    @font-face {
+        font-family: "vetorial-font-{{ font.id }}";
+        src: url("{% url 'fonts:file' font.pk %}");
+        font-display: swap;
+    }
+{% endfor %}
+</style>
+
 <section class="hero-shell">
     <div class="section-header">
         <div>
             <div class="eyebrow">Fontes</div>
             <h1 class="hero-title">Fontes</h1>
+            <p class="hero-copy muted">As fontes cadastradas aqui ficam disponíveis para qualquer campo de texto nos seus projetos.</p>
         </div>
-        <a class="button" href="{% url 'fonts:create' %}">Nova fonte</a>
+        <div class="inline-actions">
+            <form method="get" class="page-head-search">
+                <input type="text" name="q" value="{{ query }}" placeholder="Buscar fonte…" aria-label="Buscar fonte">
+                {% if show_inactive %}<input type="hidden" name="inativos" value="1">{% endif %}
+            </form>
+            <a class="button" href="{% url 'fonts:create' %}">Nova fonte</a>
+        </div>
     </div>
 </section>
 
@@ -19,19 +42,21 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Nome</th>
+                        <th>Fonte</th>
                         <th>Ações</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for font in fonts %}
                         <tr>
-                            <td>{{ font.name }}</td>
+                            <td class="font-preview-cell" style="font-family: 'vetorial-font-{{ font.id }}', ui-sans-serif, system-ui, sans-serif;">
+                                {{ font.name }}
+                            </td>
                             <td class="inline-actions icon-actions">
-                                <a class="icon-button" href="{% url 'fonts:update' font.pk %}" title="Editar" aria-label="Editar">✎</a>
+                                <a class="icon-button" href="{% url 'fonts:update' font.pk %}" title="Editar" aria-label="Editar {{ font.name }}">✎</a>
                                 <form method="post" action="{% url 'fonts:delete' font.pk %}">
                                     {% csrf_token %}
-                                    <button type="submit" class="icon-button icon-button-danger" title="Excluir" aria-label="Excluir">🗑</button>
+                                    <button type="submit" class="icon-button icon-button-danger" title="Excluir" aria-label="Excluir {{ font.name }}">🗑</button>
                                 </form>
                             </td>
                         </tr>
@@ -41,7 +66,13 @@
         </div>
     {% else %}
         <div class="empty-state">
-            <h2 class="section-title">Nenhuma fonte encontrada</h2>
+            {% if query %}
+                <h2 class="section-title">Nenhuma fonte encontrada para "{{ query }}"</h2>
+            {% else %}
+                <h2 class="section-title">Nenhuma fonte cadastrada</h2>
+                <p class="muted">Envie um arquivo TTF ou OTF para usar nos campos de texto dos seus projetos.</p>
+                <a class="button" href="{% url 'fonts:create' %}" style="margin-top: 0.9rem;">Nova fonte</a>
+            {% endif %}
         </div>
     {% endif %}
 </section>

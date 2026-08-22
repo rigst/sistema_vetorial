@@ -83,3 +83,52 @@ class FontTests(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "font/ttf")
+
+
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
+class FontListPreviewTests(TestCase):
+    """A lista de fontes só existe para escolher uma fonte — e uma lista de
+    nomes em texto plano não deixa ver como cada uma realmente é."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = get_user_model().objects.create_user(
+            username="fonts-preview", password="senha123"
+        )
+        font_path = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+        cls.font = FontAsset.objects.create(
+            user=cls.user,
+            name="Dejavu Sans",
+            family="Dejavu Sans",
+            file=SimpleUploadedFile("DejaVuSans.ttf", font_path.read_bytes()),
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(TEST_MEDIA_ROOT, ignore_errors=True)
+
+    def test_list_renders_each_font_in_its_own_typeface(self):
+        self.client.force_login(self.user)
+
+        html = self.client.get(reverse("fonts:list")).content.decode()
+
+        file_url = reverse("fonts:file", kwargs={"pk": self.font.pk})
+        # A declaração @font-face carrega o arquivo do dono da fonte...
+        self.assertIn(file_url, html)
+        self.assertIn(f'font-family: "vetorial-font-{self.font.pk}"', html)
+        # ...e a célula da tabela usa essa mesma família para exibir o nome.
+        self.assertIn(
+            f"font-family: 'vetorial-font-{self.font.pk}'",
+            html,
+        )
+
+    def test_list_offers_a_search_box(self):
+        self.client.force_login(self.user)
+
+        found = self.client.get(reverse("fonts:list"), {"q": "Dejavu"})
+        missing = self.client.get(reverse("fonts:list"), {"q": "Comic Sans"})
+
+        self.assertContains(found, "Dejavu Sans")
+        self.assertContains(missing, "Nenhuma fonte encontrada")
+        self.assertIn('name="q"', found.content.decode())

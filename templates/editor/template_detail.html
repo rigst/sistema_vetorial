@@ -76,132 +76,153 @@
         <p class="panel-empty">Nenhum campo selecionado. Clique em um campo na página ou crie um novo com "+ Campo".</p>
         <form id="field-form" class="field-config-form">
             {% csrf_token %}
-            <div class="field-group">
-                <label for="field-name">Nome</label>
-                <input id="field-name" name="name" type="text">
-            </div>
-            <div class="field-group">
-                <label for="field-excel-column">Coluna do Excel</label>
-                <input id="field-excel-column" name="excel_column" type="number" min="1">
-            </div>
-            <div class="field-group">
-                <label for="field-font-id">Fonte</label>
-                <select id="field-font-id" name="font_id">
-                    {% for font in font_options %}
-                        <option value="{{ font.id }}">{{ font.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="field-group">
-                <label for="field-color">Cor</label>
-                <div class="color-input-row">
-                    <input id="field-color-picker" type="color" value="#000000">
-                    <input id="field-color" name="color" type="text" value="#000000">
-                </div>
-            </div>
-            <div class="field-group-row">
+            <div class="field-section">
+                <h3 class="field-section-label">Conteúdo</h3>
                 <div class="field-group">
-                    <label for="field-font-size">Fonte (pt)</label>
-                    <input id="field-font-size" name="font_size" type="number" min="1" step="0.5">
+                    <label for="field-name">Nome do campo</label>
+                    <input id="field-name" name="name" type="text">
                 </div>
                 <div class="field-group">
-                    <label for="field-rotation">Rotação (°)</label>
-                    <input id="field-rotation" name="rotation" type="number" min="0" max="359.9" step="0.1">
+                    <label for="field-excel-column">Coluna do Excel</label>
+                    <input id="field-excel-column" name="excel_column" type="number" min="1">
+                    <p class="field-hint">Posição da coluna na planilha: A = 1, B = 2, C = 3…</p>
                 </div>
             </div>
-            <div class="field-group-row">
+
+            <div class="field-section">
+                <h3 class="field-section-label">Aparência</h3>
                 <div class="field-group">
-                    <label for="field-width">Largura (pt)</label>
-                    <input id="field-width" name="width" type="number" min="10" step="1">
-                </div>
-                <div class="field-group">
-                    <label for="field-text-align">Alinhamento</label>
-                    <select id="field-text-align" name="text_align">
-                        <option value="left">Esquerda</option>
-                        <option value="center">Centro</option>
-                        <option value="right">Direita</option>
-                    </select>
-                </div>
-            </div>
-            <details class="field-advanced">
-                <summary>Texto e formatação</summary>
-                <div class="field-group">
-                    <label for="field-empty-value">Texto base (quando a coluna vier vazia)</label>
-                    <input id="field-empty-value" name="empty_value" type="text">
-                </div>
-                <div class="field-group">
-                    <label for="field-text-transform">Transformação</label>
-                    <select id="field-text-transform" name="text_transform">
-                        <option value="none">Sem transformação</option>
-                        <option value="upper">Maiúsculas</option>
-                        <option value="lower">Minúsculas</option>
-                        <option value="title">Iniciais maiúsculas</option>
-                        <option value="title_smart">Palavras principais</option>
+                    <label for="field-font-id">Fonte</label>
+                    <select id="field-font-id" name="font_id">
+                        {% for font in font_options %}
+                            <option value="{{ font.id }}">{{ font.name }}</option>
+                        {% endfor %}
                     </select>
                 </div>
                 <div class="field-group">
-                    <label for="field-transform-exceptions">Exceções da transformação</label>
-                    <input id="field-transform-exceptions" name="transform_exceptions" type="text">
-                </div>
-                <div class="field-group">
-                    <label for="field-value-type">Tipo</label>
-                    <select id="field-value-type" name="value_type">
-                        <option value="text">Texto</option>
-                        <option value="integer">Inteiro</option>
-                    </select>
+                    <label for="field-color">Cor</label>
+                    <div class="color-input-row">
+                        <input id="field-color-picker" type="color" value="#000000">
+                        <input id="field-color" name="color" type="text" value="#000000">
+                    </div>
                 </div>
                 <div class="field-group-row">
                     <div class="field-group">
-                        <label for="field-line-height">Altura de linha</label>
-                        <input id="field-line-height" name="line_height" type="number" min="0.5" step="0.1">
+                        <label for="field-font-size">Fonte (pt)</label>
+                        <input id="field-font-size" name="font_size" type="number" min="1" step="0.5">
                     </div>
                     <div class="field-group">
-                        <label for="field-max-lines">Máx. linhas</label>
-                        <input id="field-max-lines" name="max_lines" type="number" min="1" step="1">
+                        <label for="field-rotation">Rotação (°)</label>
+                        <input id="field-rotation" name="rotation" type="number" min="0" max="359.9" step="0.1">
                     </div>
                 </div>
-                <div class="field-group">
-                    <label for="field-overflow-mode">Quando o texto não couber</label>
-                    <select id="field-overflow-mode" name="overflow_mode">
-                        <option value="shrink">Reduzir a fonte</option>
-                        <option value="truncate">Cortar</option>
-                        <option value="wrap">Quebrar linha</option>
-                        <option value="error">Gerar erro</option>
-                    </select>
+                <div class="field-group-row">
+                    <div class="field-group">
+                        <label for="field-width">Largura (pt)</label>
+                        <input id="field-width" name="width" type="number" min="10" step="1">
+                    </div>
+                    <div class="field-group">
+                        <label for="field-text-align">Alinhamento</label>
+                        <select id="field-text-align" name="text_align">
+                            <option value="left">Esquerda</option>
+                            <option value="center">Centro</option>
+                            <option value="right">Direita</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <details class="field-advanced">
+                <summary>
+                    <span class="field-advanced-title">Texto</span>
+                    <span class="field-advanced-hint">valor padrão, maiúsculas/minúsculas e o que fazer quando não couber</span>
+                </summary>
+                <div class="field-advanced-body">
+                    <div class="field-group">
+                        <label for="field-empty-value">Texto base (quando a coluna vier vazia)</label>
+                        <input id="field-empty-value" name="empty_value" type="text">
+                    </div>
+                    <div class="field-group">
+                        <label for="field-text-transform">Transformação</label>
+                        <select id="field-text-transform" name="text_transform">
+                            <option value="none">Sem transformação</option>
+                            <option value="upper">Maiúsculas</option>
+                            <option value="lower">Minúsculas</option>
+                            <option value="title">Iniciais maiúsculas</option>
+                            <option value="title_smart">Palavras principais</option>
+                        </select>
+                    </div>
+                    <div class="field-group">
+                        <label for="field-transform-exceptions">Exceções da transformação</label>
+                        <input id="field-transform-exceptions" name="transform_exceptions" type="text">
+                        <p class="field-hint">Palavras que ficam minúsculas, separadas por vírgula: de, da, e…</p>
+                    </div>
+                    <div class="field-group">
+                        <label for="field-value-type">Tipo</label>
+                        <select id="field-value-type" name="value_type">
+                            <option value="text">Texto</option>
+                            <option value="integer">Inteiro</option>
+                        </select>
+                    </div>
+                    <div class="field-group-row">
+                        <div class="field-group">
+                            <label for="field-line-height">Altura de linha</label>
+                            <input id="field-line-height" name="line_height" type="number" min="0.5" step="0.1">
+                        </div>
+                        <div class="field-group">
+                            <label for="field-max-lines">Máx. linhas</label>
+                            <input id="field-max-lines" name="max_lines" type="number" min="1" step="1">
+                        </div>
+                    </div>
+                    <div class="field-group">
+                        <label for="field-overflow-mode">Quando o texto não couber</label>
+                        <select id="field-overflow-mode" name="overflow_mode">
+                            <option value="shrink">Reduzir a fonte</option>
+                            <option value="truncate">Cortar</option>
+                            <option value="wrap">Quebrar linha</option>
+                            <option value="error">Gerar erro</option>
+                        </select>
+                    </div>
                 </div>
             </details>
-            <details class="field-advanced">
-                <summary>Contorno</summary>
-                <div class="field-group field-group-inline-toggle">
-                    <label for="field-border-enabled">Ativar contorno</label>
-                    <input id="field-border-enabled" name="border_enabled" type="checkbox">
-                </div>
-                <div class="field-group">
-                    <label for="field-border-color">Cor do contorno</label>
-                    <div class="color-input-row">
-                        <input id="field-border-color-picker" type="color" value="#000000">
-                        <input id="field-border-color" name="border_color" type="text" value="#000000">
+
+            <details class="field-advanced" id="field-outline-details">
+                <summary>
+                    <span class="field-advanced-title">Contorno</span>
+                    <span class="field-advanced-hint">traço ao redor da letra, para ler bem sobre fundos variados</span>
+                </summary>
+                <div class="field-advanced-body">
+                    <div class="field-group field-toggle-row">
+                        <input id="field-border-enabled" name="border_enabled" type="checkbox">
+                        <label for="field-border-enabled">Ativar contorno</label>
                     </div>
-                </div>
-                <div class="field-group">
-                    <label for="field-border-size-ratio">Espessura em relação à letra</label>
-                    <div class="slider-input-row">
-                        <input id="field-border-size-ratio-range" type="range" min="0" max="0.2" step="0.01">
-                        <input id="field-border-size-ratio" name="border_size_ratio" type="number" min="0" max="0.2" step="0.01" inputmode="decimal">
+                    <div class="field-group field-outline-dependent">
+                        <label for="field-border-color">Cor do contorno</label>
+                        <div class="color-input-row">
+                            <input id="field-border-color-picker" type="color" value="#000000">
+                            <input id="field-border-color" name="border_color" type="text" value="#000000">
+                        </div>
                     </div>
-                </div>
-                <div class="field-group">
-                    <label for="field-border-opacity">Opacidade</label>
-                    <div class="slider-input-row">
-                        <input id="field-border-opacity-range" type="range" min="0" max="1" step="0.01">
-                        <input id="field-border-opacity" name="border_opacity" type="number" min="0" max="1" step="0.01" inputmode="decimal">
+                    <div class="field-group field-outline-dependent">
+                        <label for="field-border-size-ratio">Espessura em relação à letra</label>
+                        <div class="slider-input-row">
+                            <input id="field-border-size-ratio-range" type="range" min="0" max="0.2" step="0.01">
+                            <input id="field-border-size-ratio" name="border_size_ratio" type="number" min="0" max="0.2" step="0.01" inputmode="decimal">
+                        </div>
                     </div>
-                </div>
-                <div class="field-group">
-                    <label for="field-border-blur">Blur</label>
-                    <div class="slider-input-row">
-                        <input id="field-border-blur-range" type="range" min="0" max="3" step="0.05">
-                        <input id="field-border-blur" name="border_blur" type="number" min="0" max="3" step="0.05" inputmode="decimal">
+                    <div class="field-group field-outline-dependent">
+                        <label for="field-border-opacity">Opacidade</label>
+                        <div class="slider-input-row">
+                            <input id="field-border-opacity-range" type="range" min="0" max="1" step="0.01">
+                            <input id="field-border-opacity" name="border_opacity" type="number" min="0" max="1" step="0.01" inputmode="decimal">
+                        </div>
+                    </div>
+                    <div class="field-group field-outline-dependent">
+                        <label for="field-border-blur">Blur</label>
+                        <div class="slider-input-row">
+                            <input id="field-border-blur-range" type="range" min="0" max="3" step="0.05">
+                            <input id="field-border-blur" name="border_blur" type="number" min="0" max="3" step="0.05" inputmode="decimal">
+                        </div>
                     </div>
                 </div>
             </details>
@@ -260,7 +281,7 @@
 <script src="{% static 'js/job_launcher.js' %}?v=20260822-01"></script>
 {% if preview_pages %}
 <script src="{% static 'js/fabric.min.js' %}?v=6.7.1"></script>
-<script src="{% static 'js/template_editor.js' %}?v=20260715-02"></script>
+<script src="{% static 'js/template_editor.js' %}?v=20260822-01"></script>
 <script>
 VetorialTemplateEditor.init({
   canvasId: "editor-canvas",

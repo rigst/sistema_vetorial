@@ -148,6 +148,41 @@ class EditorFlowTests(TestCase):
         # passa do limite de itens exibidos na coluna estreita da bancada.
         self.assertIn('id="generate-detail-link"', html)
 
+    def test_field_panel_groups_are_organized_and_hinted(self):
+        template = DocumentTemplate.objects.create(
+            user=self.user,
+            name="Bancada Organizada",
+            slug="bancada-organizada",
+            background_pdf=self._build_pdf_upload(),
+        )
+        update_template_pdf_metadata(template)
+        self.client.force_login(self.user)
+
+        html = self.client.get(
+            reverse("editor:detail", kwargs={"pk": template.pk})
+        ).content.decode()
+
+        # Os dois grupos sempre visíveis têm rótulo próprio, e não ficam mais
+        # numa coluna única indistinta de ~20 campos.
+        self.assertIn('id="field-panel"', html)
+        panel_html = html.split('id="field-panel"', 1)[1]
+        self.assertIn(">Conteúdo<", panel_html)
+        self.assertIn(">Aparência<", panel_html)
+
+        # Dica embutida no campo mais confuso do formulário: o que "coluna do
+        # Excel" realmente significa.
+        self.assertIn("A = 1, B = 2, C = 3", panel_html)
+
+        # As duas seções avançadas explicam o que há dentro antes de abrir.
+        self.assertIn("valor padrão, maiúsculas/minúsculas", panel_html)
+        self.assertIn("traço ao redor da letra", panel_html)
+
+        # Os controles do contorno que só valem com ele ligado carregam a
+        # classe que o CSS (:has()) e o JS usam para desabilitá-los.
+        self.assertIn('id="field-outline-details"', panel_html)
+        self.assertIn("field-outline-dependent", panel_html)
+        self.assertIn('id="field-border-enabled"', panel_html)
+
     def test_template_form_rejects_pdf_with_multiple_pages(self):
         form = DocumentTemplateForm(
             data={"name": "Faixa", "description": "Teste"},

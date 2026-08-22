@@ -690,6 +690,21 @@
     };
     const GEOMETRY_KEYS = new Set(["font_size", "rotation", "width"]);
 
+    // Cor/espessura/opacidade/blur do contorno não fazem nada com o contorno
+    // desligado. O CSS já esconde isso visualmente (:has() em style.css); os
+    // inputs ficam de fato desabilitados aqui — teclado e leitor de tela
+    // precisam do estado real, não só de uma aparência apagada.
+    const outlineDependentInputs = Array.from(
+      document.querySelectorAll(".field-outline-dependent input, .field-outline-dependent select")
+    );
+    const syncOutlineDependentInputs = () => {
+      const enabled = Boolean(panelInputs.border_enabled?.checked);
+      outlineDependentInputs.forEach((input) => {
+        input.disabled = !enabled;
+      });
+    };
+    panelInputs.border_enabled?.addEventListener("change", syncOutlineDependentInputs);
+
     const selectedFields = () =>
       canvas.getActiveObjects().map((obj) => fieldsById.get(obj.vetFieldId)).filter(Boolean);
 
@@ -710,6 +725,7 @@
       }
       if (!field) {
         formEl.reset();
+        syncOutlineDependentInputs();
         setStatus("Crie ou selecione um campo.");
         return;
       }
@@ -724,6 +740,7 @@
       Object.entries(rangeInputs).forEach(([key, input]) => {
         if (input) input.value = field[key] ?? input.min ?? 0;
       });
+      syncOutlineDependentInputs();
       setStatus(selected.length > 1 ? `${selected.length} campos selecionados` : `${field.name} selecionado`);
     }
 
