@@ -860,3 +860,55 @@ class JobDetailAndStatusWindowingTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 404)
+
+    def test_detail_page_uses_lote_vocabulary(self):
+        job = self._job_with_items(total=3)
+        self.client.force_login(self.user)
+
+        html = self.client.get(reverse("jobs:detail", kwargs={"pk": job.pk})).content.decode()
+
+        self.assertIn('<div class="eyebrow">Lote</div>', html)
+        self.assertIn("Resumo do lote", html)
+        self.assertNotIn(">Job<", html)
+
+
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
+class PortugueseCopyTests(TestCase):
+    """ "Job"/"Jobs" era o único vocabulário em inglês sobrando nas telas de
+    lote — o app inteiro (inclusive o link "Arquivos" da topbar) já falava
+    "lote"/"arquivos". Trocado por consistência com o resto do produto."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.user = get_user_model().objects.create_user(username="jobs-copy", password="senha123")
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(TEST_MEDIA_ROOT, ignore_errors=True)
+
+    def test_job_list_uses_lote_vocabulary(self):
+        self.client.force_login(self.user)
+
+        html = self.client.get(reverse("jobs:list")).content.decode()
+
+        self.assertIn("Seus arquivos", html)
+        self.assertIn("Novo lote", html)
+        self.assertNotIn(">Jobs<", html)
+        self.assertNotIn("Nenhum job encontrado", html)
+
+    def test_job_create_form_uses_lote_vocabulary(self):
+        self.client.force_login(self.user)
+
+        html = self.client.get(reverse("jobs:create")).content.decode()
+
+        self.assertIn("Novo lote", html)
+        self.assertIn("Criar lote", html)
+        self.assertIn("Nome do lote", html)
+        self.assertNotIn("Nome do job", html)
+
+    def test_job_model_and_app_are_named_in_portuguese(self):
+        self.assertEqual(GenerationJob._meta.verbose_name, "lote")
+        self.assertEqual(GenerationJob._meta.verbose_name_plural, "lotes")
+        self.assertEqual(GenerationItem._meta.verbose_name, "item do lote")

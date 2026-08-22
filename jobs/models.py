@@ -45,6 +45,8 @@ class GenerationJob(OwnedModel):
 
     class Meta:
         ordering = ["-created_at"]
+        verbose_name = "lote"
+        verbose_name_plural = "lotes"
 
     def __str__(self) -> str:
         return self.name
@@ -67,6 +69,8 @@ class GenerationItem(TimeStampedModel):
     class Meta:
         ordering = ["row_number"]
         unique_together = ("job", "row_number")
+        verbose_name = "item do lote"
+        verbose_name_plural = "itens do lote"
 
     def __str__(self) -> str:
         return f"{self.job.name} :: linha {self.row_number}"

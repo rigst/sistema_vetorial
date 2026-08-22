@@ -68,7 +68,7 @@ class GenerationJobCreateView(LoginRequiredMixin, CreateView):
             spawn_job_process(settings.BASE_DIR, self.object.pk)
         except Exception:
             self.object.status = GenerationJob.Status.FAILED
-            self.object.last_error = "O job foi salvo, mas não foi possível iniciar o processamento automático. Tente reenviar o job."
+            self.object.last_error = "O lote foi salvo, mas não foi possível iniciar o processamento automático. Tente reenviar o lote."
             self.object.save(update_fields=["status", "last_error", "updated_at"])
             messages.error(self.request, self.object.last_error)
         else:
@@ -218,7 +218,7 @@ class RerunJobView(LoginRequiredMixin, View):
         except Exception:
             new_job.status = GenerationJob.Status.FAILED
             new_job.last_error = (
-                "O job foi recriado, mas o processamento automático não pôde ser iniciado."
+                "O lote foi recriado, mas o processamento automático não pôde ser iniciado."
             )
             new_job.save(update_fields=["status", "last_error", "updated_at"])
             messages.error(request, new_job.last_error)
@@ -320,7 +320,7 @@ class GenerationItemDownloadView(LoginRequiredMixin, View):
 
 
 class GenerationJobLaunchApiView(LoginRequiredMixin, View):
-    """Cria e dispara um job direto da bancada do projeto (AJAX)."""
+    """Cria e dispara um lote direto da bancada do projeto (AJAX)."""
 
     def post(self, request, *args, **kwargs):
         template_obj = DocumentTemplate.objects.filter(
@@ -360,7 +360,7 @@ class GenerationJobLaunchApiView(LoginRequiredMixin, View):
         except Exception:
             job.status = GenerationJob.Status.FAILED
             job.last_error = (
-                "O job foi salvo, mas o processamento automático não pôde ser iniciado."
+                "O lote foi salvo, mas o processamento automático não pôde ser iniciado."
             )
             job.save(update_fields=["status", "last_error", "updated_at"])
         return JsonResponse(

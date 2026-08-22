@@ -179,3 +179,16 @@ class StaticAssetTests(TestCase):
         # frase virando um botão cheio no meio do parágrafo.
         self.assertIn(".button-secondary.button-secondary", css)
         self.assertIn(".link-button.link-button", css)
+
+    def test_page_titles_use_a_single_consistent_brand_name(self):
+        """9 templates diziam "Sistema Vetorial" no <title> enquanto todo o
+        resto do app (inclusive base.html, o valor padrão) usa
+        "StölbenVetorial" — a aba do navegador mudava de nome dependendo da
+        página em que a pessoa estivesse."""
+        templates_dir = Path(settings.BASE_DIR) / "templates"
+        offenders = [
+            path
+            for path in templates_dir.rglob("*.html")
+            if "Sistema Vetorial{% endblock %}" in path.read_text(encoding="utf-8")
+        ]
+        self.assertEqual(offenders, [])

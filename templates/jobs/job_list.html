@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 
-{% block title %}Jobs | StölbenVetorial{% endblock %}
+{% block title %}Arquivos | StölbenVetorial{% endblock %}
 
 {% block content %}
 <section class="hero-shell">
     <div class="section-header">
         <div>
-            <div class="eyebrow">Jobs</div>
-            <h1 class="hero-title">Jobs</h1>
+            <div class="eyebrow">Arquivos</div>
+            <h1 class="hero-title">{% if show_inactive %}Arquivos inativos{% else %}Seus arquivos{% endif %}</h1>
         </div>
-        <a class="button" href="{% url 'jobs:create' %}">Novo job</a>
+        <a class="button" href="{% url 'jobs:create' %}">Novo lote</a>
     </div>
 </section>
 
@@ -51,7 +51,7 @@
         </div>
     {% else %}
         <div class="empty-state">
-            <h2 class="section-title">Nenhum job encontrado</h2>
+            <h2 class="section-title">Nenhum lote encontrado</h2>
         </div>
     {% endif %}
 </section>

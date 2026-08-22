@@ -31,6 +31,8 @@ class DocumentTemplate(OwnedModel):
     class Meta:
         ordering = ["name", "-updated_at"]
         unique_together = ("user", "slug")
+        verbose_name = "projeto"
+        verbose_name_plural = "projetos"
 
     def __str__(self) -> str:
         return self.name
@@ -106,6 +108,8 @@ class TemplateField(TimeStampedModel):
     class Meta:
         ordering = ["page_number", "order_index", "id"]
         unique_together = ("template", "name")
+        verbose_name = "campo"
+        verbose_name_plural = "campos"
 
     def __str__(self) -> str:
         return f"{self.template.name} :: {self.name}"
@@ -123,6 +127,8 @@ class TemplatePreviewPage(TimeStampedModel):
     class Meta:
         ordering = ["page_number"]
         unique_together = ("template", "page_number")
+        verbose_name = "página de pré-visualização"
+        verbose_name_plural = "páginas de pré-visualização"
 
     def __str__(self) -> str:
         return f"{self.template.name} :: preview página {self.page_number}"

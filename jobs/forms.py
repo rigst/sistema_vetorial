@@ -41,7 +41,7 @@ class GenerationJobForm(forms.ModelForm):
         model = GenerationJob
         fields = ["name", "template", "source_excel"]
         labels = {
-            "name": "Nome do job",
+            "name": "Nome do lote",
             "template": "Template",
             "source_excel": "Planilha Excel (.xlsx)",
         }

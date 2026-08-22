@@ -25,6 +25,8 @@ class FontAsset(OwnedModel):
     class Meta:
         ordering = ["family", "variant", "name"]
         unique_together = ("user", "family", "variant", "name")
+        verbose_name = "fonte"
+        verbose_name_plural = "fontes"
 
     def __str__(self) -> str:
         return f"{self.family} - {self.get_variant_display()}"
