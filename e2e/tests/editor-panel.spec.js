@@ -14,6 +14,31 @@ async function login(page) {
   await expect(page).not.toHaveURL(/\/login\//);
 }
 
+// Clica no centro do campo pela posição real dele (mundo -> tela via
+// viewportTransform/zoom), não por uma porcentagem fixa da caixa do canvas:
+// a régua ao redor da bancada (Photoshop-style) reduz a área do canvas, e um
+// x/y fixo que "caía" num campo antes passa a cair fora dele ou no vizinho.
+async function clickField(page, fieldName) {
+  const canvas = page.locator("#editor-canvas");
+  // Marcar um checkbox dentro do painel lateral (sticky) faz o Playwright
+  // rolar a página para trazê-lo à vista, o que empurra o canvas para fora
+  // do topo da viewport — sem isto, a caixa do canvas fica com y negativo e
+  // o clique computado cai fora da tela.
+  await canvas.scrollIntoViewIfNeeded();
+  const box = await canvas.boundingBox();
+  const point = await page.evaluate((name) => {
+    const ed = window.__vetorialEditor;
+    const field = ed.fields.find((f) => f.name === name);
+    const vpt = ed.canvas.viewportTransform;
+    const zoom = ed.canvas.getZoom();
+    return {
+      x: (field.x + field.width / 2) * zoom + vpt[4],
+      y: (field.y + field.height / 2) * zoom + vpt[5],
+    };
+  }, fieldName);
+  await page.mouse.click(box.x + point.x, box.y + point.y);
+}
+
 async function openBancadaAndSelectField(page) {
   await login(page);
   await page.goto("/templates/");
@@ -24,9 +49,7 @@ async function openBancadaAndSelectField(page) {
   // texto de status mudar, o clique early pode cair antes dos campos
   // existirem no canvas.
   await expect(page.locator("#editor-status-text")).not.toHaveText(/Carregando/);
-  const canvas = page.locator("#editor-canvas");
-  const box = await canvas.boundingBox();
-  await page.mouse.click(box.x + box.width * 0.35, box.y + box.height * 0.42);
+  await clickField(page, "Nome");
   await expect(page.locator("#field-panel-name")).toContainText("Nome");
 }
 
@@ -70,9 +93,7 @@ test.describe("Painel do campo: organização e estados", () => {
     await expect(page.locator("#field-border-opacity")).toBeEnabled();
 
     // Seleciona o segundo campo (Curso), que nunca teve o contorno ligado.
-    const canvas = page.locator("#editor-canvas");
-    const box = await canvas.boundingBox();
-    await page.mouse.click(box.x + box.width * 0.35, box.y + box.height * 0.56);
+    await clickField(page, "Curso");
     await expect(page.locator("#field-panel-name")).toContainText("Curso");
 
     await expect(page.locator("#field-border-opacity")).toBeDisabled();

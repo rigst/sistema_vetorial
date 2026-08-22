@@ -226,6 +226,7 @@ def _template_editor_context(template_obj, user):
         "page_height_cm": round(float(template_obj.page_height or 0) * 2.54 / 72, 2)
         if template_obj.page_height
         else 0,
+        "guides_json": (template_obj.editor_state or {}).get("guides") or {"x": [], "y": []},
         "filename_space_mode_choices": DocumentTemplate.FilenameSpaceMode.choices,
         "filename_case_choices": DocumentTemplate.FilenameCase.choices,
     }
@@ -459,6 +460,27 @@ class TemplateLayoutUpdateView(LoginRequiredMixin, View):
                 ]
             )
         return JsonResponse({"ok": True, "updated": len(updates)})
+
+
+class TemplateGuidesUpdateView(LoginRequiredMixin, View):
+    """Salva as réguas-guia do editor visual (clique na régua pra criar,
+    arraste pra mover) dentro de `DocumentTemplate.editor_state` — não são
+    campos do PDF, só uma referência visual de alinhamento na tela."""
+
+    def post(self, request, *args, **kwargs):
+        template_obj = get_object_or_404(DocumentTemplate, pk=kwargs["pk"], user=request.user)
+        payload = _parse_json_body(request)
+        raw_guides = payload.get("guides") or {}
+        try:
+            clean_guides = {
+                "x": [round(float(value), 2) for value in raw_guides.get("x") or []],
+                "y": [round(float(value), 2) for value in raw_guides.get("y") or []],
+            }
+        except (TypeError, ValueError):
+            return JsonResponse({"error": "Formato de guias inválido."}, status=400)
+        template_obj.editor_state = {**(template_obj.editor_state or {}), "guides": clean_guides}
+        template_obj.save(update_fields=["editor_state", "updated_at"])
+        return JsonResponse({"ok": True, "guides": clean_guides})
 
 
 class TemplateFilenamePatternUpdateView(LoginRequiredMixin, View):

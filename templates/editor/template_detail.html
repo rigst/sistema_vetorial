@@ -42,15 +42,21 @@
                 <button type="button" class="toolbar-button" id="zoom-fit-button" title="Ajustar à tela" aria-label="Ajustar à tela">⛶</button>
             </div>
         </div>
-        <div class="editor-canvas-wrap" id="editor-canvas-wrap">
-            <canvas id="editor-canvas"></canvas>
-            <div class="editor-statusbar">
-                <span class="muted" id="editor-status-text">Carregando editor…</span>
-                <span class="editor-save-state" id="editor-save-state"></span>
+        <div class="editor-rulers" id="editor-rulers">
+            <div class="ruler-corner"></div>
+            <canvas class="ruler ruler-h" id="ruler-h" title="Clique e arraste pra criar uma guia vertical"></canvas>
+            <canvas class="ruler ruler-v" id="ruler-v" title="Clique e arraste pra criar uma guia horizontal"></canvas>
+            <div class="editor-canvas-wrap" id="editor-canvas-wrap">
+                <canvas id="editor-canvas"></canvas>
+                <div class="editor-statusbar">
+                    <span class="muted" id="editor-status-text">Carregando editor…</span>
+                    <span class="editor-save-state" id="editor-save-state"></span>
+                </div>
             </div>
         </div>
         <p class="muted editor-hints">
-            Arraste um campo para movê-lo · arraste o fundo para mover a página · roda do mouse dá zoom ·
+            Arraste da régua para criar uma guia (arraste de volta pra apagar) · arraste um campo para
+            movê-lo · arraste o fundo para mover a página · roda do mouse dá zoom ·
             Shift+clique seleciona vários · alças laterais mudam a largura · cantos mudam o tamanho da fonte ·
             alça superior gira · duplo clique edita o texto · setas ajustam a posição (Shift = 10 pt)
         </p>
@@ -385,26 +391,31 @@
 {{ field_json|json_script:"editor-field-data" }}
 {{ font_json|json_script:"editor-font-data" }}
 {{ template_obj.filename_case_columns|json_script:"filename-case-columns-data" }}
+{{ guides_json|json_script:"editor-guides-data" }}
 {% endblock %}
 
 {% block extra_js %}
 <script src="{% static 'js/job_launcher.js' %}?v=20260822-03"></script>
 {% if preview_pages %}
 <script src="{% static 'js/fabric.min.js' %}?v=6.7.1"></script>
-<script src="{% static 'js/template_editor.js' %}?v=20260822-06"></script>
+<script src="{% static 'js/template_editor.js' %}?v=20260822-08"></script>
 <script>
 VetorialTemplateEditor.init({
   canvasId: "editor-canvas",
   wrapId: "editor-canvas-wrap",
+  rulerHId: "ruler-h",
+  rulerVId: "ruler-v",
   readOnly: false,
   page: { width: {{ template_obj.page_width|default:1|unlocalize }}, height: {{ template_obj.page_height|default:1|unlocalize }} },
   backgroundUrl: "{% url 'editor:preview-page' template_obj.pk 1 %}",
   fields: JSON.parse(document.getElementById("editor-field-data").textContent),
   fonts: JSON.parse(document.getElementById("editor-font-data").textContent),
+  guides: JSON.parse(document.getElementById("editor-guides-data").textContent),
   urls: {
     fields: "{% url 'editor:fields-api' template_obj.pk %}",
     layout: "{% url 'editor:layout-update' template_obj.pk %}",
     fieldTemplate: "{% url 'editor:field-api' 123454321 %}",
+    guides: "{% url 'editor:guides-update' template_obj.pk %}",
   },
 });
 </script>

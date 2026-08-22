@@ -125,6 +125,7 @@
       const width = Math.max(wrap.clientWidth - 2, 320);
       const height = Math.max(Math.min(window.innerHeight * 0.68, width * (page.height / page.width) + 48), 260);
       canvas.setDimensions({ width, height });
+      resizeRulers();
     };
 
     const fitToScreen = () => {
@@ -165,6 +166,17 @@
     // desenha as réguas de distância até as bordas da página (ver drawMeasurements)
     let measureTarget = null;
     canvas.on("mouse:down", (opt) => {
+      // Guia ganha prioridade sobre o campo por baixo dela — igual ao
+      // Photoshop, onde dá pra pegar uma guia mesmo em cima de conteúdo.
+      if (rulersActive && !spacePressed && opt.e.button !== 1) {
+        const rect = canvasEl.getBoundingClientRect();
+        const hit = guideAtScreenPoint(opt.e.clientX - rect.left, opt.e.clientY - rect.top);
+        if (hit) {
+          canvas.setCursor(hit.axis === "x" ? "col-resize" : "row-resize");
+          trackGuideDrag(hit.axis, hit.index);
+          return;
+        }
+      }
       if (spacePressed || opt.e.button === 1 || !opt.target) {
         panState = { x: opt.e.clientX, y: opt.e.clientY };
         canvas.setCursor("grabbing");
@@ -215,6 +227,7 @@
     // réguas de distância: enquanto um campo é arrastado, mostram — em cm —
     // o vão entre cada borda da caixa e a borda correspondente da página.
     const PT_TO_CM = 2.54 / 72;
+    const CM_TO_PT = 72 / 2.54;
     const formatCm = (pt) => `${(pt * PT_TO_CM).toFixed(1)} cm`;
 
     // Pontos desenhados um a um em vez de ctx.setLineDash: um dash quase
@@ -334,6 +347,219 @@
       ctx.restore();
     };
 
+    // ----- réguas ao redor da bancada + guias de alinhamento (como no
+    // Photoshop): arrastar a partir da régua cria uma guia; arrastar uma
+    // guia de volta pra régua apaga; campos encostam nelas ao arrastar
+    // (computeSnapTargets, mais abaixo). Só existe na tela de edição —
+    // a pré-visualização somente-leitura não passa rulerHId/rulerVId. -----
+    const rulerH = document.getElementById(config.rulerHId || "ruler-h");
+    const rulerV = document.getElementById(config.rulerVId || "ruler-v");
+    const rulersActive = Boolean(!readOnly && rulerH && rulerV);
+    // Região que "segura" uma guia: régua + canvas juntos. Soltar dentro
+    // dela (mesmo ainda em cima da régua, sem nunca ter entrado no canvas —
+    // o caso de um clique simples) mantém a guia; só sair de tudo isso
+    // apaga. Sem isso, um clique parado na régua já nascia e morria no
+    // mesmo instante, porque a posição nunca tinha "entrado" no canvas.
+    const rulersContainer = rulerH ? rulerH.closest(".editor-rulers") : null;
+
+    // Posições em pontos PDF (o mesmo "mundo" dos campos): x = guias
+    // verticais, y = guias horizontais.
+    const guideLines = {
+      x: Array.isArray(config.guides && config.guides.x) ? config.guides.x.slice() : [],
+      y: Array.isArray(config.guides && config.guides.y) ? config.guides.y.slice() : [],
+    };
+
+    const saveGuides = debounce(async () => {
+      if (!config.urls || !config.urls.guides) return;
+      try {
+        await request(config.urls.guides, "POST", { guides: guideLines });
+      } catch (err) {
+        setStatus(`Não foi possível salvar as guias: ${err.message}`);
+      }
+    }, 500);
+
+    const GUIDE_HIT_TOLERANCE = 5;
+    const guideAtScreenPoint = (sx, sy) => {
+      const vpt = canvas.viewportTransform;
+      const zoom = canvas.getZoom();
+      const pageTop = vpt[5] - GUIDE_HIT_TOLERANCE;
+      const pageBottom = vpt[5] + page.height * zoom + GUIDE_HIT_TOLERANCE;
+      const pageLeft = vpt[4] - GUIDE_HIT_TOLERANCE;
+      const pageRight = vpt[4] + page.width * zoom + GUIDE_HIT_TOLERANCE;
+      for (let i = 0; i < guideLines.x.length; i += 1) {
+        const gx = guideLines.x[i] * zoom + vpt[4];
+        if (Math.abs(gx - sx) <= GUIDE_HIT_TOLERANCE && sy >= pageTop && sy <= pageBottom) {
+          return { axis: "x", index: i };
+        }
+      }
+      for (let i = 0; i < guideLines.y.length; i += 1) {
+        const gy = guideLines.y[i] * zoom + vpt[5];
+        if (Math.abs(gy - sy) <= GUIDE_HIT_TOLERANCE && sx >= pageLeft && sx <= pageRight) {
+          return { axis: "y", index: i };
+        }
+      }
+      return null;
+    };
+
+    // Acompanha o arrasto de uma guia (nova ou já existente) até soltar o
+    // botão — sempre por listeners no document, nunca pelos eventos do
+    // Fabric: o gesto de criar começa fora do canvas (na régua), e mesmo o
+    // de mover uma guia existente pode terminar fora dele (arrastar de
+    // volta pra régua apaga), e o mouse:up do Fabric não dispara nesse caso.
+    const trackGuideDrag = (axis, index) => {
+      const rect = canvasEl.getBoundingClientRect();
+      const worldFromEvent = (evt) => {
+        const vpt = canvas.viewportTransform;
+        const zoom = canvas.getZoom();
+        return axis === "x"
+          ? (evt.clientX - rect.left - vpt[4]) / zoom
+          : (evt.clientY - rect.top - vpt[5]) / zoom;
+      };
+      const onMove = (moveEvt) => {
+        const value = worldFromEvent(moveEvt);
+        guideLines[axis][index] = value;
+        canvas.requestRenderAll();
+        setStatus(`Guia ${axis === "x" ? "vertical" : "horizontal"}: ${formatCm(value)}`);
+      };
+      const onUp = (upEvt) => {
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+        // "Fora dos limites" é sair da régua+canvas inteiros, não só do
+        // canvas — soltar parado em cima da régua (um clique sem arrastar)
+        // tem que criar a guia ali, não apagar na hora por nunca ter
+        // "entrado" no canvas.
+        const bounds = (rulersContainer || canvasEl).getBoundingClientRect();
+        const px = upEvt.clientX - bounds.left;
+        const py = upEvt.clientY - bounds.top;
+        const outOfBounds = px < 0 || px > bounds.width || py < 0 || py > bounds.height;
+        if (outOfBounds) {
+          guideLines[axis].splice(index, 1);
+          setStatus("Guia removida.");
+        } else {
+          guideLines[axis][index] = round2(guideLines[axis][index]);
+          setStatus("Guia salva.");
+        }
+        canvas.setCursor("grab");
+        canvas.requestRenderAll();
+        saveGuides();
+      };
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    };
+
+    // Mousedown numa régua já cria a guia (satisfaz um clique simples) e
+    // entra em modo de arrasto na hora (satisfaz arrastar antes de soltar).
+    const beginGuideFromRuler = (axis, downEvent) => {
+      const rect = canvasEl.getBoundingClientRect();
+      const vpt = canvas.viewportTransform;
+      const zoom = canvas.getZoom();
+      const worldValue = axis === "x"
+        ? (downEvent.clientX - rect.left - vpt[4]) / zoom
+        : (downEvent.clientY - rect.top - vpt[5]) / zoom;
+      guideLines[axis].push(round2(worldValue));
+      canvas.requestRenderAll();
+      trackGuideDrag(axis, guideLines[axis].length - 1);
+    };
+
+    if (rulersActive) {
+      rulerH.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        beginGuideFromRuler("x", e);
+      });
+      rulerV.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        beginGuideFromRuler("y", e);
+      });
+    }
+
+    const NICE_RULER_STEPS_CM = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200];
+    const chooseRulerStepCm = (zoom) => {
+      const targetPx = 62;
+      for (const stepCm of NICE_RULER_STEPS_CM) {
+        if (stepCm * CM_TO_PT * zoom >= targetPx) return stepCm;
+      }
+      return NICE_RULER_STEPS_CM[NICE_RULER_STEPS_CM.length - 1];
+    };
+
+    const resizeRulers = () => {
+      if (!rulersActive) return;
+      const dpr = window.devicePixelRatio || 1;
+      [rulerH, rulerV].forEach((el) => {
+        const w = Math.round(el.clientWidth * dpr);
+        const h = Math.round(el.clientHeight * dpr);
+        if (el.width !== w) el.width = w;
+        if (el.height !== h) el.height = h;
+      });
+    };
+
+    const drawRuler = (el, axis) => {
+      const ctx = el.getContext("2d");
+      const dpr = window.devicePixelRatio || 1;
+      const widthCss = el.clientWidth;
+      const heightCss = el.clientHeight;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, widthCss, heightCss);
+
+      const vpt = canvas.viewportTransform;
+      const zoom = canvas.getZoom();
+      const stepCm = chooseRulerStepCm(zoom);
+      const stepPt = stepCm * CM_TO_PT;
+      const minorStepPt = stepPt / 5;
+
+      ctx.strokeStyle = "rgba(232, 244, 240, 0.4)";
+      ctx.fillStyle = "rgba(232, 244, 240, 0.8)";
+      ctx.font = "9px ui-sans-serif, system-ui, sans-serif";
+      ctx.lineWidth = 1;
+
+      if (axis === "h") {
+        const worldStart = (0 - vpt[4]) / zoom;
+        const worldEnd = (widthCss - vpt[4]) / zoom;
+        const first = Math.floor(worldStart / minorStepPt) * minorStepPt;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "alphabetic";
+        for (let wx = first; wx <= worldEnd; wx += minorStepPt) {
+          const sx = Math.round(wx * zoom + vpt[4]) + 0.5;
+          const nearestMajor = Math.round(wx / stepPt) * stepPt;
+          const isMajor = Math.abs(nearestMajor - wx) < minorStepPt / 2;
+          const tickLen = isMajor ? 9 : 4;
+          ctx.beginPath();
+          ctx.moveTo(sx, heightCss);
+          ctx.lineTo(sx, heightCss - tickLen);
+          ctx.stroke();
+          if (isMajor) ctx.fillText(String(Math.round(nearestMajor * PT_TO_CM)), sx + 2, 9);
+        }
+      } else {
+        const worldStart = (0 - vpt[5]) / zoom;
+        const worldEnd = (heightCss - vpt[5]) / zoom;
+        const first = Math.floor(worldStart / minorStepPt) * minorStepPt;
+        for (let wy = first; wy <= worldEnd; wy += minorStepPt) {
+          const sy = Math.round(wy * zoom + vpt[5]) + 0.5;
+          const nearestMajor = Math.round(wy / stepPt) * stepPt;
+          const isMajor = Math.abs(nearestMajor - wy) < minorStepPt / 2;
+          const tickLen = isMajor ? 9 : 4;
+          ctx.beginPath();
+          ctx.moveTo(widthCss, sy);
+          ctx.lineTo(widthCss - tickLen, sy);
+          ctx.stroke();
+          if (isMajor) {
+            ctx.save();
+            ctx.translate(9, sy - 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.textAlign = "left";
+            ctx.textBaseline = "alphabetic";
+            ctx.fillText(String(Math.round(nearestMajor * PT_TO_CM)), 0, 0);
+            ctx.restore();
+          }
+        }
+      }
+    };
+
+    const drawRulers = () => {
+      if (!rulersActive) return;
+      drawRuler(rulerH, "h");
+      drawRuler(rulerV, "v");
+    };
+
     // moldura da página
     canvas.on("after:render", ({ ctx }) => {
       const vpt = canvas.viewportTransform;
@@ -342,6 +568,26 @@
       ctx.strokeStyle = "rgba(232, 244, 240, 0.55)";
       ctx.lineWidth = 1;
       ctx.strokeRect(vpt[4] - 0.5, vpt[5] - 0.5, page.width * zoom + 1, page.height * zoom + 1);
+
+      if (rulersActive && (guideLines.x.length || guideLines.y.length)) {
+        ctx.strokeStyle = "rgba(64, 169, 255, 0.85)";
+        ctx.lineWidth = 1;
+        guideLines.x.forEach((wx) => {
+          const sx = Math.round(wx * zoom + vpt[4]) + 0.5;
+          ctx.beginPath();
+          ctx.moveTo(sx, vpt[5]);
+          ctx.lineTo(sx, vpt[5] + page.height * zoom);
+          ctx.stroke();
+        });
+        guideLines.y.forEach((wy) => {
+          const sy = Math.round(wy * zoom + vpt[5]) + 0.5;
+          ctx.beginPath();
+          ctx.moveTo(vpt[4], sy);
+          ctx.lineTo(vpt[4] + page.width * zoom, sy);
+          ctx.stroke();
+        });
+      }
+
       ctx.strokeStyle = "rgba(255, 84, 174, 0.95)";
       ctx.lineWidth = 1;
       snapGuides.forEach((guide) => {
@@ -359,6 +605,7 @@
       });
       ctx.restore();
       drawMeasurements(ctx);
+      drawRulers();
     });
 
     // ----- criação dos objetos -----
@@ -672,8 +919,8 @@
 
     // ----- snapping com guias -----
     const computeSnapTargets = (activeObj) => {
-      const xs = [0, page.width / 2, page.width];
-      const ys = [0, page.height / 2, page.height];
+      const xs = [0, page.width / 2, page.width, ...guideLines.x];
+      const ys = [0, page.height / 2, page.height, ...guideLines.y];
       canvas.getObjects().forEach((other) => {
         if (other === activeObj || !other.vetFieldId) return;
         if (canvas.getActiveObjects().includes(other)) return;
@@ -1185,7 +1432,7 @@
     // ----- inicialização final -----
     window.addEventListener("resize", debounce(fitToScreen, 150));
     fitToScreen();
-    window.__vetorialEditor = { canvas, fields, fonts: fontsList };
+    window.__vetorialEditor = { canvas, fields, fonts: fontsList, guides: guideLines };
     if (!readOnly) {
       setStatus(fields.length ? "Selecione um campo para editar." : "Crie o primeiro campo com “Novo campo”.");
       setSaveState("Salvo ✓", "ok");

@@ -1755,18 +1755,57 @@ details[open] > summary .field-advanced-title::before {
 }
 
 /* Bancada: base de corte escura onde a arte é o destaque */
-.editor-canvas-wrap {
-  position: relative;
-  width: 100%;
+/* Réguas ao redor da bancada, como no Photoshop: a moldura arredondada e a
+ * sombra interna que antes eram do canvas passam pra este grid, que agora
+ * é a "caixa" visual — régua e canvas viram uma peça só. */
+.editor-rulers {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  grid-template-rows: 20px 1fr;
   border: 1px solid rgba(20, 32, 29, 0.9);
   border-radius: var(--radius-sm);
+  overflow: hidden;
+  box-shadow: inset 0 1px 12px rgba(0, 0, 0, 0.35);
+}
+
+.ruler-corner {
+  grid-column: 1;
+  grid-row: 1;
+  background: #1b2622;
+}
+
+.ruler {
+  display: block;
+  background: #1b2622;
+  cursor: crosshair;
+}
+
+.ruler-h {
+  grid-column: 2;
+  grid-row: 1;
+  width: 100%;
+  height: 20px;
+}
+
+.ruler-v {
+  grid-column: 1;
+  grid-row: 2;
+  width: 20px;
+  height: 100%;
+}
+
+.editor-canvas-wrap {
+  position: relative;
+  grid-column: 2;
+  grid-row: 2;
+  width: 100%;
+  height: 100%;
   background:
     linear-gradient(rgba(214, 235, 228, 0.055) 1px, transparent 1px) 0 0 / 100% 28px,
     linear-gradient(90deg, rgba(214, 235, 228, 0.055) 1px, transparent 1px) 0 0 / 28px 100%,
     #22312d;
   overflow: hidden;
   touch-action: none;
-  box-shadow: inset 0 1px 12px rgba(0, 0, 0, 0.35);
 }
 
 .editor-statusbar {

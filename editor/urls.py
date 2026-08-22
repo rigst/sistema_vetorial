@@ -11,6 +11,7 @@ from .views import (
     TemplateFieldApiView,
     TemplateFieldsApiView,
     TemplateFilenamePatternUpdateView,
+    TemplateGuidesUpdateView,
     TemplateLayoutUpdateView,
     TemplatePreviewPageImageView,
     TemplateSampleDataView,
@@ -32,6 +33,7 @@ urlpatterns = [
     path("<int:pk>/duplicar/", DocumentTemplateDuplicateView.as_view(), name="duplicate"),
     path("<int:pk>/excluir/", DocumentTemplateDeleteView.as_view(), name="delete"),
     path("<int:pk>/layout/", TemplateLayoutUpdateView.as_view(), name="layout-update"),
+    path("<int:pk>/guias/", TemplateGuidesUpdateView.as_view(), name="guides-update"),
     path("<int:pk>/campos/", TemplateFieldsApiView.as_view(), name="fields-api"),
     path("<int:pk>/amostra/", TemplateSampleDataView.as_view(), name="sample-data"),
     path(

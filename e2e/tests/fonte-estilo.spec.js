@@ -20,13 +20,32 @@ async function openBancada(page) {
   await expect(page.locator("#editor-status-text")).not.toHaveText(/Carregando/);
 }
 
-async function clickField(page, { x, y }) {
+// Clica no centro do campo pela posição real dele (mundo -> tela via
+// viewportTransform/zoom), não por uma porcentagem fixa da caixa do canvas:
+// a régua ao redor da bancada (Photoshop-style) reduz a área do canvas, e um
+// x/y fixo que "caía" num campo antes passa a cair fora dele ou no vizinho.
+async function clickField(page, fieldName) {
   const canvas = page.locator("#editor-canvas");
+  // Marcar/mexer em controles do painel lateral (sticky) pode fazer o
+  // Playwright rolar a página para trazê-los à vista, o que empurra o
+  // canvas para fora do topo da viewport — sem isto, a caixa do canvas
+  // fica com y negativo e o clique computado cai fora da tela.
+  await canvas.scrollIntoViewIfNeeded();
   const box = await canvas.boundingBox();
-  await page.mouse.click(box.x + box.width * x, box.y + box.height * y);
+  const point = await page.evaluate((name) => {
+    const ed = window.__vetorialEditor;
+    const field = ed.fields.find((f) => f.name === name);
+    const vpt = ed.canvas.viewportTransform;
+    const zoom = ed.canvas.getZoom();
+    return {
+      x: (field.x + field.width / 2) * zoom + vpt[4],
+      y: (field.y + field.height / 2) * zoom + vpt[5],
+    };
+  }, fieldName);
+  await page.mouse.click(box.x + point.x, box.y + point.y);
 }
 
-const NOME_FIELD = { x: 0.35, y: 0.42 };
+const NOME_FIELD = "Nome";
 
 test.use({ viewport: { width: 1440, height: 900 } });
 

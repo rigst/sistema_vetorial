@@ -729,6 +729,110 @@ class TemplateFilenamePatternTests(TestCase):
         self.assertEqual(duplicated.filename_pattern, "{1}_{2}")
 
 
+class TemplateGuidesTests(TestCase):
+    """As réguas-guia do editor (clique na régua cria, arraste move) ficam
+    dentro de `editor_state["guides"]` — não são campo do PDF, só uma
+    referência visual de alinhamento que persiste entre visitas à tela."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = get_user_model().objects.create_user(
+            username="editor-guias", password="senha123"
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(TEST_MEDIA_ROOT, ignore_errors=True)
+
+    def _build_template(self) -> DocumentTemplate:
+        buffer = io.BytesIO()
+        canvas_obj = canvas.Canvas(buffer, pagesize=(400, 120))
+        canvas_obj.showPage()
+        canvas_obj.save()
+        return DocumentTemplate.objects.create(
+            user=self.user,
+            name="Crachá",
+            slug="cracha-guias",
+            background_pdf=SimpleUploadedFile(
+                "fundo.pdf", buffer.getvalue(), content_type="application/pdf"
+            ),
+            page_width=400,
+            page_height=120,
+        )
+
+    def test_post_saves_guides(self):
+        template = self._build_template()
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("editor:guides-update", kwargs={"pk": template.pk}),
+            data='{"guides": {"x": [10, 200.456], "y": [50]}}',
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["guides"], {"x": [10.0, 200.46], "y": [50.0]})
+        template.refresh_from_db()
+        self.assertEqual(template.editor_state["guides"], {"x": [10.0, 200.46], "y": [50.0]})
+
+    def test_post_overwrites_previous_guides(self):
+        template = self._build_template()
+        template.editor_state = {"guides": {"x": [5], "y": [5]}}
+        template.save(update_fields=["editor_state"])
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("editor:guides-update", kwargs={"pk": template.pk}),
+            data='{"guides": {"x": [], "y": [30]}}',
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        template.refresh_from_db()
+        self.assertEqual(template.editor_state["guides"], {"x": [], "y": [30.0]})
+
+    def test_post_rejects_non_numeric_guides(self):
+        template = self._build_template()
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("editor:guides-update", kwargs={"pk": template.pk}),
+            data='{"guides": {"x": ["abc"], "y": []}}',
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_post_requires_login(self):
+        template = self._build_template()
+        response = self.client.post(
+            reverse("editor:guides-update", kwargs={"pk": template.pk}),
+            data='{"guides": {"x": [10], "y": []}}',
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_rejects_other_users_template(self):
+        template = self._build_template()
+        other = get_user_model().objects.create_user(username="outro-guias", password="senha123")
+        self.client.force_login(other)
+        response = self.client.post(
+            reverse("editor:guides-update", kwargs={"pk": template.pk}),
+            data='{"guides": {"x": [10], "y": []}}',
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_detail_page_exposes_saved_guides(self):
+        template = self._build_template()
+        template.editor_state = {"guides": {"x": [12.5], "y": [40]}}
+        template.save(update_fields=["editor_state"])
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("editor:detail", kwargs={"pk": template.pk}))
+        self.assertEqual(response.context["guides_json"], {"x": [12.5], "y": [40]})
+
+    def test_detail_page_defaults_to_empty_guides(self):
+        template = self._build_template()
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("editor:detail", kwargs={"pk": template.pk}))
+        self.assertEqual(response.context["guides_json"], {"x": [], "y": []})
+
+
 class BackgroundImageFidelityTests(TestCase):
     """Um fundo enviado como imagem vira PDF sem reamostrar nem recomprimir:
     o que sai do gerador precisa ter os pixels do arquivo original."""
