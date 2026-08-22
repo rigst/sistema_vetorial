@@ -4,13 +4,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}StölbenVetorial{% endblock %}</title>
+    <title>{% block title %}Vetorial{% endblock %}</title>
     <link rel="icon" href="{% static 'img/icon.svg' %}" type="image/svg+xml">
     <link rel="icon" href="{% static 'favicon.ico' %}" sizes="any">
     <link rel="apple-touch-icon" href="{% static 'img/apple-touch-icon.png' %}">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20260822-08">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20260822-09">
 </head>
 <body>
+    <div class="side-texture side-texture-left" aria-hidden="true"></div>
+    <div class="side-texture side-texture-right" aria-hidden="true"></div>
+
     <header class="site-header">
         <div class="container topbar">
             <a href="{% url 'core:home' %}" class="brand">

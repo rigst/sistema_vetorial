@@ -1,8 +1,27 @@
 {% extends "base.html" %}
+{% load static %}
 
-{% block title %}Projetos | StölbenVetorial{% endblock %}
+{% block title %}Projetos | Vetorial{% endblock %}
 
 {% block content %}
+{% if not show_inactive %}
+<section class="welcome-hero">
+    <div class="welcome-copy">
+        <p class="welcome-greeting">{{ greeting }}, <span>{{ display_name }}</span></p>
+        <p class="welcome-phrase">{{ motivational_phrase }}</p>
+    </div>
+    <figure class="welcome-photo">
+        <img src="{% static 'img/home-hero.jpg' %}"
+             alt="Blocos de tipos móveis de madeira usados em impressão tipográfica, empilhados sobre uma mesa">
+        <figcaption>
+            <a href="https://commons.wikimedia.org/wiki/File:Wood_letterpress_type.jpg" target="_blank" rel="noopener">
+                Foto: Michellecornelison, CC BY-SA 4.0
+            </a>
+        </figcaption>
+    </figure>
+</section>
+{% endif %}
+
 <section class="hero-shell">
     <div class="section-header">
         <div>
@@ -10,11 +29,7 @@
             <h1 class="hero-title">{% if show_inactive %}Projetos inativos{% else %}Seus projetos{% endif %}</h1>
         </div>
         <div class="inline-actions">
-            <form method="get" class="page-head-search">
-                <input type="text" name="q" value="{{ query }}" placeholder="Buscar projeto…" aria-label="Buscar projeto">
-                {% if show_inactive %}<input type="hidden" name="inativos" value="1">{% endif %}
-            </form>
-            <a class="button" href="{% url 'editor:create' %}">+ Novo projeto</a>
+            <a class="button button-cta" href="{% url 'editor:create' %}">+ Novo projeto</a>
         </div>
     </div>
 </section>

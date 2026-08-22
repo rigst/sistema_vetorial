@@ -1,4 +1,5 @@
 import json
+import random
 from copy import deepcopy
 from tempfile import NamedTemporaryFile
 
@@ -8,6 +9,7 @@ from django.core.files.base import ContentFile
 from django.http import FileResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.text import slugify
 from django.views import View
 from django.views.generic import CreateView, DetailView, ListView, TemplateView, UpdateView
@@ -23,6 +25,27 @@ from .services import update_template_pdf_metadata
 DEFAULT_EXCEPTIONS = (
     "a, as, o, os, de, da, das, do, dos, e, em, com, para, por, na, nas, no, nos, à, às"
 )
+
+# Uma por visita, sorteada em get_context_data — nada de "você consegue!"
+# genérico: cada frase fala do que o sistema de fato faz (lote a partir de
+# um Excel), no registro do resto do produto.
+MOTIVATIONAL_PHRASES = (
+    "Uma arte, centenas de certificados com o nome certo em cada um.",
+    "O que levava a tarde inteira agora sai em poucos cliques.",
+    "Cada linha da planilha vira um documento pronto pra entregar.",
+    "Menos copiar e colar, mais gente recebendo o que é seu.",
+    "Do modelo à entrega: o trabalho repetitivo fica por conta do sistema.",
+    "Personalização em lote, sem perder o capricho de cada peça.",
+)
+
+
+def _greeting_for(moment) -> str:
+    hour = moment.hour
+    if 5 <= hour < 12:
+        return "Bom dia"
+    if 12 <= hour < 18:
+        return "Boa tarde"
+    return "Boa noite"
 
 
 def field_to_dict(field: TemplateField) -> dict:
@@ -99,6 +122,9 @@ class DocumentTemplateListView(UserOwnedQuerysetMixin, ListView):
         context = super().get_context_data(**kwargs)
         context["query"] = self.request.GET.get("q", "").strip()
         context["show_inactive"] = self.request.GET.get("inativos") == "1"
+        context["greeting"] = _greeting_for(timezone.localtime())
+        context["display_name"] = self.request.user.get_full_name() or self.request.user.username
+        context["motivational_phrase"] = random.choice(MOTIVATIONAL_PHRASES)
         return context
 
 

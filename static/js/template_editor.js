@@ -220,12 +220,18 @@
     const drawDimension = (ctx, { x1, y1, x2, y2, tickAxis, label, labelX, labelY }) => {
       // linha discreta com pequenos traços perpendiculares nas pontas, no
       // estilo de cota de desenho técnico — só a marcação, sem chamar atenção.
-      ctx.strokeStyle = "rgba(232, 244, 240, 0.4)";
-      ctx.lineWidth = 1;
+      // Pontilhado (não tracejado): lineCap redondo + dash quase zerado vira
+      // uma fileira de pontinhos, mais delicado que um traço contínuo.
+      ctx.strokeStyle = "rgba(232, 244, 240, 0.5)";
+      ctx.lineWidth = 1.6;
+      ctx.lineCap = "round";
+      ctx.setLineDash([0.1, 4.5]);
       ctx.beginPath();
       ctx.moveTo(x1, y1);
       ctx.lineTo(x2, y2);
       ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.lineCap = "butt";
 
       const tick = 4;
       ctx.strokeStyle = "rgba(232, 244, 240, 0.65)";

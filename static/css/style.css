@@ -2736,10 +2736,148 @@ label.toolbar-button {
 .legal-atalhos a:hover,
 .confirmacao-texto a:hover { color: var(--legal-accent); }
 
+/* ---- Faixas de textura fora da área de conteúdo: só aparecem quando a tela
+ * é larga o bastante pra sobrar uma margem de verdade dos dois lados do
+ * .container. Grade fina + pontos, a mesma linguagem "papel quadriculado de
+ * mesa de vetor" do fundo do editor, só que discreta sobre o bg claro — e
+ * esmaece perto do conteúdo em vez de cortar seco. */
+.side-texture {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  width: 260px;
+  z-index: -1;
+  pointer-events: none;
+  display: none;
+  background-image:
+    radial-gradient(circle, rgba(31, 122, 114, 0.16) 1.4px, transparent 1.4px),
+    linear-gradient(rgba(31, 122, 114, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(31, 122, 114, 0.06) 1px, transparent 1px);
+  background-size: 96px 96px, 32px 32px, 32px 32px;
+  background-position: center;
+}
+
+.side-texture-left {
+  left: 0;
+  mask-image: linear-gradient(to right, black 0%, transparent 88%);
+  -webkit-mask-image: linear-gradient(to right, black 0%, transparent 88%);
+}
+
+.side-texture-right {
+  right: 0;
+  mask-image: linear-gradient(to left, black 0%, transparent 88%);
+  -webkit-mask-image: linear-gradient(to left, black 0%, transparent 88%);
+}
+
+@media (min-width: 1500px) {
+  .side-texture {
+    display: block;
+  }
+}
+
+/* ---- Boas-vindas na lista de projetos: saudação + frase + uma foto de
+ * verdade, só na visão padrão (não some quando "Projetos inativos"). ---- */
+.welcome-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(200px, 300px);
+  gap: 2rem;
+  align-items: center;
+  margin: 0.4rem 0 2rem;
+}
+
+.welcome-greeting {
+  font-size: clamp(1.5rem, 2.8vw, 2.1rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.welcome-greeting span {
+  color: var(--accent);
+}
+
+.welcome-phrase {
+  margin-top: 0.5rem;
+  font-size: 1.02rem;
+  color: var(--text-soft);
+  max-width: 48ch;
+}
+
+.welcome-photo {
+  position: relative;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  aspect-ratio: 16 / 10;
+}
+
+.welcome-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.welcome-photo figcaption {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  font-size: 0.66rem;
+  line-height: 1;
+}
+
+.welcome-photo figcaption a {
+  display: inline-block;
+  color: rgba(255, 255, 255, 0.88);
+  background: rgba(15, 26, 24, 0.45);
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  backdrop-filter: blur(3px);
+}
+
+.welcome-photo figcaption a:hover {
+  background: rgba(15, 26, 24, 0.65);
+}
+
+@media (max-width: 720px) {
+  .welcome-hero {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .welcome-photo {
+    aspect-ratio: 16 / 7;
+  }
+}
+
+/* ---- "+ Novo projeto": único CTA em degradê da tela — a mesma dupla de
+ * cores da barra de progresso, só que num botão, pra puxar o olho pro
+ * ponto de partida de um projeto novo. */
+.button-cta {
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  box-shadow: 0 8px 20px rgba(31, 122, 114, 0.28);
+  transition: transform var(--transition), box-shadow var(--transition), filter var(--transition);
+}
+
+.button-cta:hover {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  border-color: transparent;
+  filter: brightness(1.07);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 26px rgba(31, 122, 114, 0.36);
+}
+
+.button-cta:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .confirmacao { transition: none; }
   .progress-fill,
   .progress-bar-fill { transition: none; }
   .file-drop { transition: none; }
+  .button-cta:hover { transform: none; }
 }
