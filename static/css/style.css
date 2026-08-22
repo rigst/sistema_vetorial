@@ -2041,8 +2041,16 @@ details[open] > summary .field-advanced-title::before {
   background: rgba(234, 244, 240, 0.1);
 }
 
-.field-popover input:focus,
+/* Mesmo problema do hover (ver acima): a regra global do tema claro tem a
+ * mesma especificidade de atributo+pseudo-classe, então precisa do
+ * [type="..."] aqui pra empatar e vencer por vir depois no arquivo — sem
+ * isto o fundo claro do tema principal aparecia atrás do texto claro do
+ * popover assim que um input/select ganhava foco (clicar nele, ou escolher
+ * uma opção do select). */
+.field-popover input[type="text"]:focus,
+.field-popover input[type="number"]:focus,
 .field-popover select:focus {
+  background: var(--fp-field);
   border-color: var(--fp-accent);
   box-shadow: 0 0 0 3px rgba(79, 216, 196, 0.18);
 }

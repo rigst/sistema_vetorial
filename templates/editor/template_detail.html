@@ -132,14 +132,23 @@
                         <input id="field-rotation" name="rotation" type="number" min="0" max="359.9" step="0.1">
                     </div>
                 </div>
+                <div class="field-group">
+                    <span class="field-group-label">Unidade da largura/altura</span>
+                    <div class="style-toggle-row" role="group" aria-label="Unidade de largura e altura">
+                        <input type="radio" id="field-size-unit-pt" name="field_size_unit" value="pt" class="visually-hidden style-toggle-input" checked>
+                        <label for="field-size-unit-pt" class="style-toggle" title="Pontos (pt)">pt</label>
+                        <input type="radio" id="field-size-unit-cm" name="field_size_unit" value="cm" class="visually-hidden style-toggle-input">
+                        <label for="field-size-unit-cm" class="style-toggle" title="Centímetros (cm)">cm</label>
+                    </div>
+                </div>
                 <div class="field-group-row">
                     <div class="field-group">
-                        <label for="field-width">Largura (pt)</label>
-                        <input id="field-width" name="width" type="number" min="10" step="1">
+                        <label for="field-width" id="field-width-label">Largura (pt)</label>
+                        <input id="field-width" name="width" type="number" min="1" step="1">
                     </div>
                     <div class="field-group">
-                        <label for="field-height">Altura (pt)</label>
-                        <input id="field-height" name="height" type="number" min="10" step="1">
+                        <label for="field-height" id="field-height-label">Altura (pt)</label>
+                        <input id="field-height" name="height" type="number" min="1" step="1">
                     </div>
                 </div>
                 <div class="field-group-row">
@@ -440,7 +449,7 @@
 <script src="{% static 'js/job_launcher.js' %}?v=20260822-05"></script>
 {% if preview_pages %}
 <script src="{% static 'js/fabric.min.js' %}?v=6.7.1"></script>
-<script src="{% static 'js/template_editor.js' %}?v=20260822-13"></script>
+<script src="{% static 'js/template_editor.js' %}?v=20260822-14"></script>
 <script>
 VetorialTemplateEditor.init({
   canvasId: "editor-canvas",

@@ -370,6 +370,38 @@ class JobTests(TestCase):
         self.assertIn("Coluna 9", payload["last_error"])
         self.assertEqual(payload["zip_url"], "")
 
+    def test_download_background_returns_the_original_file(self):
+        template = self._build_template()
+        job = GenerationJob.objects.create(
+            user=self.user,
+            template=template,
+            name="Job",
+            source_excel=self._build_excel_upload(),
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("jobs:download-background", kwargs={"pk": job.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(b"".join(response.streaming_content), template.background_pdf.read())
+
+    def test_download_background_hides_jobs_of_other_users(self):
+        template = self._build_template()
+        job = GenerationJob.objects.create(
+            user=self.user,
+            template=template,
+            name="Job",
+            source_excel=self._build_excel_upload(),
+        )
+        other_user = get_user_model().objects.create_user(
+            username="jobs-bisbilhoteiro-fundo", password="senha123"
+        )
+        self.client.force_login(other_user)
+
+        response = self.client.get(reverse("jobs:download-background", kwargs={"pk": job.pk}))
+
+        self.assertEqual(response.status_code, 404)
+
 
 @override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
 class JobProgressVisibilityTests(TransactionTestCase):

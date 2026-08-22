@@ -958,6 +958,41 @@
     };
     const GEOMETRY_KEYS = new Set(["font_size", "rotation", "width", "height", "vertical_align"]);
 
+    // Largura/altura aceitam pt ou cm na tela — só a apresentação muda; o
+    // que fica salvo (field.width/height) é sempre em pt, como sempre foi.
+    let sizeUnit = "pt";
+    const sizeUnitInputs = document.querySelectorAll('input[name="field_size_unit"]');
+    const widthLabelEl = document.getElementById("field-width-label");
+    const heightLabelEl = document.getElementById("field-height-label");
+    const ptToDisplaySize = (pt) => (sizeUnit === "cm" ? round2(pt * PT_TO_CM) : round2(pt));
+    const displaySizeToPt = (value) => (sizeUnit === "cm" ? value * CM_TO_PT : value);
+
+    const applySizeUnitToInputs = () => {
+      const unitLabel = sizeUnit === "cm" ? "cm" : "pt";
+      if (widthLabelEl) widthLabelEl.textContent = `Largura (${unitLabel})`;
+      if (heightLabelEl) heightLabelEl.textContent = `Altura (${unitLabel})`;
+      [panelInputs.width, panelInputs.height].forEach((input) => {
+        if (!input) return;
+        input.step = sizeUnit === "cm" ? "0.1" : "1";
+        input.min = sizeUnit === "cm" ? "0.1" : "1";
+      });
+    };
+    applySizeUnitToInputs();
+
+    sizeUnitInputs.forEach((input) => {
+      input.addEventListener("change", () => {
+        if (!input.checked) return;
+        // Só troca a apresentação dos dois campos pro novo padrão — o valor
+        // em pt guardado no field não muda, e nada é salvo por isto sozinho.
+        sizeUnit = input.value;
+        applySizeUnitToInputs();
+        const field = selectedFields()[0];
+        if (!field) return;
+        if (panelInputs.width) panelInputs.width.value = ptToDisplaySize(field.width);
+        if (panelInputs.height) panelInputs.height.value = ptToDisplaySize(field.height);
+      });
+    });
+
     // Cor/espessura/opacidade/blur do contorno não fazem nada com o contorno
     // desligado. O CSS já esconde isso visualmente (:has() em style.css); os
     // inputs ficam de fato desabilitados aqui — teclado e leitor de tela
@@ -1211,6 +1246,10 @@
         if (input.type === "checkbox") input.checked = Boolean(field[key]);
         else input.value = field[key] ?? "";
       });
+      // Largura/altura mostram no pt ou cm escolhido no seletor de unidade,
+      // não sempre em pt como o resto de PANEL_KEYS acima já deixou.
+      if (panelInputs.width) panelInputs.width.value = ptToDisplaySize(field.width);
+      if (panelInputs.height) panelInputs.height.value = ptToDisplaySize(field.height);
       if (colorPicker) colorPicker.value = field.color || "#000000";
       if (borderColorPicker) borderColorPicker.value = field.border_color || "#000000";
       Object.entries(rangeInputs).forEach(([key, input]) => {
@@ -1231,6 +1270,9 @@
           value = Number(String(value).replace(",", "."));
           if (!Number.isFinite(value)) return;
         }
+        // field.width/height ficam sempre em pt — o valor digitado só vem em
+        // cm quando o seletor de unidade está em "cm" (ver sizeUnit acima).
+        if (key === "width" || key === "height") value = round2(displaySizeToPt(value));
         if (key === "font_id") value = Number(value);
         field[key] = value;
         const obj = objectsById.get(field.id);

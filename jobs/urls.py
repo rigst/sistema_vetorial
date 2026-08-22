@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views import (
     GenerationItemDownloadView,
+    GenerationJobBackgroundDownloadView,
     GenerationJobCreateView,
     GenerationJobDeleteView,
     GenerationJobDetailView,
@@ -28,6 +29,11 @@ urlpatterns = [
         "<int:pk>/download/source/",
         GenerationJobSourceExcelDownloadView.as_view(),
         name="download-source",
+    ),
+    path(
+        "<int:pk>/download/fundo/",
+        GenerationJobBackgroundDownloadView.as_view(),
+        name="download-background",
     ),
     path("<int:pk>/download/zip/", GenerationJobZipDownloadView.as_view(), name="download-zip"),
     path("item/<int:pk>/download/", GenerationItemDownloadView.as_view(), name="download-item"),

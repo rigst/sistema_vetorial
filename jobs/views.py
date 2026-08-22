@@ -303,6 +303,25 @@ class GenerationJobSourceExcelDownloadView(LoginRequiredMixin, View):
         )
 
 
+class GenerationJobBackgroundDownloadView(LoginRequiredMixin, View):
+    """O fundo original (PDF/PNG/JPG/WebP) enviado no template — útil pra
+    quem precisa editar a arte de novo sem ter guardado o arquivo à parte."""
+
+    def get(self, request, *args, **kwargs):
+        job = (
+            GenerationJob.objects.filter(pk=kwargs["pk"], user=request.user)
+            .select_related("template")
+            .first()
+        )
+        if not job or not job.template.background_pdf:
+            return JsonResponse({"error": "not_found"}, status=404)
+        return FileResponse(
+            job.template.background_pdf.open("rb"),
+            as_attachment=True,
+            filename=job.template.background_pdf.name.split("/")[-1],
+        )
+
+
 class GenerationItemDownloadView(LoginRequiredMixin, View):
     def get(self, request, *args, **kwargs):
         item = (

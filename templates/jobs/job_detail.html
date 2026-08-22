@@ -69,6 +69,8 @@
         <dl>
             <dt>Template</dt>
             <dd>{{ job.template.name }}</dd>
+            <dt>Fundo</dt>
+            <dd><a class="link-action" href="{% url 'jobs:download-background' job.pk %}">Baixar original</a></dd>
             <dt>Excel</dt>
             <dd><a class="link-action" href="{% url 'jobs:download-source' job.pk %}">Baixar original</a></dd>
             <dt>Tipo</dt>

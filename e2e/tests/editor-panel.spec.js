@@ -159,6 +159,48 @@ test.describe("Painel do campo: organização e estados", () => {
     ]);
     await expect(page.locator("#editor-save-state")).toHaveText(/Salvo/, { timeout: 10_000 });
   });
+
+  test("largura e altura aceitam pt ou cm", async ({ page }) => {
+    await openBancadaAndSelectField(page);
+
+    const widthPt = await page.locator("#field-width").inputValue();
+    expect(Number(widthPt)).toBeCloseTo(600, 0);
+
+    // O rádio fica visually-hidden atrás do toggle estilizado — clicar a
+    // label é o gesto real, .check() no input não tem área visível pra clicar.
+    await page.locator('label[for="field-size-unit-cm"]').click();
+    await expect(page.locator("#field-width-label")).toHaveText("Largura (cm)");
+    const widthCm = await page.locator("#field-width").inputValue();
+    expect(Number(widthCm)).toBeCloseTo(21.17, 1);
+
+    await Promise.all([
+      page.waitForResponse(
+        (res) => res.url().includes("/campos/") && res.request().method() === "PATCH"
+      ),
+      page.locator("#field-width").fill("15"),
+    ]);
+    await page.locator("#field-width").blur();
+    await expect(page.locator("#editor-save-state")).toHaveText(/Salvo/, { timeout: 10_000 });
+
+    // O que fica salvo (field.width) é sempre em pt, não importa a unidade
+    // escolhida na tela — 15 cm ≈ 425.2 pt.
+    const savedWidthPt = await page.evaluate(
+      () => window.__vetorialEditor.fields.find((f) => f.name === "Nome").width
+    );
+    expect(savedWidthPt).toBeCloseTo(425.2, 0);
+
+    // Devolve o valor original e a unidade padrão (pt) pra não afetar outros
+    // testes que reaproveitam o campo "Nome" neste mesmo banco.
+    await page.locator('label[for="field-size-unit-pt"]').click();
+    await Promise.all([
+      page.waitForResponse(
+        (res) => res.url().includes("/campos/") && res.request().method() === "PATCH"
+      ),
+      page.locator("#field-width").fill("600"),
+    ]);
+    await page.locator("#field-width").blur();
+    await expect(page.locator("#editor-save-state")).toHaveText(/Salvo/, { timeout: 10_000 });
+  });
 });
 
 test.describe("Botões de ícone: ação destrutiva não parece CTA primário", () => {
