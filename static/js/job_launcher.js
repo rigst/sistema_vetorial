@@ -268,6 +268,11 @@
     const filenamePatternInput = document.getElementById("filename-pattern-input");
     const filenamePatternSaveState = document.getElementById("filename-pattern-save-state");
     const filenamePatternUrl = card.dataset.filenamePatternUrl;
+    const filenamePreviewName = document.getElementById("filename-preview-name");
+    // Atribuída de verdade mais abaixo, perto de selectedCaseColumns —
+    // declarada já aqui porque os listeners do padrão/espaços (registrados
+    // antes) também precisam poder chamá-la.
+    let renderFilenamePreview = () => {};
 
     if (filenamePatternInput && filenamePatternUrl) {
       let saveTimer = null;
@@ -303,6 +308,7 @@
         setSaveState(null, "");
         window.clearTimeout(saveTimer);
         saveTimer = window.setTimeout(saveFilenamePattern, 600);
+        renderFilenamePreview();
       });
       filenamePatternInput.addEventListener("blur", () => {
         window.clearTimeout(saveTimer);
@@ -350,11 +356,13 @@
       spaceModeSelect.addEventListener("change", () => {
         syncReplacementVisibility();
         saveSpaceMode();
+        renderFilenamePreview();
       });
       spaceReplacementInput?.addEventListener("input", () => {
         setSpaceSaveState(null, "");
         window.clearTimeout(spaceSaveTimer);
         spaceSaveTimer = window.setTimeout(saveSpaceMode, 600);
+        renderFilenamePreview();
       });
       spaceReplacementInput?.addEventListener("blur", () => {
         window.clearTimeout(spaceSaveTimer);
@@ -375,6 +383,47 @@
       const selectedCaseColumns = new Set(
         caseColumnsDataEl ? JSON.parse(caseColumnsDataEl.textContent || "[]") : []
       );
+
+      // Amostra ao vivo do nome do arquivo: mesma lógica de
+      // jobs/services.py (render_column_template + _filename_column_transform
+      // + _sanitize_filename_component), com valores de exemplo no lugar dos
+      // dados reais da planilha (que só existem depois do upload).
+      const FILENAME_PREVIEW_EXAMPLES = ["Ana Paula da Conceição", "Design", "Turma A", "2026", "Manhã"];
+      const exampleColumnValue = (columnNumber) =>
+        FILENAME_PREVIEW_EXAMPLES[(columnNumber - 1) % FILENAME_PREVIEW_EXAMPLES.length];
+
+      const stripAccentsJs = (value) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+      renderFilenamePreview = () => {
+        if (!filenamePreviewName) return;
+        const pattern = (filenamePatternInput?.value || "").trim();
+        const caseValue = caseSelect?.value || "none";
+
+        const columnText = (columnNumber) => {
+          let value = exampleColumnValue(columnNumber);
+          if (stripAccentsCheckbox?.checked) value = stripAccentsJs(value);
+          const applyCase = caseValue !== "none" && (!selectedCaseColumns.size || selectedCaseColumns.has(columnNumber));
+          if (applyCase) value = caseValue === "upper" ? value.toUpperCase() : value.toLowerCase();
+          return value;
+        };
+
+        let base = !pattern
+          ? ""
+          : /^\d+$/.test(pattern)
+            ? columnText(Number(pattern))
+            : pattern.replace(/\{(\d+)\}/g, (_, n) => columnText(Number(n)));
+
+        base = base.replace(/\s+/g, " ").trim();
+        const spaceMode = spaceModeSelect?.value || "keep";
+        if (spaceMode === "strip") {
+          base = base.replace(/ /g, "");
+        } else if (spaceMode === "replace") {
+          const replacement = (spaceReplacementInput?.value || "-").trim() || "-";
+          base = base.replace(/ /g, replacement);
+        }
+
+        filenamePreviewName.textContent = `${base || "certificado-linha-1"}.pdf`;
+      };
 
       const columnRefsFromPattern = (pattern) => {
         const trimmed = String(pattern || "").trim();
@@ -442,6 +491,7 @@
             if (input.checked) selectedCaseColumns.add(columnNumber);
             else selectedCaseColumns.delete(columnNumber);
             saveCaseOptions();
+            renderFilenamePreview();
           });
           label.appendChild(input);
           label.append(`Coluna ${columnNumber}`);
@@ -467,14 +517,22 @@
         }
       };
 
-      stripAccentsCheckbox?.addEventListener("change", saveStripAccents);
+      stripAccentsCheckbox?.addEventListener("change", () => {
+        saveStripAccents();
+        renderFilenamePreview();
+      });
       caseSelect?.addEventListener("change", () => {
         syncCaseColumnsUI();
         saveCaseOptions();
+        renderFilenamePreview();
       });
-      filenamePatternInput?.addEventListener("input", syncCaseColumnsUI);
+      filenamePatternInput?.addEventListener("input", () => {
+        syncCaseColumnsUI();
+        renderFilenamePreview();
+      });
 
       syncCaseColumnsUI();
+      renderFilenamePreview();
     }
 
     previewButton?.addEventListener("click", () => launch("preview"));

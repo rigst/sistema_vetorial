@@ -89,7 +89,9 @@ test.describe("Barra de ferramentas: ícones numa linha, sem quadrado", () => {
     await expect(newButton).toHaveAttribute("aria-label", "Novo campo");
     await expect(duplicateButton).toHaveText("⧉");
     await expect(duplicateButton).toHaveAttribute("aria-label", "Duplicar seleção");
-    await expect(deleteButton).toHaveText("🗑");
+    // A lixeira virou um ícone SVG (linha, igual aos outros da barra) em vez
+    // do emoji colorido — sem texto, só o aria-label identifica o botão.
+    await expect(deleteButton.locator("svg")).toBeAttached();
     await expect(deleteButton).toHaveAttribute("aria-label", "Excluir seleção");
 
     // O "quadrado em volta" era uma borda nos 4 lados do #editor-toolbar; a
@@ -121,8 +123,8 @@ test.describe("Card \"Gerar arquivos\" é uma seção separada", () => {
     });
     expect(isInsideFieldPanel).toBe(false);
 
-    // O card de gerar arquivos carrega tanto a configuração do nome quanto o
-    // envio do Excel — é a mesma seção, só que fora da edição do template.
+    // Nome do arquivo e envio do Excel vivem em cartões separados, mas os
+    // dois moram dentro do mesmo #generate-card (fora da edição do template).
     await expect(page.locator("#generate-card #filename-pattern-input")).toBeVisible();
     await expect(page.locator("#generate-card #generate-excel-input")).toBeAttached();
   });
@@ -137,8 +139,10 @@ test.describe("Nome dos arquivos: padrão com colunas e espaços", () => {
   test("salva o padrão {N} e explica a sintaxe", async ({ page }) => {
     await openBancada(page);
 
-    await expect(page.locator(".filename-pattern-config")).toContainText("{1}");
-    await expect(page.locator(".filename-pattern-config")).toContainText(".pdf");
+    await expect(page.locator(".filename-card")).toContainText("{1}");
+    // A extensão ".pdf" hoje só aparece na amostra ao vivo do nome do
+    // arquivo (o texto de ajuda deixou de repetir isso).
+    await expect(page.locator("#filename-preview-name")).toContainText(".pdf");
 
     await setFilenamePattern(page, "{1}_{2}");
   });

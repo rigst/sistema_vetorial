@@ -26,7 +26,15 @@
             <div class="toolbar-group">
                 <button type="button" class="toolbar-button" id="new-field-button" title="Novo campo" aria-label="Novo campo">+</button>
                 <button type="button" class="toolbar-button" id="duplicate-field-button" title="Duplicar seleção (Ctrl+D)" aria-label="Duplicar seleção">⧉</button>
-                <button type="button" class="toolbar-button toolbar-button-danger" id="delete-field-button" title="Excluir seleção (Delete)" aria-label="Excluir seleção">🗑</button>
+                <button type="button" class="toolbar-button toolbar-button-danger" id="delete-field-button" title="Excluir seleção (Delete)" aria-label="Excluir seleção">
+                    <svg class="toolbar-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M3 6h18"></path>
+                        <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                        <path d="M10 11v6"></path>
+                        <path d="M14 11v6"></path>
+                    </svg>
+                </button>
             </div>
             <div class="toolbar-group">
                 <button type="button" class="toolbar-button" id="undo-button" title="Desfazer (Ctrl+Z)">↶</button>
@@ -273,32 +281,40 @@
     </div>
 </section>
 
-<section class="panel generate-card" id="generate-card"
+<div class="generate-shell" id="generate-card"
     data-launch-url="{% url 'jobs:launch' %}"
     data-template-id="{{ template_obj.pk }}"
     data-filename-pattern-url="{% url 'editor:filename-pattern-update' template_obj.pk %}">
-    <div class="section-header">
-        <h2 class="section-title">Gerar arquivos</h2>
-    </div>
     {% csrf_token %}
-    <div class="generate-layout">
-        <div class="filename-pattern-config">
-            <h3 class="field-section-label">Nome dos arquivos</h3>
+
+    <section class="panel filename-card">
+        <div class="section-header">
+            <h2 class="section-title">Nome dos arquivos</h2>
+        </div>
+
+        <div class="field-group">
+            <label for="filename-pattern-input">Padrão do nome de cada PDF</label>
+            <input type="text" id="filename-pattern-input" name="filename_pattern"
+                   placeholder="{1}_{2}" value="{{ template_obj.filename_pattern }}">
+            <p class="field-hint">
+                Use <code>{1}</code>, <code>{2}</code>… para o texto de cada coluna da planilha.
+                <code>{1}_{2}</code> junta a coluna 1 e a 2 com um "_" no meio;
+                <code>{3}-{5}</code> junta a coluna 3 e a 5 com um traço.
+                Em branco, usa o nome padrão (nome do lote + número da linha).
+            </p>
+            <span class="save-state" id="filename-pattern-save-state"></span>
+        </div>
+
+        <div class="filename-preview" id="filename-preview">
+            <span class="filename-preview-label">Assim vai ficar</span>
+            <span class="filename-preview-name" id="filename-preview-name">certificado-linha-1.pdf</span>
+        </div>
+
+        <div class="filename-options">
+            <h3 class="field-section-label">Ajustes do texto</h3>
+
             <div class="field-group">
-                <label for="filename-pattern-input">Padrão do nome de cada PDF</label>
-                <input type="text" id="filename-pattern-input" name="filename_pattern"
-                       placeholder="{1}_{2}" value="{{ template_obj.filename_pattern }}">
-                <p class="field-hint">
-                    Use <code>{1}</code>, <code>{2}</code>… para o texto de cada coluna da planilha.
-                    <code>{1}_{2}</code> junta a coluna 1 e a 2 com um "_" no meio;
-                    <code>{3}-{5}</code> junta a coluna 3 e a 5 com um traço.
-                    A extensão <code>.pdf</code> é adicionada sozinha no final.
-                    Em branco, usa o nome padrão (nome do lote + número da linha).
-                </p>
-                <span class="save-state" id="filename-pattern-save-state"></span>
-            </div>
-            <div class="field-group">
-                <label for="filename-space-mode">Espaços em branco no nome do arquivo</label>
+                <label for="filename-space-mode">Espaços em branco</label>
                 <div class="filename-space-row">
                     <select id="filename-space-mode" name="filename_space_mode">
                         {% for value, label in filename_space_mode_choices %}
@@ -311,24 +327,19 @@
                            {% if template_obj.filename_space_mode != "replace" %}hidden{% endif %}
                            aria-label="Caractere para substituir espaços">
                 </div>
-                <p class="field-hint">
-                    Só afeta o texto vindo das colunas do Excel dentro do padrão acima. Sem
-                    escolher nada, os espaços do texto aparecem normalmente no nome do arquivo.
-                </p>
+                <p class="field-hint">Sem escolher nada, os espaços do texto aparecem normalmente.</p>
                 <span class="save-state" id="filename-space-save-state"></span>
             </div>
+
             <div class="field-group">
                 <div class="field-toggle-row">
                     <input type="checkbox" id="filename-strip-accents" name="filename_strip_accents"
                            {% if template_obj.filename_strip_accents %}checked{% endif %}>
-                    <label for="filename-strip-accents">Remover acentos e caracteres especiais (ç, ã, ü…)</label>
+                    <label for="filename-strip-accents">Remover acentos (ç → c, ã → a, ü → u…)</label>
                 </div>
-                <p class="field-hint">
-                    Troca cada letra pela versão simples (ç → c, ã → a, ü → u…) só no texto
-                    vindo das colunas do Excel dentro do padrão acima.
-                </p>
                 <span class="save-state" id="filename-strip-accents-save-state"></span>
             </div>
+
             <div class="field-group">
                 <label for="filename-case">Maiúsculas / minúsculas</label>
                 <select id="filename-case" name="filename_case">
@@ -347,7 +358,12 @@
                 <span class="save-state" id="filename-case-save-state"></span>
             </div>
         </div>
+    </section>
 
+    <section class="panel generate-steps-card">
+        <div class="section-header">
+            <h2 class="section-title">Gerar arquivos</h2>
+        </div>
         <div class="generate-steps">
             <label class="file-drop" id="generate-file-label" for="generate-excel-input">
                 <span id="generate-file-name">Escolher o Excel com os dados (.xlsx)</span>
@@ -388,8 +404,8 @@
                 <ul class="generate-items" id="generate-items"></ul>
             </div>
         </div>
-    </div>
-</section>
+    </section>
+</div>
 
 {{ field_json|json_script:"editor-field-data" }}
 {{ font_json|json_script:"editor-font-data" }}
@@ -398,10 +414,10 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/job_launcher.js' %}?v=20260822-03"></script>
+<script src="{% static 'js/job_launcher.js' %}?v=20260822-04"></script>
 {% if preview_pages %}
 <script src="{% static 'js/fabric.min.js' %}?v=6.7.1"></script>
-<script src="{% static 'js/template_editor.js' %}?v=20260822-10"></script>
+<script src="{% static 'js/template_editor.js' %}?v=20260822-11"></script>
 <script>
 VetorialTemplateEditor.init({
   canvasId: "editor-canvas",

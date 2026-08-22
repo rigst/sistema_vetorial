@@ -1184,20 +1184,50 @@
       };
     };
 
+    // Tenta várias posições ao redor do campo (direita, abaixo, esquerda,
+    // acima) e escolhe a primeira que não sobrepõe o próprio campo depois de
+    // encaixada nos limites do wrap — um campo largo (comum em certificado)
+    // deixava pouca sobra dos dois lados, e o popover "flip" antigo (só
+    // direita/esquerda) acabava clampado em cima do texto do campo.
     const positionPopover = (box) => {
       if (!panelEl) return;
       const wrapW = wrap.clientWidth;
       const wrapH = wrap.clientHeight;
       const margin = 10;
-      const popW = panelEl.offsetWidth || 340;
+      const popW = panelEl.offsetWidth || 300;
       const popH = panelEl.offsetHeight || 400;
-      let left = box.right + margin;
-      if (left + popW > wrapW - margin) left = box.left - popW - margin;
-      left = clamp(left, margin, Math.max(margin, wrapW - popW - margin));
-      let top = box.top;
-      top = clamp(top, margin, Math.max(margin, wrapH - popH - margin));
-      panelEl.style.left = `${left}px`;
-      panelEl.style.top = `${top}px`;
+      const maxLeft = Math.max(margin, wrapW - popW - margin);
+      const maxTop = Math.max(margin, wrapH - popH - margin);
+
+      const candidates = [
+        { left: box.right + margin, top: box.top }, // direita do campo
+        { left: box.left, top: box.bottom + margin }, // abaixo do campo
+        { left: box.left - popW - margin, top: box.top }, // esquerda do campo
+        { left: box.left, top: box.top - popH - margin }, // acima do campo
+      ].map((c) => ({
+        left: clamp(c.left, margin, maxLeft),
+        top: clamp(c.top, margin, maxTop),
+      }));
+
+      const overlapArea = (c) => {
+        const ox = Math.min(c.left + popW, box.right) - Math.max(c.left, box.left);
+        const oy = Math.min(c.top + popH, box.bottom) - Math.max(c.top, box.top);
+        return Math.max(0, ox) * Math.max(0, oy);
+      };
+
+      let best = candidates[0];
+      let bestOverlap = overlapArea(best);
+      for (const c of candidates) {
+        const overlap = overlapArea(c);
+        if (overlap < bestOverlap) {
+          best = c;
+          bestOverlap = overlap;
+        }
+        if (overlap === 0) break;
+      }
+
+      panelEl.style.left = `${best.left}px`;
+      panelEl.style.top = `${best.top}px`;
     };
 
     const openPopoverFor = (obj) => {

@@ -1721,10 +1721,16 @@ details[open] > summary .field-advanced-title::before {
   flex-wrap: wrap;
   gap: 0.55rem;
   align-items: center;
+  justify-content: center;
   width: 100%;
   padding: 0.55rem 0.75rem;
   background: #16211d;
   border-bottom: 1px solid rgba(234, 244, 240, 0.1);
+}
+
+.toolbar-icon {
+  display: block;
+  vertical-align: middle;
 }
 
 /* Sem caixa: um traço fino separa os grupos, a barra inteira lê como uma
@@ -1755,6 +1761,9 @@ details[open] > summary .field-advanced-title::before {
   cursor: pointer;
   transition: background var(--transition), color var(--transition);
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .toolbar-button:hover {
@@ -2331,11 +2340,6 @@ a.eyebrow:hover {
   display: inline-flex;
 }
 
-/* Card de geração na bancada */
-.generate-card {
-  margin-top: 1rem;
-}
-
 .generate-steps {
   display: grid;
   gap: 0.75rem;
@@ -2524,30 +2528,66 @@ label.toolbar-button {
   border-radius: 6px;
 }
 
-/* O card de geração virou uma seção de largura cheia, fora da coluna
- * estreita da bancada — cabe lado a lado com a configuração de nome de
- * arquivo, uma bem mais larga que a outra. */
-.generate-layout {
+/* Nome dos arquivos e geração viraram dois quadros separados (antes eram
+ * duas colunas dentro do mesmo cartão) — cada assunto no seu próprio
+ * cartão, lado a lado onde cabe. */
+.generate-shell {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
   gap: 1.5rem;
   align-items: start;
+  margin-top: 1rem;
 }
 
-.filename-pattern-config {
+.filename-card,
+.generate-steps-card {
   display: grid;
-  gap: 0.7rem;
+  gap: 0.9rem;
   align-content: start;
-  padding-right: 1.5rem;
-  border-right: 1px solid var(--border);
 }
 
-.filename-pattern-config .field-hint code,
 .field-hint code {
   background: var(--surface-strong-2);
   border-radius: 4px;
   padding: 0.05rem 0.35rem;
   font-size: 0.85em;
+}
+
+/* Amostra ao vivo do resultado (nomes de coluna de exemplo, já com os
+ * ajustes de texto aplicados) — mais rápido de entender do que só ler a
+ * descrição de cada opção. */
+.filename-preview {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.65rem 0.9rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-strong-2);
+  border: 1px solid var(--border);
+}
+
+.filename-preview-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.filename-preview-name {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+
+.filename-options {
+  display: grid;
+  gap: 0.8rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--border);
 }
 
 .filename-space-row {
@@ -2566,27 +2606,20 @@ label.toolbar-button {
   text-align: center;
 }
 
-.filename-pattern-config .save-state {
+.generate-shell .save-state {
   font-size: 0.78rem;
   color: var(--muted);
   min-height: 1.1em;
   font-weight: 600;
 }
 
-.filename-pattern-config .save-state[data-tone="ok"] { color: var(--success); }
-.filename-pattern-config .save-state[data-tone="busy"] { color: var(--warning); }
-.filename-pattern-config .save-state[data-tone="error"] { color: var(--danger); }
+.generate-shell .save-state[data-tone="ok"] { color: var(--success); }
+.generate-shell .save-state[data-tone="busy"] { color: var(--warning); }
+.generate-shell .save-state[data-tone="error"] { color: var(--danger); }
 
 @media (max-width: 860px) {
-  .generate-layout {
+  .generate-shell {
     grid-template-columns: 1fr;
-  }
-
-  .filename-pattern-config {
-    padding-right: 0;
-    border-right: 0;
-    padding-bottom: 1rem;
-    border-bottom: 1px solid var(--border);
   }
 }
 
