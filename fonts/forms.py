@@ -14,8 +14,16 @@ class FontAssetForm(forms.ModelForm):
     class Meta:
         model = FontAsset
         fields = ["name", "file"]
+        labels = {
+            "name": "Nome",
+            "file": "Arquivo (TTF ou OTF)",
+        }
         widgets = {
             "name": forms.TextInput(attrs={"placeholder": "Nome da fonte"}),
+            "file": forms.ClearableFileInput(attrs={"accept": ".ttf,.otf"}),
+        }
+        help_texts = {
+            "name": "Deixe em branco para usar o nome do arquivo.",
         }
 
     def clean_file(self):

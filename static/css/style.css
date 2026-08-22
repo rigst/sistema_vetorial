@@ -253,14 +253,20 @@ button[type="submit"]:focus-visible {
   color: #ffffff;
 }
 
-.button-secondary,
-.button-secondary:hover {
+/* Mesmo empate de especificidade do .icon-button (ver nota acima): um
+ * `<button type="submit" class="button-secondary">` (Reprocessar, Inativar,
+ * Gerar lote completo no formulário de job) herdava o preenchimento sólido
+ * do CTA primário, porque `button[type="submit"]` (elemento + atributo)
+ * empata com uma classe só e vem antes no arquivo. As duas ações ficavam
+ * idênticas ao botão principal da tela, sem diferenciação nenhuma. */
+.button-secondary.button-secondary,
+.button-secondary.button-secondary:hover {
   background: var(--surface);
   color: var(--text);
   border-color: var(--border-strong);
 }
 
-.button-secondary:hover {
+.button-secondary.button-secondary:hover {
   border-color: var(--accent);
   color: var(--accent);
 }
@@ -1406,6 +1412,22 @@ details[open] > summary .field-advanced-title::before {
 }
 
 @media (max-width: 860px) {
+  /* .nav-toggle/.header-user-meta/.nav-bottom/.nav-links abaixo não têm
+   * elemento correspondente em base.html (é CSS de outro app da família
+   * Stölben) — ficam de propósito, sem risco, mas quem resolve a barra
+   * deste app de verdade é a regra de .topbar logo depois. Sem ela, em
+   * telas estreitas "Arquivos · Fontes · usuário · sair" vazava para fora
+   * da tela e "sair" ficava cortado. */
+  .topbar {
+    flex-wrap: wrap;
+    row-gap: 0.5rem;
+  }
+
+  .topbar-right {
+    flex-wrap: wrap;
+    row-gap: 0.4rem;
+  }
+
   .nav-toggle {
     display: inline-flex;
   }
@@ -2393,11 +2415,16 @@ label.toolbar-button {
 
 /* Botão que se apresenta como link (recusar sem aceitar). O onclick inline
    seria bloqueado pela CSP, então a recusa é um submit de verdade. */
-.link-button {
+/* Mesmo empate de especificidade das outras regras .button-*: sem dobrar a
+ * classe, "Sair da conta" (link-button dentro de um <button type="submit">,
+ * no interstitial de recusa dos termos) herdava o preenchimento sólido do
+ * CTA primário e quebrava a frase em que devia ser só um link sublinhado. */
+.link-button.link-button {
   background: none;
   border: 0;
   padding: 0;
   font: inherit;
+  color: inherit;
   cursor: pointer;
   text-decoration: underline;
 }

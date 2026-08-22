@@ -101,6 +101,42 @@ test.describe("Botões de ícone: ação destrutiva não parece CTA primário", 
   });
 });
 
+test.describe("Job: Reprocessar/Inativar não parecem o CTA primário", () => {
+  test("botões secundários do job ficam neutros, não preenchidos", async ({ page }) => {
+    await login(page);
+    await page.goto("/templates/");
+    await page.getByRole("link", { name: /Certificado E2E/i }).first().click();
+    await expect(page.locator("#generate-card")).toBeVisible();
+
+    await page.locator("#generate-excel-input").setInputFiles(
+      require("path").join(__dirname, "..", ".tmp", "dados.xlsx")
+    );
+    await page.getByRole("button", { name: /Gerar amostra/i }).click();
+    await expect(page.locator("#generate-progress-text")).toHaveText(/arquivos? pronto/, {
+      timeout: 30_000,
+    });
+
+    await page.goto("/jobs/");
+    await page.locator('a[title="Abrir"]').first().click();
+    // Job de prévia: "Gerar lote completo" é o CTA primário da tela.
+    await expect(page.getByRole("button", { name: "Gerar lote completo" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Reprocessar" })).toBeVisible();
+
+    const primaryBg = await page
+      .getByRole("button", { name: "Gerar lote completo" })
+      .evaluate((el) => getComputedStyle(el).backgroundColor);
+    const reprocessarBg = await page
+      .getByRole("button", { name: "Reprocessar" })
+      .evaluate((el) => getComputedStyle(el).backgroundColor);
+    const inativarBg = await page
+      .getByRole("button", { name: "Inativar" })
+      .evaluate((el) => getComputedStyle(el).backgroundColor);
+
+    expect(reprocessarBg).not.toBe(primaryBg);
+    expect(inativarBg).not.toBe(primaryBg);
+  });
+});
+
 test.describe("Lista de fontes: cada linha no seu próprio tipo", () => {
   test("as linhas usam famílias de fonte diferentes entre si", async ({ page }) => {
     await login(page);

@@ -167,3 +167,15 @@ class StaticAssetTests(TestCase):
         # Controles que só valem com o contorno ligado ficam visualmente
         # apagados via :has() — sem depender do JS terminar de rodar.
         self.assertIn("#field-outline-details:has(#field-border-enabled:not(:checked))", css)
+
+    def test_button_secondary_and_link_button_win_over_the_global_submit_rule(self):
+        css = (Path(settings.BASE_DIR) / "static/css/style.css").read_text(encoding="utf-8")
+
+        # Mesmo bug do .icon-button, dois lugares a mais onde apareceu:
+        # "Reprocessar"/"Inativar" (job_detail.html) e "Gerar lote completo"
+        # (job_form.html) são <button type="submit" class="button-secondary">
+        # e saíam com o preenchimento sólido do CTA primário; "Sair da conta"
+        # (link-button, no interstitial de recusa dos termos) quebrava a
+        # frase virando um botão cheio no meio do parágrafo.
+        self.assertIn(".button-secondary.button-secondary", css)
+        self.assertIn(".link-button.link-button", css)

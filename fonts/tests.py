@@ -132,3 +132,22 @@ class FontListPreviewTests(TestCase):
         self.assertContains(found, "Dejavu Sans")
         self.assertContains(missing, "Nenhuma fonte encontrada")
         self.assertIn('name="q"', found.content.decode())
+
+    def test_form_labels_are_in_portuguese(self):
+        """Regressão: o form nasceu sem `labels`, então Django gerava "Name"
+        e "File" a partir do nome interno do campo — os únicos rótulos em
+        inglês no meio de um app inteiro em pt-BR."""
+        form = FontAssetForm()
+
+        self.assertEqual(form.fields["name"].label, "Nome")
+        self.assertEqual(form.fields["file"].label, "Arquivo (TTF ou OTF)")
+
+    def test_create_page_does_not_leak_english_labels(self):
+        self.client.force_login(self.user)
+
+        html = self.client.get(reverse("fonts:create")).content.decode()
+
+        self.assertNotIn(">Name<", html)
+        self.assertNotIn(">File<", html)
+        self.assertIn(">Nome<", html)
+        self.assertIn("Arquivo (TTF ou OTF)", html)
