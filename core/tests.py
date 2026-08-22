@@ -62,6 +62,15 @@ class CoreTests(TestCase):
             get_user_model().objects.filter(username__startswith="visitante_").exists()
         )
 
+    def test_authenticated_nav_links_to_jobs(self):
+        user = get_user_model().objects.create_user(username="nav-user", password="senha123")
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("editor:list"))
+
+        self.assertContains(response, f'href="{reverse("jobs:list")}"')
+        self.assertContains(response, "Arquivos")
+
     def test_ensure_default_fonts_creates_builtin_fonts(self):
         user = get_user_model().objects.create_user(username="font-user", password="senha123")
         ensure_default_fonts(user)

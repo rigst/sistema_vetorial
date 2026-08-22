@@ -66,6 +66,10 @@ def main() -> None:
         ],
     )
     (TMP_DIR / "dados.csv").write_text("Nome,Curso\nana,Design\n", encoding="utf-8")
+    build_excel(
+        TMP_DIR / "dados_grande.xlsx",
+        [[f"pessoa {i:02d} da silva", "Turma Grande"] for i in range(1, 31)],
+    )
 
     User = get_user_model()
     user, _ = User.objects.get_or_create(username=USERNAME)

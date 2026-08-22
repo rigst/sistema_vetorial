@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}StölbenVetorial{% endblock %}</title>
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20260821-01">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20260822-01">
 </head>
 <body>
     <header class="site-header">
@@ -13,6 +13,7 @@
             <a href="{% url 'core:home' %}" class="brand">Stölben<span>Vetorial</span></a>
             {% if user.is_authenticated %}
                 <div class="topbar-right">
+                    <a class="topbar-link {% if request.resolver_match.namespace == 'jobs' %}active{% endif %}" href="{% url 'jobs:list' %}">Arquivos</a>
                     <a class="topbar-link {% if request.resolver_match.namespace == 'fonts' %}active{% endif %}" href="{% url 'fonts:list' %}">Fontes</a>
                     <span class="topbar-user">{{ app_display_name }}</span>
                     <form action="{% url 'logout' %}" method="post">

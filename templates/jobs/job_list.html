@@ -31,7 +31,7 @@
                         <tr>
                             <td>{{ job.name }}</td>
                             <td>{{ job.template.name }}</td>
-                            <td>{{ job.get_status_display }}</td>
+                            <td><span class="status-pill status-{{ job.status }}"><span class="status-dot" aria-hidden="true"></span>{{ job.get_status_display }}</span></td>
                             <td>{{ job.processed_rows }}/{{ job.total_rows }}</td>
                             <td class="inline-actions icon-actions">
                                 <a class="icon-button" href="{% url 'jobs:detail' job.pk %}" title="Abrir" aria-label="Abrir">👁</a>

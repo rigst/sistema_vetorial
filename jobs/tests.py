@@ -25,7 +25,7 @@ from fonts.models import FontAsset
 
 from . import services
 from .forms import GenerationJobForm
-from .models import GenerationJob
+from .models import GenerationItem, GenerationJob
 from .services import _merge_overlay, format_field_value, process_job
 
 TEST_MEDIA_ROOT = tempfile.mkdtemp(prefix="sistema_vetorial_jobs_tests_")
@@ -702,3 +702,161 @@ class OutputFidelityTests(TestCase):
             _merge_overlay(template.background_pdf.path, overlay_buffer.getvalue(), wrong)
 
         self.assertIn("Reenvie o fundo", str(raised.exception))
+
+
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
+class JobDetailAndStatusWindowingTests(TestCase):
+    """A tela do job e o polling de status precisam aguentar um lote grande:
+    a tabela pagina, os chips filtram por estado e o JSON de status nunca
+    devolve o lote inteiro de uma vez."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = get_user_model().objects.create_user(
+            username="jobs-windowing", password="senha123"
+        )
+
+    def _template(self) -> DocumentTemplate:
+        template = DocumentTemplate.objects.create(
+            user=self.user,
+            name="Lote grande",
+            slug=f"lote-grande-{DocumentTemplate.objects.count()}",
+            background_pdf=self._build_pdf_upload(),
+        )
+        update_template_pdf_metadata(template)
+        return template
+
+    def _build_pdf_upload(self) -> SimpleUploadedFile:
+        temp_dir = Path(tempfile.mkdtemp(prefix="jobs-window-pdf-"))
+        pdf_path = temp_dir / "background.pdf"
+        pdf_canvas = canvas.Canvas(str(pdf_path), pagesize=(400, 120))
+        pdf_canvas.showPage()
+        pdf_canvas.save()
+        content = pdf_path.read_bytes()
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        return SimpleUploadedFile("background.pdf", content, content_type="application/pdf")
+
+    def _job_with_items(self, *, total: int, failed_rows: set[int] = frozenset()) -> GenerationJob:
+        template = self._template()
+        job = GenerationJob.objects.create(
+            user=self.user,
+            template=template,
+            name="Lote grande",
+            source_excel=self._build_excel_upload(rows=[["x", "y"]] * total),
+            kind=GenerationJob.Kind.FULL,
+            status=GenerationJob.Status.COMPLETED,
+            total_rows=total,
+            processed_rows=total,
+            success_rows=total - len(failed_rows),
+            failed_rows=len(failed_rows),
+        )
+        for row_number in range(1, total + 1):
+            is_failed = row_number in failed_rows
+            GenerationItem.objects.create(
+                job=job,
+                row_number=row_number,
+                status=(
+                    GenerationItem.Status.FAILED if is_failed else GenerationItem.Status.COMPLETED
+                ),
+                error_message="Falha de teste" if is_failed else "",
+            )
+        return job
+
+    def _build_excel_upload(self, rows) -> SimpleUploadedFile:
+        buffer = io.BytesIO()
+        workbook = Workbook()
+        workbook.active.append(["Nome", "Empresa"])
+        for row in rows:
+            workbook.active.append(row)
+        workbook.save(buffer)
+        return SimpleUploadedFile("dados.xlsx", buffer.getvalue())
+
+    def test_detail_paginates_items_in_windows_of_25(self):
+        job = self._job_with_items(total=40)
+        self.client.force_login(self.user)
+
+        first_page = self.client.get(reverse("jobs:detail", kwargs={"pk": job.pk}))
+        second_page = self.client.get(reverse("jobs:detail", kwargs={"pk": job.pk}), {"page": 2})
+
+        self.assertEqual(len(first_page.context["page_obj"].object_list), 25)
+        self.assertEqual(len(second_page.context["page_obj"].object_list), 15)
+        self.assertEqual(first_page.context["page_obj"].paginator.num_pages, 2)
+
+    def test_detail_filters_items_by_estado(self):
+        job = self._job_with_items(total=10, failed_rows={2, 5, 9})
+        self.client.force_login(self.user)
+
+        failed = self.client.get(
+            reverse("jobs:detail", kwargs={"pk": job.pk}), {"estado": "failed"}
+        )
+        completed = self.client.get(
+            reverse("jobs:detail", kwargs={"pk": job.pk}), {"estado": "completed"}
+        )
+
+        self.assertEqual(failed.context["page_obj"].paginator.count, 3)
+        self.assertEqual(
+            {item.row_number for item in failed.context["page_obj"].object_list}, {2, 5, 9}
+        )
+        self.assertEqual(completed.context["page_obj"].paginator.count, 7)
+
+    def test_detail_ignores_an_unknown_estado(self):
+        job = self._job_with_items(total=5)
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            reverse("jobs:detail", kwargs={"pk": job.pk}), {"estado": "sabotagem"}
+        )
+
+        self.assertEqual(response.context["estado"], "")
+        self.assertEqual(response.context["page_obj"].paginator.count, 5)
+
+    def test_detail_shows_chip_counts_and_pagination_controls(self):
+        job = self._job_with_items(total=40, failed_rows={1, 2, 3})
+        self.client.force_login(self.user)
+
+        html = self.client.get(reverse("jobs:detail", kwargs={"pk": job.pk})).content.decode()
+
+        self.assertIn('id="chip-count-all">40', html)
+        self.assertIn('id="chip-count-completed">37', html)
+        self.assertIn('id="chip-count-failed">3', html)
+        self.assertIn("Página 1 de 2", html)
+        self.assertIn('id="job-items-next"', html)
+        self.assertIn('href="?page=2"', html)
+
+    def test_status_endpoint_windows_items_by_default(self):
+        job = self._job_with_items(total=40)
+        self.client.force_login(self.user)
+
+        payload = self.client.get(reverse("jobs:status", kwargs={"pk": job.pk})).json()
+
+        self.assertEqual(len(payload["items"]), 25)
+        self.assertEqual(payload["items_count"], 40)
+        self.assertEqual(payload["items_num_pages"], 2)
+        self.assertTrue(payload["items_has_next"])
+        self.assertFalse(payload["items_has_previous"])
+        self.assertEqual(payload["pending_rows"], 0)
+        self.assertIn(f"/jobs/{job.pk}/", payload["detail_url"])
+
+    def test_status_endpoint_respects_estado_and_page(self):
+        job = self._job_with_items(total=40, failed_rows={4, 8})
+        self.client.force_login(self.user)
+
+        payload = self.client.get(
+            reverse("jobs:status", kwargs={"pk": job.pk}), {"estado": "failed", "page": 1}
+        ).json()
+
+        self.assertEqual(payload["items_count"], 2)
+        self.assertEqual({item["row_number"] for item in payload["items"]}, {4, 8})
+        self.assertEqual(payload["items_num_pages"], 1)
+        self.assertFalse(payload["items_has_next"])
+
+    def test_status_endpoint_hides_other_users_jobs_even_with_filters(self):
+        job = self._job_with_items(total=3)
+        other = get_user_model().objects.create_user(username="jobs-window-outro", password="x")
+        self.client.force_login(other)
+
+        response = self.client.get(
+            reverse("jobs:status", kwargs={"pk": job.pk}), {"estado": "failed"}
+        )
+
+        self.assertEqual(response.status_code, 404)

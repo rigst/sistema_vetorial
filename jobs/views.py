@@ -2,6 +2,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.files.base import ContentFile
+from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import FileResponse, JsonResponse
 from django.shortcuts import redirect
@@ -96,10 +97,50 @@ class GenerationJobCreateView(LoginRequiredMixin, CreateView):
         return context
 
 
+# Estado exibido nos chips de filtro da tela do job. "pending" agrupa
+# GenerationItem.Status.PENDING e .PROCESSING: para quem está acompanhando o
+# lote, os dois são "ainda não terminou".
+ITEM_STATE_FILTERS = {
+    "completed": [GenerationItem.Status.COMPLETED],
+    "failed": [GenerationItem.Status.FAILED],
+    "pending": [GenerationItem.Status.PENDING, GenerationItem.Status.PROCESSING],
+}
+ITEMS_PAGE_SIZE = 25
+
+
+def _filtered_items(job: GenerationJob, estado: str):
+    queryset = job.items.order_by("row_number")
+    statuses = ITEM_STATE_FILTERS.get(estado)
+    if statuses:
+        queryset = queryset.filter(status__in=statuses)
+    return queryset
+
+
 class GenerationJobDetailView(UserOwnedQuerysetMixin, DetailView):
     model = GenerationJob
     template_name = "jobs/job_detail.html"
     context_object_name = "job"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        job = self.object
+        estado = self.request.GET.get("estado", "")
+        if estado not in ITEM_STATE_FILTERS:
+            estado = ""
+        page_number = self.request.GET.get("page", "1")
+
+        paginator = Paginator(_filtered_items(job, estado), ITEMS_PAGE_SIZE)
+        page_obj = paginator.get_page(page_number)
+
+        context["estado"] = estado
+        context["page_obj"] = page_obj
+        context["pending_rows"] = max(job.total_rows - job.processed_rows, 0)
+        # page_obj.previous_page_number/.next_page_number lançam EmptyPage
+        # quando não existem — não dá pra resolver isso com |default no
+        # template, então os hrefs de sempre (mesmo escondidos) usam estes.
+        context["prev_page"] = page_obj.previous_page_number if page_obj.has_previous() else 1
+        context["next_page"] = page_obj.next_page_number if page_obj.has_next() else page_obj.number
+        return context
 
 
 class GenerationJobDeleteView(LoginRequiredMixin, View):
@@ -187,10 +228,22 @@ class RerunJobView(LoginRequiredMixin, View):
 
 
 class GenerationJobStatusView(LoginRequiredMixin, View):
+    """Status do job para polling. Os itens vêm em uma janela (não o lote
+    inteiro): um lote de milhares de linhas não pode significar milhares de
+    linhas de JSON a cada 1,2s. `estado`/`page` replicam o filtro e a página
+    que a tela do job está mostrando; sem eles, primeira página, sem filtro —
+    o mesmo recorte que o card da bancada usa."""
+
     def get(self, request, *args, **kwargs):
         job = GenerationJob.objects.filter(pk=kwargs["pk"], user=request.user).first()
         if not job:
             return JsonResponse({"error": "not_found"}, status=404)
+
+        estado = request.GET.get("estado", "")
+        if estado not in ITEM_STATE_FILTERS:
+            estado = ""
+        paginator = Paginator(_filtered_items(job, estado), ITEMS_PAGE_SIZE)
+        page_obj = paginator.get_page(request.GET.get("page", "1"))
 
         return JsonResponse(
             {
@@ -201,10 +254,17 @@ class GenerationJobStatusView(LoginRequiredMixin, View):
                 "processed_rows": job.processed_rows,
                 "success_rows": job.success_rows,
                 "failed_rows": job.failed_rows,
+                "pending_rows": max(job.total_rows - job.processed_rows, 0),
                 "last_error": job.last_error,
+                "detail_url": reverse("jobs:detail", kwargs={"pk": job.pk}),
                 "zip_url": reverse("jobs:download-zip", kwargs={"pk": job.pk})
                 if job.zip_file
                 else "",
+                "items_page": page_obj.number,
+                "items_num_pages": paginator.num_pages,
+                "items_count": paginator.count,
+                "items_has_previous": page_obj.has_previous(),
+                "items_has_next": page_obj.has_next(),
                 "items": [
                     {
                         "row_number": item.row_number,
@@ -215,7 +275,7 @@ class GenerationJobStatusView(LoginRequiredMixin, View):
                         if item.output_pdf
                         else "",
                     }
-                    for item in job.items.order_by("row_number")
+                    for item in page_obj.object_list
                 ],
             }
         )

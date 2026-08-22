@@ -476,6 +476,113 @@ main {
   color: var(--warning);
 }
 
+.status-pill.status-pending {
+  background: rgba(61, 95, 140, 0.1);
+  color: var(--accent-2);
+}
+
+.status-pill .status-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: currentColor;
+  margin-right: 0.4rem;
+}
+
+/* ---- Painel de estatísticas do job: uma faixa, não quatro caixas soltas ---- */
+.job-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  margin-bottom: 1.5rem;
+}
+
+.job-stat {
+  padding: 1rem 1.25rem;
+  border-left: 1px solid var(--border);
+}
+
+.job-stat:first-child {
+  border-left: 0;
+}
+
+.job-stat-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.job-stat-value {
+  font-size: 1.7rem;
+  font-weight: 700;
+  line-height: 1.15;
+  margin-top: 0.3rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.job-stat--success .job-stat-value {
+  color: var(--success);
+}
+
+.job-stat--danger .job-stat-value {
+  color: var(--danger);
+}
+
+/* ---- Chips de filtro por estado ---- */
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.filter-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.filter-chip.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.filter-chip-count {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+.job-items-pagination {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 1rem;
+  font-size: 0.85rem;
+}
+
 .inline-actions {
   display: inline-flex;
   gap: 0.55rem;
@@ -1736,6 +1843,10 @@ label.toolbar-button {
   color: var(--danger);
   font-size: 0.85rem;
   overflow-wrap: anywhere;
+}
+
+#generate-detail-link {
+  font-weight: 600;
 }
 
 .auth-shell {

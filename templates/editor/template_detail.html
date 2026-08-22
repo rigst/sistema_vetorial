@@ -238,6 +238,13 @@
             <p class="generate-error" id="generate-error" role="alert" hidden></p>
             <div class="generate-result" id="generate-result" hidden>
                 <a class="button" id="generate-zip-link" href="#" hidden>Baixar todos (ZIP)</a>
+                {% comment %}
+                Lote grande: a lista some daqui e vira um link para a página do
+                job (que já pagina, filtra por estado e faz o polling em
+                janelas) — sem empilhar 100 linhas nesta coluna. A contagem já
+                foi anunciada pela barra de progresso, então aqui é só o link.
+                {% endcomment %}
+                <a class="link-action" id="generate-detail-link" href="#" hidden>Ver todos os arquivos →</a>
                 <ul class="generate-items" id="generate-items"></ul>
             </div>
         </div>
@@ -250,7 +257,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/job_launcher.js' %}?v=20260821-01"></script>
+<script src="{% static 'js/job_launcher.js' %}?v=20260822-01"></script>
 {% if preview_pages %}
 <script src="{% static 'js/fabric.min.js' %}?v=6.7.1"></script>
 <script src="{% static 'js/template_editor.js' %}?v=20260715-02"></script>

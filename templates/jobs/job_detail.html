@@ -8,7 +8,7 @@
     <div class="section-header">
         <div>
             <h1 class="hero-title">{{ job.name }}</h1>
-            <p class="hero-copy">Acompanhe o processamento e os arquivos gerados.</p>
+            <p class="hero-copy">{{ job.template.name }} · <span id="job-status-text">{{ job.get_status_display }}</span></p>
         </div>
         <div class="inline-actions">
             {% if job.kind == 'preview' %}
@@ -30,138 +30,270 @@
     </div>
 </section>
 
+<div class="job-stats" id="job-stats">
+    <div class="job-stat">
+        <div class="job-stat-label">Linhas</div>
+        <div class="job-stat-value" id="job-stat-total">{{ job.total_rows }}</div>
+    </div>
+    <div class="job-stat">
+        <div class="job-stat-label">Processadas</div>
+        <div class="job-stat-value" id="job-stat-processed">{{ job.processed_rows }}</div>
+    </div>
+    <div class="job-stat job-stat--success">
+        <div class="job-stat-label">Prontas</div>
+        <div class="job-stat-value" id="job-stat-success">{{ job.success_rows }}</div>
+    </div>
+    <div class="job-stat job-stat--danger">
+        <div class="job-stat-label">Falhas</div>
+        <div class="job-stat-value" id="job-stat-failed">{{ job.failed_rows }}</div>
+    </div>
+</div>
+
+<div class="progress-shell" id="job-progress-shell" style="margin-bottom: 1.5rem;" {% if job.status != 'queued' and job.status != 'processing' %}hidden{% endif %}>
+    <div class="progress-bar">
+        <div class="progress-bar-fill" id="job-progress-fill" style="width: {% if job.total_rows %}{% widthratio job.processed_rows job.total_rows 100 %}{% else %}0{% endif %}%;"></div>
+    </div>
+    <p class="muted" id="job-progress-text">{{ job.processed_rows }}/{{ job.total_rows }} linhas processadas</p>
+</div>
+
+<div class="form-alert" id="job-last-error-box" {% if not job.last_error %}style="display:none;"{% endif %}>
+    <span class="ui-icon ui-icon-soft" aria-hidden="true">!</span>
+    <div>
+        <strong>Último erro</strong>
+        <span id="job-last-error-text">{{ job.last_error }}</span>
+    </div>
+</div>
+
 <section class="split-grid">
     <div class="panel template-meta">
         <h2 class="section-title">Resumo do job</h2>
-        <div class="progress-shell" style="margin-bottom: 1rem;">
-            <div class="progress-bar">
-                <div class="progress-bar-fill" id="job-progress-fill" style="width: 0%;"></div>
-            </div>
-            <p class="muted" id="job-progress-text">Aguardando status...</p>
-        </div>
-        <div class="form-alert" id="job-last-error-box" {% if not job.last_error %}style="display:none;"{% endif %}>
-            <span class="ui-icon ui-icon-soft" aria-hidden="true">!</span>
-            <div>
-                <strong>Último erro</strong>
-                <span id="job-last-error-text">{{ job.last_error }}</span>
-            </div>
-        </div>
         <dl>
-            <dt>Status</dt>
-            <dd><span class="status-pill status-{{ job.status }}" id="job-status-pill">{{ job.get_status_display }}</span></dd>
             <dt>Template</dt>
             <dd>{{ job.template.name }}</dd>
             <dt>Excel</dt>
             <dd><a class="link-action" href="{% url 'jobs:download-source' job.pk %}">Baixar original</a></dd>
             <dt>Tipo</dt>
             <dd>{{ job.get_kind_display }}</dd>
-            <dt>Linhas</dt>
-            <dd id="job-rows-text">{{ job.processed_rows }}/{{ job.total_rows }}</dd>
-            <dt>Sucesso</dt>
-            <dd id="job-success-text">{{ job.success_rows }}</dd>
-            <dt>Falhas</dt>
-            <dd id="job-failed-text">{{ job.failed_rows }}</dd>
             <dt id="job-zip-dt" {% if not job.zip_file %}style="display:none;"{% endif %}>ZIP</dt>
             <dd id="job-zip-dd" {% if not job.zip_file %}style="display:none;"{% endif %}>
                 <a class="link-action" id="job-zip-link" href="{% if job.zip_file %}{% url 'jobs:download-zip' job.pk %}{% else %}#{% endif %}">Baixar ZIP</a>
             </dd>
         </dl>
+        {% if job.column_map.headers %}
+            <p class="muted" style="margin-top: 0.9rem;">Cabeçalhos detectados: {{ job.column_map.headers|join:", " }}</p>
+        {% endif %}
+        {% if job.column_map.missing_headers %}
+            <p class="muted" style="margin-top: 0.4rem;">Cabeçalhos esperados ausentes: {{ job.column_map.missing_headers|join:", " }}</p>
+        {% endif %}
     </div>
 
     <aside class="panel">
         <h2 class="section-title">Arquivos gerados</h2>
-        {% if job.column_map.headers %}
-            <p class="muted" style="margin-bottom: 0.8rem;">Cabeçalhos detectados: {{ job.column_map.headers|join:", " }}</p>
-        {% endif %}
-        {% if job.column_map.missing_headers %}
-            <p class="muted" style="margin-bottom: 0.8rem;">Cabeçalhos esperados ausentes: {{ job.column_map.missing_headers|join:", " }}</p>
-        {% endif %}
-        <ul class="list" id="job-items-list">
-            {% for item in job.items.all %}
-                <li>
-                    <strong>Linha {{ item.row_number }}</strong><br>
-                    <span class="muted">{{ item.get_status_display }}</span><br>
-                    {% if item.output_pdf %}
-                        <a class="link-action" href="{% url 'jobs:download-item' item.pk %}">Baixar PDF</a>
-                    {% elif item.error_message %}
-                        <span class="muted">{{ item.error_message }}</span>
-                    {% endif %}
-                </li>
-            {% empty %}
-                <li class="muted">Nenhum item processado ainda.</li>
-            {% endfor %}
-        </ul>
+
+        <nav class="filter-chips" id="job-filter-chips" aria-label="Filtrar por estado">
+            <a class="filter-chip {% if not estado %}is-active{% endif %}" href="?">
+                Todos <span class="filter-chip-count" id="chip-count-all">{{ job.total_rows }}</span>
+            </a>
+            <a class="filter-chip {% if estado == 'completed' %}is-active{% endif %}" href="?estado=completed">
+                Prontas <span class="filter-chip-count" id="chip-count-completed">{{ job.success_rows }}</span>
+            </a>
+            <a class="filter-chip {% if estado == 'failed' %}is-active{% endif %}" href="?estado=failed">
+                Falhas <span class="filter-chip-count" id="chip-count-failed">{{ job.failed_rows }}</span>
+            </a>
+            <a class="filter-chip {% if estado == 'pending' %}is-active{% endif %}" href="?estado=pending">
+                Pendentes <span class="filter-chip-count" id="chip-count-pending">{{ pending_rows }}</span>
+            </a>
+        </nav>
+
+        {% comment %}
+        A tabela é sempre renderizada, mesmo sem itens ainda: um job recém
+        iniciado tem total_rows > 0 mas zero linhas criadas, e o JS de
+        atualização precisa de #job-items-body já no DOM para inserir as
+        linhas assim que elas chegarem — sem isso, ficariam órfãs até um
+        recarregamento manual da página.
+        {% endcomment %}
+        <div class="table-scroll">
+            <table class="data-table" id="job-items-table">
+                <thead>
+                    <tr>
+                        <th>Linha</th>
+                        <th>Estado</th>
+                        <th>Arquivo</th>
+                    </tr>
+                </thead>
+                <tbody id="job-items-body">
+                    {% for item in page_obj.object_list %}
+                        <tr>
+                            <td>{{ item.row_number }}</td>
+                            <td><span class="status-pill status-{{ item.status }}"><span class="status-dot" aria-hidden="true"></span>{{ item.get_status_display }}</span></td>
+                            <td>
+                                {% if item.output_pdf %}
+                                    <a class="link-action" href="{% url 'jobs:download-item' item.pk %}">Baixar PDF</a>
+                                {% elif item.error_message %}
+                                    <span class="muted item-error">{{ item.error_message }}</span>
+                                {% else %}
+                                    <span class="muted">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr id="job-items-empty-row">
+                            <td colspan="3" class="muted">
+                                {% if estado == 'completed' %}Nenhum arquivo pronto ainda.
+                                {% elif estado == 'failed' %}Nenhuma linha com erro.
+                                {% elif estado == 'pending' %}Nada pendente.
+                                {% else %}Nenhum item processado ainda.{% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% comment %}
+        Sempre no DOM, mesmo com 1 página só: total_rows é conhecido antes dos
+        itens existirem, então um job recém-iniciado pode passar a precisar de
+        paginação enquanto a página já está aberta. O JS decide a visibilidade
+        a cada resposta do polling — sem isso, só um F5 revelaria a página 2.
+        {% endcomment %}
+        <div class="job-items-pagination" id="job-items-pagination" {% if page_obj.paginator.num_pages <= 1 %}hidden{% endif %}>
+            <a class="button button-secondary" id="job-items-prev"
+               href="?{% if estado %}estado={{ estado }}&{% endif %}page={{ prev_page }}"
+               {% if not page_obj.has_previous %}hidden{% endif %}>Anterior</a>
+            <span class="muted" id="job-items-page-label">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+            <a class="button button-secondary" id="job-items-next"
+               href="?{% if estado %}estado={{ estado }}&{% endif %}page={{ next_page }}"
+               {% if not page_obj.has_next %}hidden{% endif %}>Próxima</a>
+        </div>
     </aside>
 </section>
+
 <script>
 (() => {
-  const statusUrl = "{% url 'jobs:status' job.pk %}";
+  const jobId = {{ job.pk }};
+  const params = new URLSearchParams(window.location.search);
+  const estado = params.get("estado") || "";
+  const page = params.get("page") || "1";
+  const statusUrl = `{% url 'jobs:status' job.pk %}?estado=${encodeURIComponent(estado)}&page=${encodeURIComponent(page)}`;
+
+  const progressShell = document.getElementById("job-progress-shell");
   const fill = document.getElementById("job-progress-fill");
   const progressText = document.getElementById("job-progress-text");
-  const statusPill = document.getElementById("job-status-pill");
-  const rowsText = document.getElementById("job-rows-text");
-  const successText = document.getElementById("job-success-text");
-  const failedText = document.getElementById("job-failed-text");
-  const itemsList = document.getElementById("job-items-list");
+  const statusText = document.getElementById("job-status-text");
+  const statTotal = document.getElementById("job-stat-total");
+  const statProcessed = document.getElementById("job-stat-processed");
+  const statSuccess = document.getElementById("job-stat-success");
+  const statFailed = document.getElementById("job-stat-failed");
+  const itemsBody = document.getElementById("job-items-body");
   const zipDt = document.getElementById("job-zip-dt");
   const zipDd = document.getElementById("job-zip-dd");
   const zipLink = document.getElementById("job-zip-link");
   const lastErrorBox = document.getElementById("job-last-error-box");
   const lastErrorText = document.getElementById("job-last-error-text");
+  const chipAll = document.getElementById("chip-count-all");
+  const chipCompleted = document.getElementById("chip-count-completed");
+  const chipFailed = document.getElementById("chip-count-failed");
+  const chipPending = document.getElementById("chip-count-pending");
+  const pagination = document.getElementById("job-items-pagination");
+  const pageLabel = document.getElementById("job-items-page-label");
+  const prevLink = document.getElementById("job-items-prev");
+  const nextLink = document.getElementById("job-items-next");
 
-  const createItemNode = (item) => {
-    const li = document.createElement("li");
-    const strong = document.createElement("strong");
-    strong.textContent = `Linha ${item.row_number}`;
-    li.appendChild(strong);
-    li.appendChild(document.createElement("br"));
+  const pageHref = (targetPage) =>
+    `?${estado ? `estado=${encodeURIComponent(estado)}&` : ""}page=${targetPage}`;
 
-    const status = document.createElement("span");
-    status.className = "muted";
-    status.textContent = item.status_display;
-    li.appendChild(status);
-    li.appendChild(document.createElement("br"));
+  const rowNode = (item) => {
+    const tr = document.createElement("tr");
 
+    const rowCell = document.createElement("td");
+    rowCell.textContent = `${item.row_number}`;
+    tr.appendChild(rowCell);
+
+    const statusCell = document.createElement("td");
+    const pill = document.createElement("span");
+    pill.className = `status-pill status-${item.status}`;
+    const dot = document.createElement("span");
+    dot.className = "status-dot";
+    dot.setAttribute("aria-hidden", "true");
+    pill.appendChild(dot);
+    pill.append(item.status_display);
+    statusCell.appendChild(pill);
+    tr.appendChild(statusCell);
+
+    const fileCell = document.createElement("td");
     if (item.output_url) {
       const link = document.createElement("a");
       link.className = "link-action";
       link.href = item.output_url;
       link.textContent = "Baixar PDF";
-      li.appendChild(link);
+      fileCell.appendChild(link);
     } else if (item.error_message) {
       const error = document.createElement("span");
-      error.className = "muted";
+      error.className = "muted item-error";
       error.textContent = item.error_message;
-      li.appendChild(error);
+      fileCell.appendChild(error);
+    } else {
+      const dash = document.createElement("span");
+      dash.className = "muted";
+      dash.textContent = "—";
+      fileCell.appendChild(dash);
     }
-    return li;
+    tr.appendChild(fileCell);
+    return tr;
   };
 
-    const renderItems = (items) => {
-      if (!items.length) {
-      itemsList.replaceChildren();
-      const li = document.createElement("li");
-      li.className = "muted";
-      li.textContent = "Nenhum item processado ainda.";
-      itemsList.appendChild(li);
-      return;
-    }
-    itemsList.replaceChildren(...items.map(createItemNode));
+  const EMPTY_LABELS = {
+    completed: "Nenhum arquivo pronto ainda.",
+    failed: "Nenhuma linha com erro.",
+    pending: "Nada pendente.",
+    "": "Nenhum item processado ainda.",
   };
 
-    const refresh = async () => {
+  const emptyRow = () => {
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = 3;
+    td.className = "muted";
+    td.textContent = EMPTY_LABELS[estado] ?? EMPTY_LABELS[""];
+    tr.appendChild(td);
+    return tr;
+  };
+
+  const renderItems = (items) => {
+    if (!itemsBody) return;
+    itemsBody.replaceChildren(...(items.length ? items.map(rowNode) : [emptyRow()]));
+  };
+
+  const refresh = async () => {
     const response = await fetch(statusUrl, { headers: { "X-Requested-With": "XMLHttpRequest" } });
     if (!response.ok) return;
     const data = await response.json();
+
     const progress = data.total_rows ? Math.round((data.processed_rows / data.total_rows) * 100) : 0;
-    fill.style.width = `${progress}%`;
-    progressText.textContent = `${data.processed_rows}/${data.total_rows} linhas processadas`;
-    statusPill.textContent = data.status_display;
-    statusPill.className = `status-pill status-${data.status}`;
-    rowsText.textContent = `${data.processed_rows}/${data.total_rows}`;
-    successText.textContent = data.success_rows;
-    failedText.textContent = data.failed_rows;
-    renderItems(data.items);
+    if (fill) fill.style.width = `${progress}%`;
+    if (progressText) progressText.textContent = `${data.processed_rows}/${data.total_rows} linhas processadas`;
+    if (statusText) statusText.textContent = data.status_display;
+    if (statTotal) statTotal.textContent = data.total_rows;
+    if (statProcessed) statProcessed.textContent = data.processed_rows;
+    if (statSuccess) statSuccess.textContent = data.success_rows;
+    if (statFailed) statFailed.textContent = data.failed_rows;
+    if (chipAll) chipAll.textContent = data.total_rows;
+    if (chipCompleted) chipCompleted.textContent = data.success_rows;
+    if (chipFailed) chipFailed.textContent = data.failed_rows;
+    if (chipPending) chipPending.textContent = data.pending_rows;
+    if (itemsBody) renderItems(data.items);
+
+    if (pagination) pagination.hidden = data.items_num_pages <= 1;
+    if (pageLabel) pageLabel.textContent = `Página ${data.items_page} de ${data.items_num_pages}`;
+    if (prevLink) {
+      prevLink.hidden = !data.items_has_previous;
+      prevLink.href = pageHref(data.items_page - 1);
+    }
+    if (nextLink) {
+      nextLink.hidden = !data.items_has_next;
+      nextLink.href = pageHref(data.items_page + 1);
+    }
+
     if (data.last_error) {
       lastErrorBox.style.display = "";
       lastErrorText.textContent = data.last_error;
@@ -174,10 +306,13 @@
       zipDd.style.display = "";
       zipLink.href = data.zip_url;
     }
-    if (!["completed", "failed"].includes(data.status)) {
+
+    const terminal = ["completed", "failed"].includes(data.status);
+    if (progressShell) progressShell.hidden = terminal;
+    if (!terminal) {
       window.setTimeout(refresh, 1500);
     }
-    };
+  };
 
   refresh();
 })();

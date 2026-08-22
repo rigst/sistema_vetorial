@@ -110,6 +110,44 @@ class EditorFlowTests(TestCase):
         self.assertIn('id="sample-file-input"', html)
         self.assertIn('for="sample-file-input"', html)
 
+    def test_detail_page_does_not_leak_template_comments_as_text(self):
+        """Regressão: um `{# ... #}` de mais de uma linha não fecha no Django —
+        o texto do comentário vaza para a página. O bloco correto é
+        `{% comment %}...{% endcomment %}`, que aceita várias linhas."""
+        template = DocumentTemplate.objects.create(
+            user=self.user,
+            name="Bancada Comentario",
+            slug="bancada-comentario",
+            background_pdf=self._build_pdf_upload(),
+        )
+        update_template_pdf_metadata(template)
+        self.client.force_login(self.user)
+
+        html = self.client.get(
+            reverse("editor:detail", kwargs={"pk": template.pk})
+        ).content.decode()
+
+        self.assertNotIn("visually-hidden em vez de hidden", html)
+        self.assertNotIn("{#", html)
+
+    def test_detail_page_offers_a_link_to_the_full_job_for_large_batches(self):
+        template = DocumentTemplate.objects.create(
+            user=self.user,
+            name="Bancada Lote",
+            slug="bancada-lote",
+            background_pdf=self._build_pdf_upload(),
+        )
+        update_template_pdf_metadata(template)
+        self.client.force_login(self.user)
+
+        html = self.client.get(
+            reverse("editor:detail", kwargs={"pk": template.pk})
+        ).content.decode()
+
+        # Some por padrão; o job_launcher.js é quem revela isso quando o lote
+        # passa do limite de itens exibidos na coluna estreita da bancada.
+        self.assertIn('id="generate-detail-link"', html)
+
     def test_template_form_rejects_pdf_with_multiple_pages(self):
         form = DocumentTemplateForm(
             data={"name": "Faixa", "description": "Teste"},

@@ -9,6 +9,9 @@
 
   const POLL_INTERVAL = 1200;
   const TERMINAL_STATUS = new Set(["completed", "failed"]);
+  // Acima disso a lista por linha vira resumo + link para a página do job:
+  // essa coluna estreita da bancada não é lugar para 100 linhas.
+  const INLINE_ITEM_LIMIT = 12;
 
   const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
 
@@ -33,6 +36,7 @@
     const resultBox = document.getElementById("generate-result");
     const zipLink = document.getElementById("generate-zip-link");
     const itemsList = document.getElementById("generate-items");
+    const detailLink = document.getElementById("generate-detail-link");
 
     const EMPTY_LABEL = fileLabelText ? fileLabelText.textContent : "";
     let pollTimer = null;
@@ -68,6 +72,10 @@
       }
     };
 
+    // #generate-progress é role="status"/aria-live: fica no ar até o fim para
+    // que o texto final ("N arquivos prontos") seja anunciado por leitor de
+    // tela. Escondê-la no exato instante da conclusão apagaria a região viva
+    // antes de qualquer anúncio chegar a acontecer.
     const setProgress = (data) => {
       const total = Number(data.total_rows) || 0;
       const processed = Number(data.processed_rows) || 0;
@@ -115,12 +123,22 @@
 
     const renderResult = (data) => {
       const items = data.items || [];
-      if (itemsList) itemsList.replaceChildren(...items.map(itemNode));
+      const total = Number(data.total_rows) || 0;
+      const inline = total > 0 && total <= INLINE_ITEM_LIMIT;
+
+      show(itemsList, inline);
+      if (inline && itemsList) itemsList.replaceChildren(...items.map(itemNode));
+
+      // A contagem já foi dita pela barra de progresso (#generate-progress-text);
+      // aqui só o link para a página do job, sem repetir a mesma frase.
+      if (detailLink) detailLink.href = data.detail_url || "#";
+      show(detailLink, !inline && total > 0);
+
       if (zipLink) {
         zipLink.href = data.zip_url || "#";
         show(zipLink, Boolean(data.zip_url));
       }
-      show(resultBox, items.length > 0 || Boolean(data.zip_url));
+      show(resultBox, total > 0 || Boolean(data.zip_url));
     };
 
     const poll = async (statusUrl) => {
@@ -159,6 +177,7 @@
       show(progressBox, true);
       show(resultBox, false);
       if (itemsList) itemsList.replaceChildren();
+      show(detailLink, false);
       if (progressFill) progressFill.style.transform = "scaleX(0)";
       if (progressTrack) progressTrack.setAttribute("aria-valuenow", "0");
       if (progressText) progressText.textContent = "Enviando a planilha…";
