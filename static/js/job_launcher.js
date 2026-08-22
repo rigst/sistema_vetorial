@@ -266,29 +266,33 @@
     }
 
     const filenamePatternInput = document.getElementById("filename-pattern-input");
-    const filenamePatternSaveState = document.getElementById("filename-pattern-save-state");
     const filenamePatternUrl = card.dataset.filenamePatternUrl;
+    const sampleUrl = card.dataset.sampleUrl;
+    const filenamePreview = document.getElementById("filename-preview");
     const filenamePreviewName = document.getElementById("filename-preview-name");
+    const filenameSaveStateEl = document.getElementById("filename-save-state");
     // Atribuída de verdade mais abaixo, perto de selectedCaseColumns —
     // declarada já aqui porque os listeners do padrão/espaços (registrados
     // antes) também precisam poder chamá-la.
     let renderFilenamePreview = () => {};
 
+    // Um indicador só pro cartão inteiro (canto inferior direito) em vez de
+    // um "Salvo" atrás de cada uma das quatro opções.
+    const setFilenameSaveState = (tone, text) => {
+      if (!filenameSaveStateEl) return;
+      filenameSaveStateEl.textContent = text || "";
+      if (tone) filenameSaveStateEl.dataset.tone = tone;
+      else delete filenameSaveStateEl.dataset.tone;
+    };
+
     if (filenamePatternInput && filenamePatternUrl) {
       let saveTimer = null;
       let lastSaved = filenamePatternInput.value;
 
-      const setSaveState = (tone, text) => {
-        if (!filenamePatternSaveState) return;
-        filenamePatternSaveState.textContent = text || "";
-        if (tone) filenamePatternSaveState.dataset.tone = tone;
-        else delete filenamePatternSaveState.dataset.tone;
-      };
-
       const saveFilenamePattern = async () => {
         const value = filenamePatternInput.value;
         if (value === lastSaved) return;
-        setSaveState("busy", "Salvando…");
+        setFilenameSaveState("busy", "Salvando\u2026");
         try {
           const response = await fetch(filenamePatternUrl, {
             method: "POST",
@@ -298,14 +302,14 @@
           const data = await response.json().catch(() => ({}));
           if (!response.ok) throw new Error(data.error || `Erro ${response.status}`);
           lastSaved = data.filename_pattern ?? value;
-          setSaveState("ok", "Salvo");
+          setFilenameSaveState("ok", "Salvo");
         } catch (err) {
-          setSaveState("error", err.message || "Não foi possível salvar o nome dos arquivos.");
+          setFilenameSaveState("error", err.message || "N\u00e3o foi poss\u00edvel salvar o nome dos arquivos.");
         }
       };
 
       filenamePatternInput.addEventListener("input", () => {
-        setSaveState(null, "");
+        setFilenameSaveState(null, "");
         window.clearTimeout(saveTimer);
         saveTimer = window.setTimeout(saveFilenamePattern, 600);
         renderFilenamePreview();
@@ -318,24 +322,16 @@
 
     const spaceModeSelect = document.getElementById("filename-space-mode");
     const spaceReplacementInput = document.getElementById("filename-space-replacement");
-    const spaceSaveState = document.getElementById("filename-space-save-state");
 
     if (spaceModeSelect && filenamePatternUrl) {
       let spaceSaveTimer = null;
-
-      const setSpaceSaveState = (tone, text) => {
-        if (!spaceSaveState) return;
-        spaceSaveState.textContent = text || "";
-        if (tone) spaceSaveState.dataset.tone = tone;
-        else delete spaceSaveState.dataset.tone;
-      };
 
       const syncReplacementVisibility = () => {
         if (spaceReplacementInput) spaceReplacementInput.hidden = spaceModeSelect.value !== "replace";
       };
 
       const saveSpaceMode = async () => {
-        setSpaceSaveState("busy", "Salvando…");
+        setFilenameSaveState("busy", "Salvando\u2026");
         try {
           const response = await fetch(filenamePatternUrl, {
             method: "POST",
@@ -347,9 +343,9 @@
           });
           const data = await response.json().catch(() => ({}));
           if (!response.ok) throw new Error(data.error || `Erro ${response.status}`);
-          setSpaceSaveState("ok", "Salvo");
+          setFilenameSaveState("ok", "Salvo");
         } catch (err) {
-          setSpaceSaveState("error", err.message || "Não foi possível salvar.");
+          setFilenameSaveState("error", err.message || "N\u00e3o foi poss\u00edvel salvar.");
         }
       };
 
@@ -359,7 +355,7 @@
         renderFilenamePreview();
       });
       spaceReplacementInput?.addEventListener("input", () => {
-        setSpaceSaveState(null, "");
+        setFilenameSaveState(null, "");
         window.clearTimeout(spaceSaveTimer);
         spaceSaveTimer = window.setTimeout(saveSpaceMode, 600);
         renderFilenamePreview();
@@ -371,36 +367,35 @@
     }
 
     const stripAccentsCheckbox = document.getElementById("filename-strip-accents");
-    const stripAccentsSaveState = document.getElementById("filename-strip-accents-save-state");
     const caseSelect = document.getElementById("filename-case");
-    const caseSaveState = document.getElementById("filename-case-save-state");
     const caseColumnsGroup = document.getElementById("filename-case-columns-group");
     const caseColumnsContainer = document.getElementById("filename-case-columns");
     const caseColumnsDataEl = document.getElementById("filename-case-columns-data");
 
     if (filenamePatternUrl) {
-      // Colunas já marcadas ao carregar a página (JSONField do template).
+      // Colunas j\u00e1 marcadas ao carregar a p\u00e1gina (JSONField do template).
       const selectedCaseColumns = new Set(
         caseColumnsDataEl ? JSON.parse(caseColumnsDataEl.textContent || "[]") : []
       );
 
-      // Amostra ao vivo do nome do arquivo: mesma lógica de
-      // jobs/services.py (render_column_template + _filename_column_transform
-      // + _sanitize_filename_component), com valores de exemplo no lugar dos
-      // dados reais da planilha (que só existem depois do upload).
-      const FILENAME_PREVIEW_EXAMPLES = ["Ana Paula da Conceição", "Design", "Turma A", "2026", "Manhã"];
-      const exampleColumnValue = (columnNumber) =>
-        FILENAME_PREVIEW_EXAMPLES[(columnNumber - 1) % FILENAME_PREVIEW_EXAMPLES.length];
-
       const stripAccentsJs = (value) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
+      // Amostra ao vivo do nome do arquivo, s\u00f3 com dado real: firstRowColumns
+      // (coluna_1, coluna_2...) vem da primeira linha da planilha escolhida
+      // (ver readFirstRowFromFile) \u2014 sem planilha ainda, n\u00e3o h\u00e1 o que mostrar.
+      let firstRowColumns = null;
+
       renderFilenamePreview = () => {
-        if (!filenamePreviewName) return;
+        if (!filenamePreview || !filenamePreviewName) return;
+        if (!firstRowColumns) {
+          filenamePreview.hidden = true;
+          return;
+        }
         const pattern = (filenamePatternInput?.value || "").trim();
         const caseValue = caseSelect?.value || "none";
 
         const columnText = (columnNumber) => {
-          let value = exampleColumnValue(columnNumber);
+          let value = String(firstRowColumns[columnNumber] ?? "");
           if (stripAccentsCheckbox?.checked) value = stripAccentsJs(value);
           const applyCase = caseValue !== "none" && (!selectedCaseColumns.size || selectedCaseColumns.has(columnNumber));
           if (applyCase) value = caseValue === "upper" ? value.toUpperCase() : value.toLowerCase();
@@ -422,8 +417,42 @@
           base = base.replace(/ /g, replacement);
         }
 
+        filenamePreview.hidden = false;
         filenamePreviewName.textContent = `${base || "certificado-linha-1"}.pdf`;
       };
+
+      const readFirstRowFromFile = async (file) => {
+        if (!sampleUrl || !filenamePreview || !filenamePreviewName) return;
+        firstRowColumns = null;
+        filenamePreview.hidden = false;
+        filenamePreviewName.textContent = "Lendo a planilha\u2026";
+        const formData = new FormData();
+        formData.append("excel", file);
+        try {
+          const response = await fetch(sampleUrl, {
+            method: "POST",
+            headers: { "X-CSRFToken": csrfToken },
+            body: formData,
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(data.error || "N\u00e3o foi poss\u00edvel ler a planilha.");
+          firstRowColumns = data.first_row_columns || {};
+          renderFilenamePreview();
+        } catch (err) {
+          filenamePreview.hidden = false;
+          filenamePreviewName.textContent = err.message || "N\u00e3o foi poss\u00edvel ler a planilha.";
+        }
+      };
+
+      fileInput?.addEventListener("change", () => {
+        const file = fileInput.files?.[0];
+        if (!file) {
+          firstRowColumns = null;
+          if (filenamePreview) filenamePreview.hidden = true;
+          return;
+        }
+        readFirstRowFromFile(file);
+      });
 
       const columnRefsFromPattern = (pattern) => {
         const trimmed = String(pattern || "").trim();
@@ -436,22 +465,8 @@
         return refs;
       };
 
-      const setStripAccentsSaveState = (tone, text) => {
-        if (!stripAccentsSaveState) return;
-        stripAccentsSaveState.textContent = text || "";
-        if (tone) stripAccentsSaveState.dataset.tone = tone;
-        else delete stripAccentsSaveState.dataset.tone;
-      };
-
-      const setCaseSaveState = (tone, text) => {
-        if (!caseSaveState) return;
-        caseSaveState.textContent = text || "";
-        if (tone) caseSaveState.dataset.tone = tone;
-        else delete caseSaveState.dataset.tone;
-      };
-
       const saveCaseOptions = async () => {
-        setCaseSaveState("busy", "Salvando…");
+        setFilenameSaveState("busy", "Salvando…");
         try {
           const response = await fetch(filenamePatternUrl, {
             method: "POST",
@@ -463,9 +478,9 @@
           });
           const data = await response.json().catch(() => ({}));
           if (!response.ok) throw new Error(data.error || `Erro ${response.status}`);
-          setCaseSaveState("ok", "Salvo");
+          setFilenameSaveState("ok", "Salvo");
         } catch (err) {
-          setCaseSaveState("error", err.message || "Não foi possível salvar.");
+          setFilenameSaveState("error", err.message || "Não foi possível salvar.");
         }
       };
 
@@ -500,7 +515,7 @@
       };
 
       const saveStripAccents = async () => {
-        setStripAccentsSaveState("busy", "Salvando…");
+        setFilenameSaveState("busy", "Salvando…");
         try {
           const response = await fetch(filenamePatternUrl, {
             method: "POST",
@@ -511,9 +526,9 @@
           });
           const data = await response.json().catch(() => ({}));
           if (!response.ok) throw new Error(data.error || `Erro ${response.status}`);
-          setStripAccentsSaveState("ok", "Salvo");
+          setFilenameSaveState("ok", "Salvo");
         } catch (err) {
-          setStripAccentsSaveState("error", err.message || "Não foi possível salvar.");
+          setFilenameSaveState("error", err.message || "Não foi possível salvar.");
         }
       };
 

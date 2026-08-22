@@ -170,17 +170,6 @@
     // desenha as réguas de distância até as bordas da página (ver drawMeasurements)
     let measureTarget = null;
     canvas.on("mouse:down", (opt) => {
-      // Guia ganha prioridade sobre o campo por baixo dela — igual ao
-      // Photoshop, onde dá pra pegar uma guia mesmo em cima de conteúdo.
-      if (rulersActive && !spacePressed && opt.e.button !== 1) {
-        const rect = canvasEl.getBoundingClientRect();
-        const hit = guideAtScreenPoint(opt.e.clientX - rect.left, opt.e.clientY - rect.top);
-        if (hit) {
-          canvas.setCursor(hit.axis === "x" ? "col-resize" : "row-resize");
-          trackGuideDrag(hit.axis, hit.index);
-          return;
-        }
-      }
       if (spacePressed || opt.e.button === 1 || !opt.target) {
         panState = { x: opt.e.clientX, y: opt.e.clientY };
         canvas.setCursor("grabbing");
@@ -351,182 +340,13 @@
       ctx.restore();
     };
 
-    // ----- réguas ao redor da bancada + guias de alinhamento (como no
-    // Photoshop): arrastar a partir da régua cria uma guia; arrastar uma
-    // guia de volta pra régua apaga; campos encostam nelas ao arrastar
-    // (computeSnapTargets, mais abaixo). Só existe na tela de edição —
-    // a pré-visualização somente-leitura não passa rulerHId/rulerVId. -----
+    // ----- réguas ao redor da bancada (como no Photoshop), só de medida —
+    // a criação de linhas-guia clicáveis foi removida (não ficava confiável).
+    // Só existe na tela de edição — a pré-visualização somente-leitura não
+    // passa rulerHId/rulerVId. -----
     const rulerH = document.getElementById(config.rulerHId || "ruler-h");
     const rulerV = document.getElementById(config.rulerVId || "ruler-v");
     const rulersActive = Boolean(!readOnly && rulerH && rulerV);
-    // Região que "segura" uma guia: régua + canvas juntos. Soltar dentro
-    // dela (mesmo ainda em cima da régua, sem nunca ter entrado no canvas —
-    // o caso de um clique simples) mantém a guia; só sair de tudo isso
-    // apaga. Sem isso, um clique parado na régua já nascia e morria no
-    // mesmo instante, porque a posição nunca tinha "entrado" no canvas.
-    const rulersContainer = rulerH ? rulerH.closest(".editor-rulers") : null;
-
-    // Posições em pontos PDF (o mesmo "mundo" dos campos): x = guias
-    // verticais, y = guias horizontais.
-    const guideLines = {
-      x: Array.isArray(config.guides && config.guides.x) ? config.guides.x.slice() : [],
-      y: Array.isArray(config.guides && config.guides.y) ? config.guides.y.slice() : [],
-    };
-
-    const saveGuides = debounce(async () => {
-      if (!config.urls || !config.urls.guides) return;
-      try {
-        await request(config.urls.guides, "POST", { guides: guideLines });
-      } catch (err) {
-        setStatus(`Não foi possível salvar as guias: ${err.message}`);
-      }
-    }, 500);
-
-    const GUIDE_HIT_TOLERANCE = 5;
-    const guideAtScreenPoint = (sx, sy) => {
-      const vpt = canvas.viewportTransform;
-      const zoom = canvas.getZoom();
-      const pageTop = vpt[5] - GUIDE_HIT_TOLERANCE;
-      const pageBottom = vpt[5] + page.height * zoom + GUIDE_HIT_TOLERANCE;
-      const pageLeft = vpt[4] - GUIDE_HIT_TOLERANCE;
-      const pageRight = vpt[4] + page.width * zoom + GUIDE_HIT_TOLERANCE;
-      for (let i = 0; i < guideLines.x.length; i += 1) {
-        const gx = guideLines.x[i] * zoom + vpt[4];
-        if (Math.abs(gx - sx) <= GUIDE_HIT_TOLERANCE && sy >= pageTop && sy <= pageBottom) {
-          return { axis: "x", index: i };
-        }
-      }
-      for (let i = 0; i < guideLines.y.length; i += 1) {
-        const gy = guideLines.y[i] * zoom + vpt[5];
-        if (Math.abs(gy - sy) <= GUIDE_HIT_TOLERANCE && sx >= pageLeft && sx <= pageRight) {
-          return { axis: "y", index: i };
-        }
-      }
-      return null;
-    };
-
-    // Acompanha o arrasto de uma guia (nova ou já existente) até soltar o
-    // botão — sempre por listeners no document, nunca pelos eventos do
-    // Fabric: o gesto de criar começa fora do canvas (na régua), e mesmo o
-    // de mover uma guia existente pode terminar fora dele (arrastar de
-    // volta pra régua apaga), e o mouse:up do Fabric não dispara nesse caso.
-    const trackGuideDrag = (axis, index) => {
-      const rect = canvasEl.getBoundingClientRect();
-      const worldFromEvent = (evt) => {
-        const vpt = canvas.viewportTransform;
-        const zoom = canvas.getZoom();
-        return axis === "x"
-          ? (evt.clientX - rect.left - vpt[4]) / zoom
-          : (evt.clientY - rect.top - vpt[5]) / zoom;
-      };
-      const onMove = (moveEvt) => {
-        const value = worldFromEvent(moveEvt);
-        guideLines[axis][index] = value;
-        canvas.requestRenderAll();
-        setStatus(`Guia ${axis === "x" ? "vertical" : "horizontal"}: ${formatCm(value)}`);
-      };
-      const onUp = (upEvt) => {
-        document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("mouseup", onUp);
-        // "Fora dos limites" é sair da régua+canvas inteiros, não só do
-        // canvas — soltar parado em cima da régua (um clique sem arrastar)
-        // tem que criar a guia ali, não apagar na hora por nunca ter
-        // "entrado" no canvas.
-        const bounds = (rulersContainer || canvasEl).getBoundingClientRect();
-        const px = upEvt.clientX - bounds.left;
-        const py = upEvt.clientY - bounds.top;
-        const outOfBounds = px < 0 || px > bounds.width || py < 0 || py > bounds.height;
-        if (outOfBounds) {
-          guideLines[axis].splice(index, 1);
-          setStatus("Guia removida.");
-        } else {
-          guideLines[axis][index] = round2(guideLines[axis][index]);
-          setStatus("Guia salva.");
-        }
-        canvas.setCursor("grab");
-        canvas.requestRenderAll();
-        saveGuides();
-      };
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
-    };
-
-    // Mousedown numa régua já cria a guia (satisfaz um clique simples) e
-    // entra em modo de arrasto na hora (satisfaz arrastar antes de soltar).
-    const beginGuideFromRuler = (axis, downEvent) => {
-      const rect = canvasEl.getBoundingClientRect();
-      const vpt = canvas.viewportTransform;
-      const zoom = canvas.getZoom();
-      const worldValue = axis === "x"
-        ? (downEvent.clientX - rect.left - vpt[4]) / zoom
-        : (downEvent.clientY - rect.top - vpt[5]) / zoom;
-      guideLines[axis].push(round2(worldValue));
-      canvas.requestRenderAll();
-      trackGuideDrag(axis, guideLines[axis].length - 1);
-    };
-
-    if (rulersActive) {
-      // button !== 0 (botão direito, ou o do meio) não cria guia — sem essa
-      // checagem, o mousedown do botão direito (que sempre dispara antes do
-      // contextmenu) criava uma guia fantasma bem no meio do gesto de
-      // apagar uma guia existente.
-      rulerH.addEventListener("mousedown", (e) => {
-        if (e.button !== 0) return;
-        e.preventDefault();
-        beginGuideFromRuler("x", e);
-      });
-      rulerV.addEventListener("mousedown", (e) => {
-        if (e.button !== 0) return;
-        e.preventDefault();
-        beginGuideFromRuler("y", e);
-      });
-
-      // Botão direito em cima de uma guia (na régua ou já no canvas) apaga
-      // na hora — sem isso a única forma de remover era arrastar de volta
-      // pra régua, o que não é óbvio. O Fabric já suprime o menu do
-      // navegador sobre o canvas (stopContextMenu); as réguas não são dele,
-      // então cada uma precisa do próprio preventDefault.
-      const removeGuide = (axis, index) => {
-        guideLines[axis].splice(index, 1);
-        canvas.requestRenderAll();
-        setStatus("Guia removida.");
-        saveGuides();
-      };
-      // O Fabric envolve o <canvas> original (canvasEl) num canvas "de
-      // baixo" só de desenho — quem recebe eventos de verdade é o
-      // upperCanvasEl que ele cria por cima. Um listener em canvasEl nunca
-      // dispararia pra cliques reais do usuário.
-      canvas.upperCanvasEl.addEventListener("contextmenu", (e) => {
-        const rect = canvasEl.getBoundingClientRect();
-        const hit = guideAtScreenPoint(e.clientX - rect.left, e.clientY - rect.top);
-        if (hit) {
-          e.preventDefault();
-          removeGuide(hit.axis, hit.index);
-        }
-      });
-      rulerH.addEventListener("contextmenu", (e) => {
-        e.preventDefault();
-        const rect = canvasEl.getBoundingClientRect();
-        const sx = e.clientX - rect.left;
-        const vpt = canvas.viewportTransform;
-        const zoom = canvas.getZoom();
-        const index = guideLines.x.findIndex(
-          (wx) => Math.abs(wx * zoom + vpt[4] - sx) <= GUIDE_HIT_TOLERANCE
-        );
-        if (index !== -1) removeGuide("x", index);
-      });
-      rulerV.addEventListener("contextmenu", (e) => {
-        e.preventDefault();
-        const rect = canvasEl.getBoundingClientRect();
-        const sy = e.clientY - rect.top;
-        const vpt = canvas.viewportTransform;
-        const zoom = canvas.getZoom();
-        const index = guideLines.y.findIndex(
-          (wy) => Math.abs(wy * zoom + vpt[5] - sy) <= GUIDE_HIT_TOLERANCE
-        );
-        if (index !== -1) removeGuide("y", index);
-      });
-    }
 
     const NICE_RULER_STEPS_CM = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200];
     const chooseRulerStepCm = (zoom) => {
@@ -624,25 +444,6 @@
       ctx.strokeStyle = "rgba(232, 244, 240, 0.55)";
       ctx.lineWidth = 1;
       ctx.strokeRect(vpt[4] - 0.5, vpt[5] - 0.5, page.width * zoom + 1, page.height * zoom + 1);
-
-      if (rulersActive && (guideLines.x.length || guideLines.y.length)) {
-        ctx.strokeStyle = "rgba(64, 169, 255, 0.85)";
-        ctx.lineWidth = 1;
-        guideLines.x.forEach((wx) => {
-          const sx = Math.round(wx * zoom + vpt[4]) + 0.5;
-          ctx.beginPath();
-          ctx.moveTo(sx, vpt[5]);
-          ctx.lineTo(sx, vpt[5] + page.height * zoom);
-          ctx.stroke();
-        });
-        guideLines.y.forEach((wy) => {
-          const sy = Math.round(wy * zoom + vpt[5]) + 0.5;
-          ctx.beginPath();
-          ctx.moveTo(vpt[4], sy);
-          ctx.lineTo(vpt[4] + page.width * zoom, sy);
-          ctx.stroke();
-        });
-      }
 
       ctx.strokeStyle = "rgba(255, 84, 174, 0.95)";
       ctx.lineWidth = 1;
@@ -974,10 +775,10 @@
       setStatus("Refeito.");
     };
 
-    // ----- snapping com guias -----
+    // ----- snapping: bordas/centro da página e dos outros campos -----
     const computeSnapTargets = (activeObj) => {
-      const xs = [0, page.width / 2, page.width, ...guideLines.x];
-      const ys = [0, page.height / 2, page.height, ...guideLines.y];
+      const xs = [0, page.width / 2, page.width];
+      const ys = [0, page.height / 2, page.height];
       canvas.getObjects().forEach((other) => {
         if (other === activeObj || !other.vetFieldId) return;
         if (canvas.getActiveObjects().includes(other)) return;
@@ -1629,7 +1430,7 @@
     // ----- inicialização final -----
     window.addEventListener("resize", debounce(fitToScreen, 150));
     fitToScreen();
-    window.__vetorialEditor = { canvas, fields, fonts: fontsList, guides: guideLines };
+    window.__vetorialEditor = { canvas, fields, fonts: fontsList };
     if (!readOnly) {
       setStatus(fields.length ? "Selecione um campo para editar." : "Crie o primeiro campo com “Novo campo”.");
       setSaveState("Salvo ✓", "ok");

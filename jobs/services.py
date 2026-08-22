@@ -279,6 +279,12 @@ def load_excel_rows(excel_path: str):
     if not rows:
         return [], []
     headers = [_normalize_value(value) for value in rows[0]]
+    # A largura "usada" que o Excel relata costuma sobrar além do último
+    # cabeçalho de verdade (células vazias que já foram formatadas ou
+    # tocadas alguma vez) — sem isto, "Cabeçalhos detectados" na tela do job
+    # exibia um monte de vírgulas soltas depois dos nomes reais.
+    while headers and not headers[-1]:
+        headers.pop()
     data_rows = []
     for row_index, row in enumerate(rows[1:], start=2):
         payload = {}

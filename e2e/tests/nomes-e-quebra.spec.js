@@ -60,7 +60,7 @@ async function clickField(page, fieldName) {
 // antes do valor final, então a espera pelo "Salvo" nunca fica presa.
 async function setFilenamePattern(page, value) {
   const input = page.locator("#filename-pattern-input");
-  const saveState = page.locator("#filename-pattern-save-state");
+  const saveState = page.locator("#filename-save-state");
   await input.fill("__reset__");
   await input.blur();
   await expect(saveState).toHaveText(/Salvo/, { timeout: 10_000 });
@@ -140,9 +140,10 @@ test.describe("Nome dos arquivos: padrão com colunas e espaços", () => {
     await openBancada(page);
 
     await expect(page.locator(".filename-card")).toContainText("{1}");
-    // A extensão ".pdf" hoje só aparece na amostra ao vivo do nome do
-    // arquivo (o texto de ajuda deixou de repetir isso).
-    await expect(page.locator("#filename-preview-name")).toContainText(".pdf");
+    // A amostra ao vivo do nome do arquivo só usa dado real da planilha —
+    // sem nenhuma escolhida ainda, fica escondida (ver o teste com upload
+    // logo abaixo pra amostra de verdade).
+    await expect(page.locator("#filename-preview")).toBeHidden();
 
     await setFilenamePattern(page, "{1}_{2}");
   });
@@ -161,7 +162,7 @@ test.describe("Nome dos arquivos: padrão com colunas e espaços", () => {
       spaceMode.selectOption("replace"),
     ]);
     await expect(replacement).toBeVisible();
-    await expect(page.locator("#filename-space-save-state")).toHaveText(/Salvo/);
+    await expect(page.locator("#filename-save-state")).toHaveText(/Salvo/);
 
     await Promise.all([
       page.waitForResponse(
@@ -196,6 +197,12 @@ test.describe("Nome dos arquivos: padrão com colunas e espaços", () => {
     await replacement.blur();
 
     await page.locator("#generate-excel-input").setInputFiles(EXCEL);
+    // Amostra ao vivo do nome (dado real da planilha, sem gerar nada ainda).
+    await expect(page.locator("#filename-preview-name")).toHaveText(
+      "ana.paula.de.souza_Design.pdf",
+      { timeout: 10_000 }
+    );
+
     await page.getByRole("button", { name: /Gerar amostra/i }).click();
     await expect(page.locator("#generate-progress-text")).toHaveText(/arquivos? pronto/, {
       timeout: 30_000,

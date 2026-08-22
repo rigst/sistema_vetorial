@@ -951,6 +951,36 @@ class ColumnTemplateTests(TestCase):
         self.assertEqual(services.render_column_template("", {"coluna_1": "Ana"}), "")
 
 
+class LoadExcelRowsTests(TestCase):
+    """A largura "usada" que o Excel relata para a linha de cabeçalho costuma
+    sobrar além do último cabeçalho de verdade (células vazias que já foram
+    tocadas alguma vez) — sem cortar essa sobra, "Cabeçalhos detectados" na
+    tela do job saía com um monte de vírgulas soltas no final."""
+
+    def test_trims_trailing_empty_headers(self):
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.append(["Nome", "Curso", None, None, None])
+        sheet.append(["Ana", "Design", None, None, None])
+        with tempfile.NamedTemporaryFile(suffix=".xlsx") as temp:
+            workbook.save(temp.name)
+            headers, data_rows = services.load_excel_rows(temp.name)
+        self.assertEqual(headers, ["Nome", "Curso"])
+        self.assertEqual(data_rows[0][1]["coluna_1"], "Ana")
+        self.assertEqual(data_rows[0][1]["coluna_2"], "Design")
+        self.assertNotIn("coluna_3", data_rows[0][1])
+
+    def test_keeps_gap_in_the_middle(self):
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.append(["Nome", None, "Curso"])
+        sheet.append(["Ana", "x", "Design"])
+        with tempfile.NamedTemporaryFile(suffix=".xlsx") as temp:
+            workbook.save(temp.name)
+            headers, _data_rows = services.load_excel_rows(temp.name)
+        self.assertEqual(headers, ["Nome", "", "Curso"])
+
+
 class ResolveFieldRawValueTests(TestCase):
     """`resolve_field_raw_value` decide se a Transformação roda coluna a
     coluna (campo com 2+ colunas e `transform_columns` marcado) ou, como

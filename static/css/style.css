@@ -1805,7 +1805,6 @@ details[open] > summary .field-advanced-title::before {
 .ruler {
   display: block;
   background: #1b2622;
-  cursor: crosshair;
 }
 
 .ruler-h {
@@ -1894,11 +1893,25 @@ details[open] > summary .field-advanced-title::before {
   max-height: min(560px, calc(100% - 20px));
   overflow-y: auto;
   box-shadow: 0 16px 44px rgba(0, 0, 0, 0.45);
-  background: var(--fp-bg);
   border: 1px solid rgba(234, 244, 240, 0.12);
   border-radius: var(--radius-xl);
   padding: 0.75rem 0.9rem;
   color: var(--fp-text);
+
+  /* Degradê nas pontas do conteúdo rolável: some quando não sobra mais nada
+   * pra cima/pra baixo (as duas camadas "local" cobrem com a própria cor de
+   * fundo e rolam junto com o conteúdo; as duas "scroll" são a sombra em si,
+   * fixas na janela — a combinação é o truque clássico de "scroll shadow"). */
+  background-color: var(--fp-bg);
+  background-image:
+    linear-gradient(rgba(24, 36, 32, 1) 30%, rgba(24, 36, 32, 0)),
+    linear-gradient(rgba(24, 36, 32, 0), rgba(24, 36, 32, 1) 70%),
+    linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0)),
+    linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.45));
+  background-repeat: no-repeat;
+  background-size: 100% 36px, 100% 36px, 100% 14px, 100% 14px;
+  background-position: 0 0, 0 100%, 0 0, 0 100%;
+  background-attachment: local, local, scroll, scroll;
 
   transform-origin: top left;
   opacity: 0;
@@ -2002,6 +2015,16 @@ details[open] > summary .field-advanced-title::before {
 
 .field-popover select option {
   color: var(--text);
+}
+
+/* .field-config-form (regra global, tema claro) clareia o fundo no hover —
+ * sem isto o campo ficava com fundo quase branco e o texto claro do popover
+ * em cima dele, ilegível. Mesma especificidade da regra global; esta vence
+ * por vir depois no arquivo. */
+.field-popover input[type="text"]:hover,
+.field-popover input[type="number"]:hover,
+.field-popover select:hover {
+  background: rgba(234, 244, 240, 0.1);
 }
 
 .field-popover input:focus,
@@ -2616,6 +2639,14 @@ label.toolbar-button {
 .generate-shell .save-state[data-tone="ok"] { color: var(--success); }
 .generate-shell .save-state[data-tone="busy"] { color: var(--warning); }
 .generate-shell .save-state[data-tone="error"] { color: var(--danger); }
+
+/* Um indicador só pro cartão inteiro (canto inferior direito) em vez de um
+ * "Salvo" atrás de cada opção — as quatro configurações salvam sozinhas,
+ * mas só uma delas por vez, então um indicador compartilhado já basta. */
+.filename-save-state {
+  justify-self: end;
+  margin-top: 0.2rem;
+}
 
 @media (max-width: 860px) {
   .generate-shell {

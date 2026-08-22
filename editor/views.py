@@ -226,7 +226,6 @@ def _template_editor_context(template_obj, user):
         "page_height_cm": round(float(template_obj.page_height or 0) * 2.54 / 72, 2)
         if template_obj.page_height
         else 0,
-        "guides_json": (template_obj.editor_state or {}).get("guides") or {"x": [], "y": []},
         "filename_space_mode_choices": DocumentTemplate.FilenameSpaceMode.choices,
         "filename_case_choices": DocumentTemplate.FilenameCase.choices,
     }
@@ -462,27 +461,6 @@ class TemplateLayoutUpdateView(LoginRequiredMixin, View):
         return JsonResponse({"ok": True, "updated": len(updates)})
 
 
-class TemplateGuidesUpdateView(LoginRequiredMixin, View):
-    """Salva as réguas-guia do editor visual (clique na régua pra criar,
-    arraste pra mover) dentro de `DocumentTemplate.editor_state` — não são
-    campos do PDF, só uma referência visual de alinhamento na tela."""
-
-    def post(self, request, *args, **kwargs):
-        template_obj = get_object_or_404(DocumentTemplate, pk=kwargs["pk"], user=request.user)
-        payload = _parse_json_body(request)
-        raw_guides = payload.get("guides") or {}
-        try:
-            clean_guides = {
-                "x": [round(float(value), 2) for value in raw_guides.get("x") or []],
-                "y": [round(float(value), 2) for value in raw_guides.get("y") or []],
-            }
-        except (TypeError, ValueError):
-            return JsonResponse({"error": "Formato de guias inválido."}, status=400)
-        template_obj.editor_state = {**(template_obj.editor_state or {}), "guides": clean_guides}
-        template_obj.save(update_fields=["editor_state", "updated_at"])
-        return JsonResponse({"ok": True, "guides": clean_guides})
-
-
 class TemplateFilenamePatternUpdateView(LoginRequiredMixin, View):
     """Salva as opções de nome dos PDFs gerados (card "Gerar arquivos"): o
     padrão com variáveis {N} e o que fazer com espaços do texto no nome."""
@@ -583,7 +561,23 @@ class TemplateSampleDataView(LoginRequiredMixin, View):
                 except Exception:
                     values[str(field.id)] = str(raw_value)
             rows.append({"row_number": row_number, "values": values})
-        return JsonResponse({"headers": headers, "rows": rows, "total": len(data_rows)})
+
+        # Colunas cruas (coluna_1, coluna_2...) da primeira linha, sem
+        # nenhuma formatação de campo — é o que o padrão de nome de arquivo
+        # ({1}_{2}...) de fato substitui, então a amostra ao vivo do nome
+        # usa isto, não os valores já formatados por campo acima.
+        first_payload = data_rows[0][1]
+        first_row_columns = {
+            str(idx + 1): first_payload.get(f"coluna_{idx + 1}", "") for idx in range(len(headers))
+        }
+        return JsonResponse(
+            {
+                "headers": headers,
+                "rows": rows,
+                "total": len(data_rows),
+                "first_row_columns": first_row_columns,
+            }
+        )
 
 
 class TemplatePreviewPageImageView(LoginRequiredMixin, View):

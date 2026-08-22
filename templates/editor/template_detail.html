@@ -53,8 +53,8 @@
         </div>
         <div class="editor-rulers" id="editor-rulers">
             <div class="ruler-corner"></div>
-            <canvas class="ruler ruler-h" id="ruler-h" title="Clique e arraste pra criar uma guia vertical (botão direito apaga)"></canvas>
-            <canvas class="ruler ruler-v" id="ruler-v" title="Clique e arraste pra criar uma guia horizontal (botão direito apaga)"></canvas>
+            <canvas class="ruler ruler-h" id="ruler-h"></canvas>
+            <canvas class="ruler ruler-v" id="ruler-v"></canvas>
             <div class="editor-canvas-wrap" id="editor-canvas-wrap">
                 <canvas id="editor-canvas"></canvas>
                 <div class="editor-statusbar">
@@ -269,9 +269,8 @@
         </div>
         </div>
         <p class="muted editor-hints">
-            Arraste da régua para criar uma guia (arraste de volta pra apagar, ou clique nela com o
-            botão direito) · clique num campo e depois no ✎ para editar · arraste um campo para
-            movê-lo · arraste o fundo para mover a página · roda do mouse dá zoom ·
+            Clique num campo e depois no ✎ para editar · arraste um campo para movê-lo ·
+            arraste o fundo para mover a página · roda do mouse dá zoom ·
             Shift+clique seleciona vários · alças laterais mudam a largura · cantos mudam o tamanho da fonte ·
             alça superior gira · duplo clique edita o texto · setas ajustam a posição (Shift = 10 pt)
         </p>
@@ -284,7 +283,8 @@
 <div class="generate-shell" id="generate-card"
     data-launch-url="{% url 'jobs:launch' %}"
     data-template-id="{{ template_obj.pk }}"
-    data-filename-pattern-url="{% url 'editor:filename-pattern-update' template_obj.pk %}">
+    data-filename-pattern-url="{% url 'editor:filename-pattern-update' template_obj.pk %}"
+    data-sample-url="{% url 'editor:sample-data' template_obj.pk %}">
     {% csrf_token %}
 
     <section class="panel filename-card">
@@ -302,12 +302,15 @@
                 <code>{3}-{5}</code> junta a coluna 3 e a 5 com um traço.
                 Em branco, usa o nome padrão (nome do lote + número da linha).
             </p>
-            <span class="save-state" id="filename-pattern-save-state"></span>
         </div>
 
-        <div class="filename-preview" id="filename-preview">
+        {% comment %}
+        Só aparece depois que um Excel é escolhido (dado real da primeira
+        linha) — antes disso não há o que mostrar de verdade.
+        {% endcomment %}
+        <div class="filename-preview" id="filename-preview" hidden>
             <span class="filename-preview-label">Assim vai ficar</span>
-            <span class="filename-preview-name" id="filename-preview-name">certificado-linha-1.pdf</span>
+            <span class="filename-preview-name" id="filename-preview-name"></span>
         </div>
 
         <div class="filename-options">
@@ -328,7 +331,6 @@
                            aria-label="Caractere para substituir espaços">
                 </div>
                 <p class="field-hint">Sem escolher nada, os espaços do texto aparecem normalmente.</p>
-                <span class="save-state" id="filename-space-save-state"></span>
             </div>
 
             <div class="field-group">
@@ -337,7 +339,6 @@
                            {% if template_obj.filename_strip_accents %}checked{% endif %}>
                     <label for="filename-strip-accents">Remover acentos (ç → c, ã → a, ü → u…)</label>
                 </div>
-                <span class="save-state" id="filename-strip-accents-save-state"></span>
             </div>
 
             <div class="field-group">
@@ -355,9 +356,10 @@
                         todas; marcando algumas, só nelas.
                     </p>
                 </div>
-                <span class="save-state" id="filename-case-save-state"></span>
             </div>
         </div>
+
+        <span class="save-state filename-save-state" id="filename-save-state"></span>
     </section>
 
     <section class="panel generate-steps-card">
@@ -410,14 +412,13 @@
 {{ field_json|json_script:"editor-field-data" }}
 {{ font_json|json_script:"editor-font-data" }}
 {{ template_obj.filename_case_columns|json_script:"filename-case-columns-data" }}
-{{ guides_json|json_script:"editor-guides-data" }}
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/job_launcher.js' %}?v=20260822-04"></script>
+<script src="{% static 'js/job_launcher.js' %}?v=20260822-05"></script>
 {% if preview_pages %}
 <script src="{% static 'js/fabric.min.js' %}?v=6.7.1"></script>
-<script src="{% static 'js/template_editor.js' %}?v=20260822-11"></script>
+<script src="{% static 'js/template_editor.js' %}?v=20260822-12"></script>
 <script>
 VetorialTemplateEditor.init({
   canvasId: "editor-canvas",
@@ -429,12 +430,10 @@ VetorialTemplateEditor.init({
   backgroundUrl: "{% url 'editor:preview-page' template_obj.pk 1 %}",
   fields: JSON.parse(document.getElementById("editor-field-data").textContent),
   fonts: JSON.parse(document.getElementById("editor-font-data").textContent),
-  guides: JSON.parse(document.getElementById("editor-guides-data").textContent),
   urls: {
     fields: "{% url 'editor:fields-api' template_obj.pk %}",
     layout: "{% url 'editor:layout-update' template_obj.pk %}",
     fieldTemplate: "{% url 'editor:field-api' 123454321 %}",
-    guides: "{% url 'editor:guides-update' template_obj.pk %}",
   },
 });
 </script>

@@ -105,39 +105,6 @@ test.describe("Painel do campo: organização e estados", () => {
   });
 });
 
-test.describe("Réguas: guias de alinhamento", () => {
-  test("clique na régua cria uma guia; botão direito nela apaga", async ({ page }) => {
-    await login(page);
-    await page.goto("/templates/");
-    await page.getByRole("link", { name: /Certificado E2E/i }).first().click();
-    await expect(page.locator("#generate-card")).toBeVisible();
-    await expect(page.locator("#editor-status-text")).not.toHaveText(/Carregando/);
-
-    // Clique simples (sem arrastar) na régua vertical cria uma guia
-    // horizontal a essa altura.
-    const rulerV = page.locator("#ruler-v");
-    const rulerBox = await rulerV.boundingBox();
-    const targetY = rulerBox.y + 60;
-    await page.mouse.click(rulerBox.x + rulerBox.width / 2, targetY);
-    await expect
-      .poll(() => page.evaluate(() => window.__vetorialEditor.guides.y.length))
-      .toBe(1);
-    await expect(page.locator("#editor-save-state")).toHaveText(/Salvo/, { timeout: 10_000 });
-
-    // Botão direito bem em cima da guia (na própria régua) apaga na hora.
-    await page.mouse.click(rulerBox.x + rulerBox.width / 2, targetY, { button: "right" });
-    await expect
-      .poll(() => page.evaluate(() => window.__vetorialEditor.guides.y.length))
-      .toBe(0);
-
-    // Persiste: recarregar não traz a guia apagada de volta.
-    await page.reload();
-    await expect(page.locator("#editor-status-text")).not.toHaveText(/Carregando/);
-    const guidesAfterReload = await page.evaluate(() => window.__vetorialEditor.guides);
-    expect(guidesAfterReload.y).toEqual([]);
-  });
-});
-
 test.describe("Botões de ícone: ação destrutiva não parece CTA primário", () => {
   test("excluir/editar não herdam o preenchimento sólido do botão principal", async ({ page }) => {
     await login(page);
