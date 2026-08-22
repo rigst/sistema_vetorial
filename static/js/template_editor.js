@@ -1146,9 +1146,20 @@
     const popoverCloseButton = document.getElementById("field-popover-close");
     let popoverOpenFieldId = null;
 
+    // Abrir/fechar anima (opacidade + leve escala) via a classe .is-open;
+    // o hidden real só chega depois da transição terminar, senão o popover
+    // sumiria (display:none) na hora e a animação de saída nunca apareceria.
+    const POPOVER_TRANSITION_MS = 160;
     const closePopover = () => {
-      if (panelEl && !panelEl.hidden) panelEl.hidden = true;
+      if (!panelEl || panelEl.hidden) {
+        popoverOpenFieldId = null;
+        return;
+      }
+      panelEl.classList.remove("is-open");
       popoverOpenFieldId = null;
+      window.setTimeout(() => {
+        if (!panelEl.classList.contains("is-open")) panelEl.hidden = true;
+      }, POPOVER_TRANSITION_MS);
     };
 
     // Caixa do campo em coordenadas de tela, relativas ao wrap (onde o botão
@@ -1194,6 +1205,10 @@
       popoverOpenFieldId = obj.vetFieldId;
       panelEl.hidden = false;
       positionPopover(screenBoxFor(obj));
+      // Próximo frame: garante que o navegador registre o estado fechado
+      // (opacity 0, ver CSS) antes de ligar is-open — sem isso as duas
+      // mudanças caem no mesmo frame e a transição não roda.
+      requestAnimationFrame(() => panelEl.classList.add("is-open"));
     };
 
     // Chamado a cada after:render: mostra/reposiciona o botão ✎ sobre o

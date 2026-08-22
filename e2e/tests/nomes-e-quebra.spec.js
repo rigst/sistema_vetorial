@@ -92,13 +92,19 @@ test.describe("Barra de ferramentas: ícones numa linha, sem quadrado", () => {
     await expect(deleteButton).toHaveText("🗑");
     await expect(deleteButton).toHaveAttribute("aria-label", "Excluir seleção");
 
-    // O "quadrado em volta" era um fundo + borda no #editor-toolbar; a barra
-    // agora só separa os grupos com um traço fino entre eles, sem caixa.
-    const toolbarBox = await page.locator("#editor-toolbar").evaluate((el) => {
+    // O "quadrado em volta" era uma borda nos 4 lados do #editor-toolbar; a
+    // barra virou o topo do quadro escuro da bancada (barra + régua + canvas
+    // como uma peça só), com só um traço embaixo separando-a da régua —
+    // não uma caixa fechada nos 4 lados.
+    const toolbarBorders = await page.locator("#editor-toolbar").evaluate((el) => {
       const style = getComputedStyle(el);
-      return { border: style.borderStyle, background: style.backgroundColor };
+      return {
+        top: style.borderTopStyle,
+        left: style.borderLeftStyle,
+        right: style.borderRightStyle,
+      };
     });
-    expect(toolbarBox.border).toBe("none");
+    expect(toolbarBorders).toEqual({ top: "none", left: "none", right: "none" });
   });
 });
 
