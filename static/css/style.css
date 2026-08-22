@@ -1257,11 +1257,16 @@ a.icon-button:focus-visible {
 }
 
 /* Campos quietos: sem borda em repouso, só um fundo suave — o contorno só
- * aparece no foco. Com uma dúzia de campos empilhados na coluna estreita do
- * painel, uma borda em cada um empilhava "caixa dentro de caixa dentro de
- * caixa"; o fundo sozinho já marca onde é editável. Vale para o painel do
- * campo e para "Gerar arquivos" logo abaixo — a mesma bancada, o mesmo
- * vocabulário visual dos dois lados. */
+ * aparece no foco. Com uma dúzia de campos empilhados numa coluna estreita,
+ * uma borda em cada um empilhava "caixa dentro de caixa dentro de caixa"; o
+ * fundo sozinho já marca onde é editável. .quiet-fields é a classe genérica
+ * (formulário de criar/editar template etc.); o painel do campo e "Gerar
+ * arquivos" já valiam antes disso existir, então continuam listados também. */
+.quiet-fields input[type="text"],
+.quiet-fields input[type="number"],
+.quiet-fields input[type="file"],
+.quiet-fields select,
+.quiet-fields textarea,
 .field-config-form input[type="text"],
 .field-config-form input[type="number"],
 .field-config-form select,
@@ -1274,6 +1279,11 @@ a.icon-button:focus-visible {
   transition: background var(--transition), border-color var(--transition), box-shadow var(--transition);
 }
 
+.quiet-fields input[type="text"]:hover,
+.quiet-fields input[type="number"]:hover,
+.quiet-fields input[type="file"]:hover,
+.quiet-fields select:hover,
+.quiet-fields textarea:hover,
 .field-config-form input[type="text"]:hover,
 .field-config-form input[type="number"]:hover,
 .field-config-form select:hover,
@@ -1282,6 +1292,11 @@ a.icon-button:focus-visible {
   background: var(--surface-strong-2);
 }
 
+.quiet-fields input[type="text"]:focus,
+.quiet-fields input[type="number"]:focus,
+.quiet-fields input[type="file"]:focus,
+.quiet-fields select:focus,
+.quiet-fields textarea:focus,
 .field-config-form input[type="text"]:focus,
 .field-config-form input[type="number"]:focus,
 .field-config-form select:focus,
@@ -2215,6 +2230,14 @@ label.toolbar-button {
   grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
 }
 
+/* Visualização somente-leitura: uma coluna só, sem o painel do campo — usar
+ * .editor-shell-single aqui deixava uma faixa vazia do tamanho da coluna do
+ * painel que não existe nesta tela. */
+.preview-shell {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
 /* A coluna da direita gruda no topo e nunca passa da altura da tela: dentro
  * dela, o painel do campo (que cresce bastante com as seções avançadas
  * abertas) rola por conta própria, e "Gerar arquivos" fica sempre à vista
@@ -2775,79 +2798,22 @@ label.toolbar-button {
   }
 }
 
-/* ---- Boas-vindas na lista de projetos: saudação + frase + uma foto de
- * verdade, só na visão padrão (não some quando "Projetos inativos"). ---- */
-.welcome-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(200px, 300px);
-  gap: 2rem;
-  align-items: center;
-  margin: 0.4rem 0 2rem;
+/* ---- Lista de projetos: a saudação é o único hero grande da tela; "Seus
+ * projetos" vem depois, do tamanho de um título de seção normal — do
+ * mesmo jeito que "Resumo do lote"/"Arquivos gerados" na tela do job — em
+ * vez de duas manchetes gigantes brigando pela atenção. ---- */
+.projects-header {
+  margin: 0.5rem 0 1.5rem;
 }
 
-.welcome-greeting {
-  font-size: clamp(1.5rem, 2.8vw, 2.1rem);
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  line-height: 1.15;
-}
-
-.welcome-greeting span {
-  color: var(--accent);
-}
-
-.welcome-phrase {
-  margin-top: 0.5rem;
-  font-size: 1.02rem;
-  color: var(--text-soft);
-  max-width: 48ch;
-}
-
-.welcome-photo {
-  position: relative;
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  box-shadow: var(--shadow);
-  aspect-ratio: 16 / 10;
-}
-
-.welcome-photo img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.welcome-photo figcaption {
-  position: absolute;
-  right: 0.5rem;
-  bottom: 0.5rem;
-  font-size: 0.66rem;
-  line-height: 1;
-}
-
-.welcome-photo figcaption a {
-  display: inline-block;
-  color: rgba(255, 255, 255, 0.88);
-  background: rgba(15, 26, 24, 0.45);
-  padding: 0.25rem 0.55rem;
-  border-radius: 999px;
-  backdrop-filter: blur(3px);
-}
-
-.welcome-photo figcaption a:hover {
-  background: rgba(15, 26, 24, 0.65);
-}
-
-@media (max-width: 720px) {
-  .welcome-hero {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-  }
-
-  .welcome-photo {
-    aspect-ratio: 16 / 7;
-  }
+/* Direto sobre o fundo da página (sem cartão branco por baixo), a pílula da
+ * versalete padrão pesa demais — mesmo achatamento do .hero-shell .eyebrow. */
+.projects-header .eyebrow {
+  background: transparent;
+  padding: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 /* ---- "+ Novo projeto": único CTA em degradê da tela — a mesma dupla de

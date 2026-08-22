@@ -217,21 +217,27 @@
     const PT_TO_CM = 2.54 / 72;
     const formatCm = (pt) => `${(pt * PT_TO_CM).toFixed(1)} cm`;
 
+    // Pontos desenhados um a um em vez de ctx.setLineDash: um dash quase
+    // zero (pra virar bolinha com lineCap round) renderiza inconsistente
+    // entre navegadores — em alguns o segmento sub-pixel vira linha sólida.
+    // Um círculo pequeno por vez sempre aparece igual.
+    const drawDottedLine = (ctx, x1, y1, x2, y2, spacing, radius) => {
+      const length = Math.hypot(x2 - x1, y2 - y1);
+      const steps = Math.max(1, Math.round(length / spacing));
+      const stepX = (x2 - x1) / steps;
+      const stepY = (y2 - y1) / steps;
+      for (let i = 0; i <= steps; i += 1) {
+        ctx.beginPath();
+        ctx.arc(x1 + stepX * i, y1 + stepY * i, radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    };
+
     const drawDimension = (ctx, { x1, y1, x2, y2, tickAxis, label, labelX, labelY }) => {
       // linha discreta com pequenos traços perpendiculares nas pontas, no
       // estilo de cota de desenho técnico — só a marcação, sem chamar atenção.
-      // Pontilhado (não tracejado): lineCap redondo + dash quase zerado vira
-      // uma fileira de pontinhos, mais delicado que um traço contínuo.
-      ctx.strokeStyle = "rgba(232, 244, 240, 0.5)";
-      ctx.lineWidth = 1.6;
-      ctx.lineCap = "round";
-      ctx.setLineDash([0.1, 4.5]);
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.lineCap = "butt";
+      ctx.fillStyle = "rgba(232, 244, 240, 0.6)";
+      drawDottedLine(ctx, x1, y1, x2, y2, 6, 1);
 
       const tick = 4;
       ctx.strokeStyle = "rgba(232, 244, 240, 0.65)";

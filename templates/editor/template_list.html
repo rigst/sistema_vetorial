@@ -1,38 +1,23 @@
 {% extends "base.html" %}
-{% load static %}
 
 {% block title %}Projetos | Vetorial{% endblock %}
 
 {% block content %}
 {% if not show_inactive %}
-<section class="welcome-hero">
-    <div class="welcome-copy">
-        <p class="welcome-greeting">{{ greeting }}, <span>{{ display_name }}</span></p>
-        <p class="welcome-phrase">{{ motivational_phrase }}</p>
-    </div>
-    <figure class="welcome-photo">
-        <img src="{% static 'img/home-hero.jpg' %}"
-             alt="Blocos de tipos móveis de madeira usados em impressão tipográfica, empilhados sobre uma mesa">
-        <figcaption>
-            <a href="https://commons.wikimedia.org/wiki/File:Wood_letterpress_type.jpg" target="_blank" rel="noopener">
-                Foto: Michellecornelison, CC BY-SA 4.0
-            </a>
-        </figcaption>
-    </figure>
+<section class="hero-shell">
+    <div class="eyebrow">{{ greeting }}</div>
+    <h1 class="hero-title">{{ display_name }}</h1>
+    <p class="hero-copy">{{ motivational_phrase }}</p>
 </section>
 {% endif %}
 
-<section class="hero-shell">
-    <div class="section-header">
-        <div>
-            <div class="eyebrow">Projetos</div>
-            <h1 class="hero-title">{% if show_inactive %}Projetos inativos{% else %}Seus projetos{% endif %}</h1>
-        </div>
-        <div class="inline-actions">
-            <a class="button button-cta" href="{% url 'editor:create' %}">+ Novo projeto</a>
-        </div>
+<div class="section-header projects-header">
+    <div>
+        <div class="eyebrow">Projetos</div>
+        <h2 class="section-title">{% if show_inactive %}Projetos inativos{% else %}Seus projetos{% endif %}</h2>
     </div>
-</section>
+    <a class="button button-cta" href="{% url 'editor:create' %}">+ Novo projeto</a>
+</div>
 
 {% if templates %}
     <div class="project-grid">
@@ -68,7 +53,7 @@
     <section class="empty-state">
         <h2 class="section-title">{% if query %}Nenhum projeto para “{{ query }}”{% else %}Comece o primeiro projeto{% endif %}</h2>
         <p class="muted">Envie a arte de fundo (PDF ou imagem), organize os campos por cima e gere os arquivos a partir do Excel.</p>
-        <a class="button" href="{% url 'editor:create' %}">+ Novo projeto</a>
+        <a class="button button-cta" href="{% url 'editor:create' %}">+ Novo projeto</a>
     </section>
 {% endif %}
 

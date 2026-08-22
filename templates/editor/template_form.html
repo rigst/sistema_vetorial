@@ -3,11 +3,14 @@
 {% block title %}{% if form.instance.pk %}Editar template{% else %}Novo template{% endif %} | Vetorial{% endblock %}
 
 {% block content %}
+<section class="hero-shell hero-compact">
+    <div class="eyebrow">Template</div>
+    <h1 class="hero-title">{% if form.instance.pk %}Editar template{% else %}Criar template{% endif %}</h1>
+</section>
+
 <section class="split-grid split-grid-wide">
     <div class="form-shell">
-        <div class="eyebrow">Template</div>
-        <h1 class="section-title" style="margin-top: 0.7rem;">{% if form.instance.pk %}Editar template{% else %}Criar template{% endif %}</h1>
-        <form method="post" enctype="multipart/form-data" id="template-form">
+        <form method="post" enctype="multipart/form-data" id="template-form" class="quiet-fields">
             {% csrf_token %}
             <div class="form-grid">
                 {% for field in form %}

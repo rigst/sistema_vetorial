@@ -17,7 +17,7 @@
     </div>
 </section>
 
-<section class="editor-shell editor-shell-single">
+<section class="preview-shell">
     <div class="editor-preview-panel">
         {% if preview_pages %}
             <div class="editor-canvas-wrap" id="editor-canvas-wrap">
@@ -36,7 +36,7 @@
 {% block extra_js %}
 {% if preview_pages %}
 <script src="{% static 'js/fabric.min.js' %}?v=6.7.1"></script>
-<script src="{% static 'js/template_editor.js' %}?v=20260715-02"></script>
+<script src="{% static 'js/template_editor.js' %}?v=20260822-06"></script>
 <script>
 VetorialTemplateEditor.init({
   canvasId: "editor-canvas",
