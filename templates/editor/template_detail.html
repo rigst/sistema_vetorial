@@ -44,34 +44,23 @@
         </div>
         <div class="editor-rulers" id="editor-rulers">
             <div class="ruler-corner"></div>
-            <canvas class="ruler ruler-h" id="ruler-h" title="Clique e arraste pra criar uma guia vertical"></canvas>
-            <canvas class="ruler ruler-v" id="ruler-v" title="Clique e arraste pra criar uma guia horizontal"></canvas>
+            <canvas class="ruler ruler-h" id="ruler-h" title="Clique e arraste pra criar uma guia vertical (botão direito apaga)"></canvas>
+            <canvas class="ruler ruler-v" id="ruler-v" title="Clique e arraste pra criar uma guia horizontal (botão direito apaga)"></canvas>
             <div class="editor-canvas-wrap" id="editor-canvas-wrap">
                 <canvas id="editor-canvas"></canvas>
                 <div class="editor-statusbar">
                     <span class="muted" id="editor-status-text">Carregando editor…</span>
                     <span class="editor-save-state" id="editor-save-state"></span>
                 </div>
-            </div>
-        </div>
-        <p class="muted editor-hints">
-            Arraste da régua para criar uma guia (arraste de volta pra apagar) · arraste um campo para
-            movê-lo · arraste o fundo para mover a página · roda do mouse dá zoom ·
-            Shift+clique seleciona vários · alças laterais mudam a largura · cantos mudam o tamanho da fonte ·
-            alça superior gira · duplo clique edita o texto · setas ajustam a posição (Shift = 10 pt)
-        </p>
-        {% else %}
-        <div class="empty-stage">Envie um PDF ou imagem de fundo válido para habilitar a edição visual.</div>
-        {% endif %}
-    </div>
 
-    <div class="editor-side">
-    <aside class="panel editor-config-panel" id="field-panel">
-        <div class="section-header">
-            <h2 class="section-title">Campo <span class="field-panel-name" id="field-panel-name"></span></h2>
-        </div>
-        <p class="panel-empty">Nenhum campo selecionado. Clique em um campo na página ou crie um novo com "+ Campo".</p>
-        <form id="field-form" class="field-config-form">
+                <button type="button" class="field-edit-button" id="field-edit-button" hidden aria-label="Editar campo">✎</button>
+
+                <aside class="panel field-popover editor-config-panel" id="field-panel" hidden>
+                    <div class="section-header">
+                        <h2 class="section-title">Campo <span class="field-panel-name" id="field-panel-name"></span></h2>
+                        <button type="button" class="icon-button" id="field-popover-close" aria-label="Fechar edição do campo">×</button>
+                    </div>
+                    <form id="field-form" class="field-config-form">
             {% csrf_token %}
             <div class="field-section">
                 <h3 class="field-section-label">Conteúdo</h3>
@@ -265,8 +254,20 @@
                     </div>
                 </div>
             </details>
-        </form>
-    </aside>
+                    </form>
+                </aside>
+            </div>
+        </div>
+        <p class="muted editor-hints">
+            Arraste da régua para criar uma guia (arraste de volta pra apagar, ou clique nela com o
+            botão direito) · clique num campo e depois no ✎ para editar · arraste um campo para
+            movê-lo · arraste o fundo para mover a página · roda do mouse dá zoom ·
+            Shift+clique seleciona vários · alças laterais mudam a largura · cantos mudam o tamanho da fonte ·
+            alça superior gira · duplo clique edita o texto · setas ajustam a posição (Shift = 10 pt)
+        </p>
+        {% else %}
+        <div class="empty-stage">Envie um PDF ou imagem de fundo válido para habilitar a edição visual.</div>
+        {% endif %}
     </div>
 </section>
 
@@ -398,7 +399,7 @@
 <script src="{% static 'js/job_launcher.js' %}?v=20260822-03"></script>
 {% if preview_pages %}
 <script src="{% static 'js/fabric.min.js' %}?v=6.7.1"></script>
-<script src="{% static 'js/template_editor.js' %}?v=20260822-08"></script>
+<script src="{% static 'js/template_editor.js' %}?v=20260822-09"></script>
 <script>
 VetorialTemplateEditor.init({
   canvasId: "editor-canvas",

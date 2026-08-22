@@ -74,6 +74,10 @@
     const statusText = document.getElementById("editor-status-text");
     const saveState = document.getElementById("editor-save-state");
     const wrap = document.getElementById(config.wrapId || "editor-canvas-wrap");
+    // Atribuída de verdade mais abaixo (perto do popover de edição do
+    // campo) — declarada já aqui porque after:render, registrado antes
+    // disso, precisa poder chamá-la a cada render.
+    let updateFieldOverlay = () => {};
 
     const setStatus = (text) => { if (statusText) statusText.textContent = text; };
     const setSaveState = (text, tone) => {
@@ -123,7 +127,7 @@
     // ----- enquadramento / zoom -----
     const resizeCanvas = () => {
       const width = Math.max(wrap.clientWidth - 2, 320);
-      const height = Math.max(Math.min(window.innerHeight * 0.68, width * (page.height / page.width) + 48), 260);
+      const height = Math.max(Math.min(window.innerHeight * 0.82, width * (page.height / page.width) + 48), 420);
       canvas.setDimensions({ width, height });
       resizeRulers();
     };
@@ -462,13 +466,65 @@
     };
 
     if (rulersActive) {
+      // button !== 0 (botão direito, ou o do meio) não cria guia — sem essa
+      // checagem, o mousedown do botão direito (que sempre dispara antes do
+      // contextmenu) criava uma guia fantasma bem no meio do gesto de
+      // apagar uma guia existente.
       rulerH.addEventListener("mousedown", (e) => {
+        if (e.button !== 0) return;
         e.preventDefault();
         beginGuideFromRuler("x", e);
       });
       rulerV.addEventListener("mousedown", (e) => {
+        if (e.button !== 0) return;
         e.preventDefault();
         beginGuideFromRuler("y", e);
+      });
+
+      // Botão direito em cima de uma guia (na régua ou já no canvas) apaga
+      // na hora — sem isso a única forma de remover era arrastar de volta
+      // pra régua, o que não é óbvio. O Fabric já suprime o menu do
+      // navegador sobre o canvas (stopContextMenu); as réguas não são dele,
+      // então cada uma precisa do próprio preventDefault.
+      const removeGuide = (axis, index) => {
+        guideLines[axis].splice(index, 1);
+        canvas.requestRenderAll();
+        setStatus("Guia removida.");
+        saveGuides();
+      };
+      // O Fabric envolve o <canvas> original (canvasEl) num canvas "de
+      // baixo" só de desenho — quem recebe eventos de verdade é o
+      // upperCanvasEl que ele cria por cima. Um listener em canvasEl nunca
+      // dispararia pra cliques reais do usuário.
+      canvas.upperCanvasEl.addEventListener("contextmenu", (e) => {
+        const rect = canvasEl.getBoundingClientRect();
+        const hit = guideAtScreenPoint(e.clientX - rect.left, e.clientY - rect.top);
+        if (hit) {
+          e.preventDefault();
+          removeGuide(hit.axis, hit.index);
+        }
+      });
+      rulerH.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        const rect = canvasEl.getBoundingClientRect();
+        const sx = e.clientX - rect.left;
+        const vpt = canvas.viewportTransform;
+        const zoom = canvas.getZoom();
+        const index = guideLines.x.findIndex(
+          (wx) => Math.abs(wx * zoom + vpt[4] - sx) <= GUIDE_HIT_TOLERANCE
+        );
+        if (index !== -1) removeGuide("x", index);
+      });
+      rulerV.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        const rect = canvasEl.getBoundingClientRect();
+        const sy = e.clientY - rect.top;
+        const vpt = canvas.viewportTransform;
+        const zoom = canvas.getZoom();
+        const index = guideLines.y.findIndex(
+          (wy) => Math.abs(wy * zoom + vpt[5] - sy) <= GUIDE_HIT_TOLERANCE
+        );
+        if (index !== -1) removeGuide("y", index);
       });
     }
 
@@ -606,6 +662,7 @@
       ctx.restore();
       drawMeasurements(ctx);
       drawRulers();
+      updateFieldOverlay();
     });
 
     // ----- criação dos objetos -----
@@ -1081,6 +1138,101 @@
 
     const panelEl = document.getElementById("field-panel");
     const panelNameEl = document.getElementById("field-panel-name");
+
+    // ----- popover de edição do campo: em vez de uma coluna fixa ao lado,
+    // abre flutuando perto do campo selecionado (botão ✎ no canto dele) —
+    // o canvas fica livre pra usar a largura inteira da bancada. -----
+    const editButton = document.getElementById("field-edit-button");
+    const popoverCloseButton = document.getElementById("field-popover-close");
+    let popoverOpenFieldId = null;
+
+    const closePopover = () => {
+      if (panelEl && !panelEl.hidden) panelEl.hidden = true;
+      popoverOpenFieldId = null;
+    };
+
+    // Caixa do campo em coordenadas de tela, relativas ao wrap (onde o botão
+    // e o popover são posicionados) — mesmo padrão de conversão mundo→tela
+    // usado em drawMeasurements (rect do Fabric + vpt/zoom).
+    const screenBoxFor = (obj) => {
+      const rect = obj.getBoundingRect();
+      const vpt = canvas.viewportTransform;
+      const zoom = canvas.getZoom();
+      // getBoundingClientRect() (não offsetLeft/Top): o Fabric envolve o
+      // <canvas> original num wrapper próprio com dois canvases internos,
+      // então o offsetParent real não é necessariamente o wrap.
+      const canvasRect = canvasEl.getBoundingClientRect();
+      const wrapRect = wrap.getBoundingClientRect();
+      const canvasOffsetX = canvasRect.left - wrapRect.left;
+      const canvasOffsetY = canvasRect.top - wrapRect.top;
+      return {
+        left: canvasOffsetX + rect.left * zoom + vpt[4],
+        top: canvasOffsetY + rect.top * zoom + vpt[5],
+        right: canvasOffsetX + (rect.left + rect.width) * zoom + vpt[4],
+        bottom: canvasOffsetY + (rect.top + rect.height) * zoom + vpt[5],
+      };
+    };
+
+    const positionPopover = (box) => {
+      if (!panelEl) return;
+      const wrapW = wrap.clientWidth;
+      const wrapH = wrap.clientHeight;
+      const margin = 10;
+      const popW = panelEl.offsetWidth || 340;
+      const popH = panelEl.offsetHeight || 400;
+      let left = box.right + margin;
+      if (left + popW > wrapW - margin) left = box.left - popW - margin;
+      left = clamp(left, margin, Math.max(margin, wrapW - popW - margin));
+      let top = box.top;
+      top = clamp(top, margin, Math.max(margin, wrapH - popH - margin));
+      panelEl.style.left = `${left}px`;
+      panelEl.style.top = `${top}px`;
+    };
+
+    const openPopoverFor = (obj) => {
+      if (!panelEl) return;
+      popoverOpenFieldId = obj.vetFieldId;
+      panelEl.hidden = false;
+      positionPopover(screenBoxFor(obj));
+    };
+
+    // Chamado a cada after:render: mostra/reposiciona o botão ✎ sobre o
+    // campo único selecionado (some com seleção múltipla ou vazia) e, se o
+    // popover já estiver aberto para ele, acompanha a posição — inclusive
+    // durante um arrasto, zoom ou pan.
+    updateFieldOverlay = () => {
+      if (readOnly || !editButton) return;
+      const activeObjects = canvas.getActiveObjects();
+      const single = activeObjects.length === 1 && activeObjects[0].vetFieldId ? activeObjects[0] : null;
+      if (!single) {
+        editButton.hidden = true;
+        if (popoverOpenFieldId) closePopover();
+        return;
+      }
+      const box = screenBoxFor(single);
+      const btnSize = 26;
+      const wrapW = wrap.clientWidth;
+      const wrapH = wrap.clientHeight;
+      editButton.style.left = `${clamp(box.right - btnSize / 2, 2, Math.max(2, wrapW - btnSize - 2))}px`;
+      editButton.style.top = `${clamp(box.top - btnSize / 2, 2, Math.max(2, wrapH - btnSize - 2))}px`;
+      editButton.hidden = false;
+
+      if (popoverOpenFieldId && popoverOpenFieldId !== single.vetFieldId) {
+        closePopover();
+      } else if (popoverOpenFieldId === single.vetFieldId) {
+        positionPopover(box);
+      }
+    };
+
+    editButton?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const activeObjects = canvas.getActiveObjects();
+      const single = activeObjects.length === 1 ? activeObjects[0] : null;
+      if (!single) return;
+      if (popoverOpenFieldId === single.vetFieldId) closePopover();
+      else openPopoverFor(single);
+    });
+    popoverCloseButton?.addEventListener("click", () => closePopover());
 
     // ----- Transformação por coluna (só quando o campo junta 2+ colunas) -----
     const transformColumnsGroup = document.getElementById("field-transform-columns-group");

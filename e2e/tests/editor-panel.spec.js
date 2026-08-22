@@ -37,6 +37,9 @@ async function clickField(page, fieldName) {
     };
   }, fieldName);
   await page.mouse.click(box.x + point.x, box.y + point.y);
+  // A edição do campo agora é um popover que só abre pelo botão ✎ do campo
+  // selecionado — clicar no campo sozinho não deixa o painel visível.
+  await page.locator("#field-edit-button").click();
 }
 
 async function openBancadaAndSelectField(page) {
@@ -61,10 +64,12 @@ test.describe("Painel do campo: organização e estados", () => {
     await page.locator("#field-outline-details summary").click();
 
     // O bug original: abrir as seções empurrava a página até o canvas sumir.
-    // O painel agora rola por conta própria (max-height + overflow-y no
-    // sticky #editor-side), então o canvas fica sempre à vista.
+    // Hoje a edição é um popover flutuante (posição absoluta dentro do
+    // canvas, com scroll próprio) em vez de uma coluna no fluxo normal da
+    // página — crescer não pode mais empurrar nada ao redor, então o canvas
+    // e o próprio popover continuam à vista.
     await expect(page.locator("#editor-canvas")).toBeInViewport();
-    await expect(page.locator("#generate-card")).toBeInViewport();
+    await expect(page.locator("#field-panel")).toBeInViewport();
   });
 
   test("os controles do contorno só ficam ativos com o contorno ligado", async ({ page }) => {
@@ -97,6 +102,39 @@ test.describe("Painel do campo: organização e estados", () => {
     await expect(page.locator("#field-panel-name")).toContainText("Curso");
 
     await expect(page.locator("#field-border-opacity")).toBeDisabled();
+  });
+});
+
+test.describe("Réguas: guias de alinhamento", () => {
+  test("clique na régua cria uma guia; botão direito nela apaga", async ({ page }) => {
+    await login(page);
+    await page.goto("/templates/");
+    await page.getByRole("link", { name: /Certificado E2E/i }).first().click();
+    await expect(page.locator("#generate-card")).toBeVisible();
+    await expect(page.locator("#editor-status-text")).not.toHaveText(/Carregando/);
+
+    // Clique simples (sem arrastar) na régua vertical cria uma guia
+    // horizontal a essa altura.
+    const rulerV = page.locator("#ruler-v");
+    const rulerBox = await rulerV.boundingBox();
+    const targetY = rulerBox.y + 60;
+    await page.mouse.click(rulerBox.x + rulerBox.width / 2, targetY);
+    await expect
+      .poll(() => page.evaluate(() => window.__vetorialEditor.guides.y.length))
+      .toBe(1);
+    await expect(page.locator("#editor-save-state")).toHaveText(/Salvo/, { timeout: 10_000 });
+
+    // Botão direito bem em cima da guia (na própria régua) apaga na hora.
+    await page.mouse.click(rulerBox.x + rulerBox.width / 2, targetY, { button: "right" });
+    await expect
+      .poll(() => page.evaluate(() => window.__vetorialEditor.guides.y.length))
+      .toBe(0);
+
+    // Persiste: recarregar não traz a guia apagada de volta.
+    await page.reload();
+    await expect(page.locator("#editor-status-text")).not.toHaveText(/Carregando/);
+    const guidesAfterReload = await page.evaluate(() => window.__vetorialEditor.guides);
+    expect(guidesAfterReload.y).toEqual([]);
   });
 });
 

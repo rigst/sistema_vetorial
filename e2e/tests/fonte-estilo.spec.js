@@ -43,6 +43,9 @@ async function clickField(page, fieldName) {
     };
   }, fieldName);
   await page.mouse.click(box.x + point.x, box.y + point.y);
+  // A edição do campo agora é um popover que só abre pelo botão ✎ do campo
+  // selecionado — clicar no campo sozinho não deixa o painel visível.
+  await page.locator("#field-edit-button").click();
 }
 
 const NOME_FIELD = "Nome";

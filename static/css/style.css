@@ -1220,17 +1220,17 @@ a.icon-button:focus-visible {
   border: 0;
 }
 
+/* A edição do campo virou um popover flutuante dentro do próprio canvas
+ * (aberto pelo botão ✎ no campo selecionado) em vez de uma coluna fixa ao
+ * lado — o canvas usa a largura inteira do conteúdo da página. */
 .editor-shell-single {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 310px);
-  gap: 1rem;
-  align-items: start;
+  display: block;
 }
 
 .editor-preview-panel {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
 }
 
 .editor-config-panel {
@@ -1650,13 +1650,19 @@ details[open] > summary .field-advanced-title::before {
 
   .split-grid,
   .editor-shell,
-  .editor-shell-single,
   .split-grid-wide {
     grid-template-columns: 1fr;
   }
 
-  .editor-config-panel {
-    position: static;
+  /* Tela estreita: o popover deixa de flutuar perto do campo (não sobra
+   * espaço) e vira uma folha ancorada na base do canvas, largura cheia. */
+  .field-popover {
+    left: 0.5rem !important;
+    right: 0.5rem;
+    bottom: 0.5rem;
+    top: auto !important;
+    width: auto;
+    max-height: min(70vh, 520px);
   }
 
   .preview-stage-large {
@@ -1808,6 +1814,51 @@ details[open] > summary .field-advanced-title::before {
   touch-action: none;
 }
 
+/* Botão ✎ sobre o canto do campo selecionado (abre o popover de edição) e o
+ * próprio popover, ambos posicionados em JS a partir da posição em tela do
+ * campo (ver updateFieldOverlay em template_editor.js). */
+.field-edit-button {
+  position: absolute;
+  z-index: 25;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1.5px solid #eaf4f0;
+  background: var(--accent);
+  color: #eaf4f0;
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  transition: transform var(--transition), background var(--transition);
+}
+
+.field-edit-button:hover {
+  transform: scale(1.08);
+  background: #24897f;
+}
+
+.field-edit-button:focus-visible {
+  outline: 2px solid #eaf4f0;
+  outline-offset: 2px;
+}
+
+.field-edit-button[hidden] {
+  display: none;
+}
+
+.field-popover {
+  position: absolute;
+  z-index: 30;
+  width: min(340px, calc(100% - 20px));
+  max-height: min(640px, calc(100% - 20px));
+  overflow-y: auto;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.4);
+}
+
 .editor-statusbar {
   position: absolute;
   left: 0;
@@ -1925,22 +1976,6 @@ details[open] > summary .field-advanced-title::before {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.panel-empty {
-  display: none;
-  color: var(--muted);
-  font-size: 0.9rem;
-  line-height: 1.5;
-  padding: 0.4rem 0 0.6rem;
-}
-
-.editor-config-panel.is-empty .panel-empty {
-  display: block;
-}
-
-.editor-config-panel.is-empty .field-config-form {
-  display: none;
 }
 
 .color-input-row {
@@ -2267,48 +2302,22 @@ label.toolbar-button {
 
 
 
-.editor-shell-single {
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
-}
-
-/* Visualização somente-leitura: uma coluna só, sem o painel do campo — usar
- * .editor-shell-single aqui deixava uma faixa vazia do tamanho da coluna do
- * painel que não existe nesta tela. */
 .preview-shell {
   max-width: 900px;
   margin: 0 auto;
 }
 
-/* A coluna da direita gruda no topo e nunca passa da altura da tela: dentro
- * dela, o painel do campo (que cresce bastante com as seções avançadas
- * abertas) rola por conta própria, e "Gerar arquivos" fica sempre à vista
- * logo abaixo dele — sem isso, abrir "Contorno" empurrava a página inteira e
- * o canvas, o ponto principal de um editor visual, sumia da tela. */
-.editor-side {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  position: sticky;
-  top: 5.4rem;
-  max-height: calc(100vh - 6.4rem);
-  min-width: 0;
-}
-
-.editor-config-panel {
-  position: static;
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
+.field-popover {
   scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) transparent;
 }
 
-.editor-config-panel::-webkit-scrollbar {
+.field-popover::-webkit-scrollbar {
   width: 8px;
 }
 
-.editor-config-panel::-webkit-scrollbar-thumb {
+.field-popover::-webkit-scrollbar-thumb {
   background: var(--border-strong);
   border-radius: 6px;
 }
@@ -2376,17 +2385,6 @@ label.toolbar-button {
     border-right: 0;
     padding-bottom: 1rem;
     border-bottom: 1px solid var(--border);
-  }
-}
-
-@media (max-width: 980px) {
-  .editor-shell-single {
-    grid-template-columns: 1fr;
-  }
-
-  .editor-side {
-    position: static;
-    max-height: none;
   }
 }
 
