@@ -92,24 +92,6 @@ class EditorFlowTests(TestCase):
         self.assertIn("js/job_launcher.js", html)
         self.assertIn('id="generate-excel-input"', html)
 
-    def test_detail_page_offers_the_sample_data_input(self):
-        template = DocumentTemplate.objects.create(
-            user=self.user,
-            name="Bancada Amostra",
-            slug="bancada-amostra",
-            background_pdf=self._build_pdf_upload(),
-        )
-        update_template_pdf_metadata(template)
-        self.client.force_login(self.user)
-
-        html = self.client.get(
-            reverse("editor:detail", kwargs={"pk": template.pk})
-        ).content.decode()
-
-        # template_editor.js escuta este id para carregar os dados no canvas.
-        self.assertIn('id="sample-file-input"', html)
-        self.assertIn('for="sample-file-input"', html)
-
     def test_detail_page_does_not_leak_template_comments_as_text(self):
         """Regressão: um `{# ... #}` de mais de uma linha não fecha no Django —
         o texto do comentário vaza para a página. O bloco correto é
@@ -509,6 +491,53 @@ class FieldRotationAndSampleTests(TestCase):
         self.assertEqual(response.json()["field"]["grow_direction"], "up")
         field.refresh_from_db()
         self.assertEqual(field.grow_direction, TemplateField.GrowDirection.UP)
+
+    def test_patch_persists_underline_and_strikethrough(self):
+        template = self._build_template()
+        field = TemplateField.objects.create(
+            template=template,
+            name="nome",
+            excel_column="1",
+            x=20,
+            y=20,
+            width=160,
+            height=24,
+            font=self.font,
+            font_size=18,
+        )
+        self.client.force_login(self.user)
+        response = self.client.patch(
+            reverse("editor:field-api", kwargs={"pk": field.pk}),
+            data='{"text_underline": true, "text_strikethrough": true}',
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["field"]
+        self.assertTrue(payload["text_underline"])
+        self.assertTrue(payload["text_strikethrough"])
+        field.refresh_from_db()
+        self.assertTrue(field.text_underline)
+        self.assertTrue(field.text_strikethrough)
+
+    def test_detail_page_exposes_font_weight_and_italic_for_the_picker(self):
+        template = self._build_template()
+        TemplateField.objects.create(
+            template=template,
+            name="nome",
+            excel_column="1",
+            x=20,
+            y=20,
+            width=160,
+            height=24,
+            font=self.font,
+            font_size=18,
+        )
+        self.client.force_login(self.user)
+        html = self.client.get(
+            reverse("editor:detail", kwargs={"pk": template.pk})
+        ).content.decode()
+        self.assertIn('"weight": 400', html)
+        self.assertIn('"is_italic": false', html)
 
     def test_sample_endpoint_resolves_multi_column_concatenation(self):
         from io import BytesIO

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}StölbenVetorial{% endblock %}</title>
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20260822-05">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20260822-06">
 </head>
 <body>
     <header class="site-header">
@@ -25,19 +25,34 @@
         </div>
     </header>
 
-    <main class="container">
-        {% if messages %}
-            <div class="flash-stack" role="status" aria-live="polite">
-                <ul class="flash-list">
-                    {% for message in messages %}
-                        <li class="flash-message {% if message.tags %}flash-{{ message.tags }}{% endif %}">
-                            <span>{{ message }}</span>
-                        </li>
-                    {% endfor %}
-                </ul>
-            </div>
-        {% endif %}
+    {% if messages %}
+        <div class="toast-stack" id="toast-stack" aria-live="polite" aria-atomic="false">
+            {% for message in messages %}
+                <div class="toast toast-{{ message.tags|default:'info' }}" role="status">
+                    <span class="toast-message">{{ message }}</span>
+                    <button type="button" class="toast-close" aria-label="Fechar aviso">&times;</button>
+                </div>
+            {% endfor %}
+        </div>
+        <script>
+        (() => {
+            const stack = document.getElementById("toast-stack");
+            if (!stack) return;
+            const dismiss = (toast) => {
+                if (!toast || toast.dataset.leaving) return;
+                toast.dataset.leaving = "1";
+                toast.classList.add("is-leaving");
+                toast.addEventListener("animationend", () => toast.remove(), { once: true });
+            };
+            stack.querySelectorAll(".toast").forEach((toast) => {
+                toast.querySelector(".toast-close")?.addEventListener("click", () => dismiss(toast));
+                window.setTimeout(() => dismiss(toast), 6000);
+            });
+        })();
+        </script>
+    {% endif %}
 
+    <main class="container">
         {% block content %}{% endblock %}
     </main>
 

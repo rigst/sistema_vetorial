@@ -455,9 +455,9 @@ class JobProgressVisibilityTests(TransactionTestCase):
         job.delete()
 
 
-def _ink_bbox(pdf_bytes: bytes, resolution: int = 72):
+def _rasterize(pdf_bytes: bytes, resolution: int = 72):
     """Rasteriza a página (o pdftoppm aplica /Rotate e recorta pela CropBox,
-    igual ao preview do editor) e devolve a caixa do que não é branco."""
+    igual ao preview do editor) e devolve uma imagem em tons de cinza."""
     temp_dir = Path(tempfile.mkdtemp(prefix="jobs-raster-"))
     try:
         pdf_path = temp_dir / "page.pdf"
@@ -478,10 +478,14 @@ def _ink_bbox(pdf_bytes: bytes, resolution: int = 72):
         )
         rendered = sorted(temp_dir.glob("p-*.png"))[0]
         with Image.open(rendered) as image:
-            gray = image.convert("L")
-            return ImageChops.invert(gray).getbbox(), gray.size
+            return image.convert("L").copy()
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def _ink_bbox(pdf_bytes: bytes, resolution: int = 72):
+    gray = _rasterize(pdf_bytes, resolution)
+    return ImageChops.invert(gray).getbbox(), gray.size
 
 
 @override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
@@ -1273,3 +1277,112 @@ class WrapGrowDirectionTests(TestCase):
         )
         self.assertAlmostEqual(short_bbox[3], long_bbox[3], delta=2)
         self.assertLess(long_bbox[1], short_bbox[1] - 5)
+
+
+def _dark_pixel_count(image) -> int:
+    # Soma pixels abaixo de um limiar de cinza — não precisa ser exato:
+    # o que os testes comparam é a diferença entre com/sem decoração.
+    histogram = image.histogram()
+    return sum(histogram[:200])
+
+
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
+class TextDecorationTests(TestCase):
+    """Sublinhado e tachado desenham uma linha vetorial extra usando a
+    métrica real da fonte (post.underlinePosition/OS-2 yStrikeoutPosition),
+    não um número fixo — por isso o teste é "apareceu mais tinta", não uma
+    posição exata em pontos."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = get_user_model().objects.create_user(
+            username="decoration-user", password="senha123"
+        )
+        font_path = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+        cls.font = FontAsset.objects.create(
+            user=cls.user,
+            name="Dejavu Sans",
+            family="Dejavu Sans",
+            variant="Regular",
+            file=SimpleUploadedFile(
+                "DejaVuSans.ttf", font_path.read_bytes(), content_type="font/ttf"
+            ),
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(TEST_MEDIA_ROOT, ignore_errors=True)
+
+    def _build_excel_upload(self, text) -> SimpleUploadedFile:
+        temp_dir = Path(tempfile.mkdtemp(prefix="decoration-xlsx-"))
+        xlsx_path = temp_dir / "dados.xlsx"
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.append(["Texto"])
+        sheet.append([text])
+        workbook.save(xlsx_path)
+        content = xlsx_path.read_bytes()
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        return SimpleUploadedFile(
+            "dados.xlsx",
+            content,
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+    def _render(self, *, underline=False, strikethrough=False, text="A     B"):
+        buffer = io.BytesIO()
+        pdf_canvas = canvas.Canvas(buffer, pagesize=(400, 120))
+        pdf_canvas.showPage()
+        pdf_canvas.save()
+        template = DocumentTemplate.objects.create(
+            user=self.user,
+            name="Decoração",
+            slug=f"decoracao-{underline}-{strikethrough}",
+            background_pdf=SimpleUploadedFile(
+                "background.pdf", buffer.getvalue(), content_type="application/pdf"
+            ),
+        )
+        update_template_pdf_metadata(template)
+        TemplateField.objects.create(
+            template=template,
+            name="texto",
+            excel_column="1",
+            x=20,
+            y=80,
+            width=0,
+            height=24,
+            font=self.font,
+            font_size=40,
+            order_index=1,
+            text_underline=underline,
+            text_strikethrough=strikethrough,
+        )
+        job = GenerationJob.objects.create(
+            user=self.user,
+            template=template,
+            name="Job",
+            source_excel=self._build_excel_upload(text),
+            kind=GenerationJob.Kind.PREVIEW,
+            status=GenerationJob.Status.QUEUED,
+        )
+        process_job(job)
+        job.refresh_from_db()
+        item = job.items.get()
+        with item.output_pdf.open("rb") as output_file:
+            return _rasterize(output_file.read(), resolution=150)
+
+    def test_underline_adds_ink(self):
+        base = _dark_pixel_count(self._render())
+        underlined = _dark_pixel_count(self._render(underline=True))
+        self.assertGreater(underlined, base + 20)
+
+    def test_strikethrough_adds_ink(self):
+        base = _dark_pixel_count(self._render())
+        struck = _dark_pixel_count(self._render(strikethrough=True))
+        self.assertGreater(struck, base + 20)
+
+    def test_both_together_add_more_ink_than_either_alone(self):
+        underlined = _dark_pixel_count(self._render(underline=True))
+        both = _dark_pixel_count(self._render(underline=True, strikethrough=True))
+        self.assertGreater(both, underlined + 20)

@@ -76,6 +76,39 @@ class CoreTests(TestCase):
         ensure_default_fonts(user)
         self.assertGreaterEqual(FontAsset.objects.filter(user=user, is_builtin=True).count(), 1)
 
+    def test_ensure_default_fonts_bundles_inter_full_weight_range(self):
+        # DejaVu (as outras fontes padrão) só tem Regular/Bold — sem uma
+        # família com a escala inteira, o seletor de "espessura" do editor
+        # não tem o que oferecer além de dois pontos. Inter cobre 100-900,
+        # com itálico real em cada peso.
+        user = get_user_model().objects.create_user(username="inter-user", password="senha123")
+        ensure_default_fonts(user)
+        inter_fonts = FontAsset.objects.filter(user=user, family="Inter", is_builtin=True)
+        weights = set(inter_fonts.filter(is_italic=False).values_list("weight", flat=True))
+        self.assertEqual(weights, {100, 200, 300, 400, 500, 600, 700, 800, 900})
+        italic_weights = set(inter_fonts.filter(is_italic=True).values_list("weight", flat=True))
+        self.assertEqual(italic_weights, {100, 200, 300, 400, 500, 600, 700, 800, 900})
+
+    def test_ensure_default_fonts_is_idempotent_for_inter(self):
+        user = get_user_model().objects.create_user(username="inter-repeat", password="senha123")
+        ensure_default_fonts(user)
+        ensure_default_fonts(user)
+        self.assertEqual(FontAsset.objects.filter(user=user, family="Inter").count(), 18)
+
+    def test_ensure_default_fonts_bundles_wix_madefor_display(self):
+        # Só existe como fonte variável no Google Fonts; os 5 arquivos
+        # padrão são instâncias estáticas geradas com varLib.instancer (ver
+        # core/auth.py) — confere que cada peso realmente virou um FontAsset
+        # com o peso certo, não 5 cópias idênticas do 400 default.
+        user = get_user_model().objects.create_user(username="wix-user", password="senha123")
+        ensure_default_fonts(user)
+        wix_fonts = FontAsset.objects.filter(
+            user=user, family="Wix Madefor Display", is_builtin=True
+        )
+        weights = set(wix_fonts.values_list("weight", flat=True))
+        self.assertEqual(weights, {400, 500, 600, 700, 800})
+        self.assertFalse(wix_fonts.filter(is_italic=True).exists())
+
     def test_cleanup_expired_records_removes_old_files(self):
         user = get_user_model().objects.create_user(username="cleanup-user", password="senha123")
         font_path = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")

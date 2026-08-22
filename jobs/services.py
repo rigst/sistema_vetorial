@@ -366,6 +366,31 @@ class _GlyphOutlinePen(BasePen):
 
 
 @lru_cache(maxsize=32)
+def _decoration_metrics(font_path: str) -> dict:
+    """Posição/espessura do sublinhado (tabela post) e do tachado (OS/2),
+    como fração de font_size — lidas do próprio desenho da fonte em vez de
+    um número fixo que só ficaria bem numa fonte específica."""
+    ttfont = FontToolsTTFont(font_path)
+    units_per_em = float(ttfont["head"].unitsPerEm) or 1000.0
+    post = ttfont["post"]
+    os2 = ttfont.get("OS/2")
+    underline_position = float(getattr(post, "underlinePosition", None) or -units_per_em * 0.1)
+    underline_thickness = float(getattr(post, "underlineThickness", None) or units_per_em * 0.05)
+    if os2 is not None:
+        strikeout_position = float(getattr(os2, "yStrikeoutPosition", None) or units_per_em * 0.3)
+        strikeout_thickness = float(getattr(os2, "yStrikeoutSize", None) or units_per_em * 0.05)
+    else:
+        strikeout_position = units_per_em * 0.3
+        strikeout_thickness = units_per_em * 0.05
+    return {
+        "underline_position": underline_position / units_per_em,
+        "underline_thickness": underline_thickness / units_per_em,
+        "strikeout_position": strikeout_position / units_per_em,
+        "strikeout_thickness": strikeout_thickness / units_per_em,
+    }
+
+
+@lru_cache(maxsize=32)
 def _outline_font(font_path: str):
     """Fonte aberta pelo fontTools, pronta para extrair contornos.
 
@@ -474,6 +499,25 @@ def _draw_field(pdf_canvas, field: TemplateField, value: str, page_height: float
         )
         pdf_canvas.restoreState()
 
+    def draw_decoration(draw_x, line_baseline, line, *, fill_color):
+        if not line or not (field.text_underline or field.text_strikethrough):
+            return
+        width = pdfmetrics.stringWidth(line, font_name, adjusted_size)
+        if width <= 0:
+            return
+        metrics = _decoration_metrics(font_path)
+        pdf_canvas.saveState()
+        pdf_canvas.setFillColor(fill_color)
+        if field.text_underline:
+            y = line_baseline + metrics["underline_position"] * adjusted_size
+            thickness = max(metrics["underline_thickness"] * adjusted_size, 0.4)
+            pdf_canvas.rect(draw_x, y - thickness / 2, width, thickness, fill=1, stroke=0)
+        if field.text_strikethrough:
+            y = line_baseline + metrics["strikeout_position"] * adjusted_size
+            thickness = max(metrics["strikeout_thickness"] * adjusted_size, 0.4)
+            pdf_canvas.rect(draw_x, y - thickness / 2, width, thickness, fill=1, stroke=0)
+        pdf_canvas.restoreState()
+
     pdf_canvas.saveState()
     # Origem local no canto superior-esquerdo da caixa; y cresce para baixo no
     # editor, então as baselines ficam em y locais negativos.
@@ -510,12 +554,16 @@ def _draw_field(pdf_canvas, field: TemplateField, value: str, page_height: float
                 line_width=border_width,
                 alpha=border_alpha,
             )
+            draw_decoration(x, line_baseline, line, fill_color=HexColor(field.color or "#000000"))
         pdf_canvas.restoreState()
         return
 
     fill_color = HexColor(field.color or "#000000")
     for index, line in enumerate(lines):
-        draw_text_line(aligned_x(0, line), baseline_y(index), line, fill_color=fill_color)
+        x = aligned_x(0, line)
+        line_baseline = baseline_y(index)
+        draw_text_line(x, line_baseline, line, fill_color=fill_color)
+        draw_decoration(x, line_baseline, line, fill_color=fill_color)
     pdf_canvas.restoreState()
 
 

@@ -32,27 +32,18 @@
                 <button type="button" class="toolbar-button" id="redo-button" title="Refazer (Ctrl+Shift+Z)">↷</button>
             </div>
             <div class="toolbar-group">
-                <button type="button" class="toolbar-button" id="align-center-h" title="Centralizar na largura da página">Centrar ↔</button>
-                <button type="button" class="toolbar-button" id="align-center-v" title="Centralizar na altura da página">Centrar ↕</button>
+                <button type="button" class="toolbar-button" id="align-center-h" title="Centralizar na largura da página" aria-label="Centralizar na largura da página">↔</button>
+                <button type="button" class="toolbar-button" id="align-center-v" title="Centralizar na altura da página" aria-label="Centralizar na altura da página">↕</button>
             </div>
             <div class="toolbar-group">
                 <button type="button" class="toolbar-button" id="zoom-out-button" title="Reduzir zoom" aria-label="Reduzir zoom">−</button>
                 <span class="toolbar-label" id="editor-zoom-label">100%</span>
                 <button type="button" class="toolbar-button" id="zoom-in-button" title="Ampliar zoom" aria-label="Ampliar zoom">+</button>
-                <button type="button" class="toolbar-button" id="zoom-fit-button" title="Ajustar à tela">Ajustar</button>
-            </div>
-            <div class="toolbar-group" id="sample-controls">
-                <label class="toolbar-button" for="sample-file-input" title="Ver o layout com os dados do seu Excel">Ver com meus dados</label>
-                <input type="file" class="visually-hidden" id="sample-file-input" accept=".xlsx,.xlsm">
-                <button type="button" class="toolbar-button sample-only" id="sample-prev" title="Linha anterior" aria-label="Linha anterior">◀</button>
-                <span class="toolbar-label sample-only" id="sample-row-label"></span>
-                <button type="button" class="toolbar-button sample-only" id="sample-next" title="Próxima linha" aria-label="Próxima linha">▶</button>
-                <button type="button" class="toolbar-button sample-only" id="sample-exit" title="Voltar aos textos base">Ocultar dados</button>
+                <button type="button" class="toolbar-button" id="zoom-fit-button" title="Ajustar à tela" aria-label="Ajustar à tela">⛶</button>
             </div>
         </div>
         <div class="editor-canvas-wrap" id="editor-canvas-wrap">
             <canvas id="editor-canvas"></canvas>
-            <span class="sample-badge">● Dados de amostra</span>
             <div class="editor-statusbar">
                 <span class="muted" id="editor-status-text">Carregando editor…</span>
                 <span class="editor-save-state" id="editor-save-state"></span>
@@ -96,20 +87,49 @@
             <div class="field-section">
                 <h3 class="field-section-label">Aparência</h3>
                 <div class="field-group">
-                    <label for="field-font-id">Fonte</label>
-                    <select id="field-font-id" name="font_id">
+                    <label for="field-font-family">Fonte</label>
+                    <select id="field-font-family"></select>
+                    <!-- font_id de verdade (o que é salvo) é resolvido a partir de
+                         família + peso + itálico pelo JS; este select fica fora da
+                         tela mas continua no fluxo normal de input/queueSave. -->
+                    <select id="field-font-id" name="font_id" class="visually-hidden" aria-hidden="true" tabindex="-1">
                         {% for group in font_groups %}
-                            {% if group.fonts|length > 1 %}
-                                <optgroup label="{{ group.family }}">
-                                    {% for font in group.fonts %}
-                                        <option value="{{ font.id }}">{{ font.variant }}</option>
-                                    {% endfor %}
-                                </optgroup>
-                            {% else %}
-                                <option value="{{ group.fonts.0.id }}">{{ group.family }}</option>
-                            {% endif %}
+                            {% for font in group.fonts %}
+                                <option value="{{ font.id }}">{{ group.family }} — {{ font.variant }}</option>
+                            {% endfor %}
                         {% endfor %}
                     </select>
+                </div>
+                <div class="field-group-row">
+                    <div class="field-group">
+                        <label for="field-font-weight">Espessura</label>
+                        <select id="field-font-weight">
+                            <option value="100">Fina</option>
+                            <option value="200">Extra leve</option>
+                            <option value="300">Leve</option>
+                            <option value="400">Normal</option>
+                            <option value="500">Média</option>
+                            <option value="600">Semi-negrito</option>
+                            <option value="700">Negrito</option>
+                            <option value="800">Extra-negrito</option>
+                            <option value="900">Preta</option>
+                        </select>
+                    </div>
+                    <div class="field-group">
+                        <span class="field-group-label">Estilo</span>
+                        <div class="style-toggle-row" role="group" aria-label="Estilo do texto">
+                            <input type="checkbox" id="field-style-italic" class="visually-hidden style-toggle-input">
+                            <label for="field-style-italic" class="style-toggle" title="Itálico"><span class="style-icon style-icon-italic">I</span></label>
+                            <input type="checkbox" id="field-text-underline" name="text_underline" class="visually-hidden style-toggle-input">
+                            <label for="field-text-underline" class="style-toggle" title="Sublinhado"><span class="style-icon style-icon-underline">U</span></label>
+                            <input type="checkbox" id="field-text-strikethrough" name="text_strikethrough" class="visually-hidden style-toggle-input">
+                            <label for="field-text-strikethrough" class="style-toggle" title="Tachado"><span class="style-icon style-icon-strike">S</span></label>
+                        </div>
+                        <p class="field-hint" id="field-italic-hint" hidden>
+                            Esta família não tem um arquivo itálico enviado; o pedido fica
+                            salvo, mas o texto continua reto até alguém enviar um.
+                        </p>
+                    </div>
                 </div>
                 <div class="field-group">
                     <label for="field-color">Cor</label>
@@ -349,7 +369,7 @@
 <script src="{% static 'js/job_launcher.js' %}?v=20260822-02"></script>
 {% if preview_pages %}
 <script src="{% static 'js/fabric.min.js' %}?v=6.7.1"></script>
-<script src="{% static 'js/template_editor.js' %}?v=20260822-02"></script>
+<script src="{% static 'js/template_editor.js' %}?v=20260822-03"></script>
 <script>
 VetorialTemplateEditor.init({
   canvasId: "editor-canvas",
@@ -362,7 +382,6 @@ VetorialTemplateEditor.init({
   urls: {
     fields: "{% url 'editor:fields-api' template_obj.pk %}",
     layout: "{% url 'editor:layout-update' template_obj.pk %}",
-    sample: "{% url 'editor:sample-data' template_obj.pk %}",
     fieldTemplate: "{% url 'editor:field-api' 123454321 %}",
   },
 });

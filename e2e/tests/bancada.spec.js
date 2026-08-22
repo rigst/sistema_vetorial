@@ -134,26 +134,4 @@ test.describe("Bancada: gerar arquivos a partir do Excel", () => {
     await expect(page.locator("#generate-preview-button")).toBeEnabled();
   });
 
-  test("os dados reais podem ser vistos no editor antes de gerar", async ({ page }) => {
-    await openBancada(page);
-
-    await page.locator("#sample-file-input").setInputFiles(EXCEL);
-
-    await expect(page.locator("#sample-controls")).toHaveClass(/is-active/, { timeout: 30_000 });
-    await expect(page.locator("#sample-row-label")).toContainText(/linha/i);
-
-    const firstRow = await page.evaluate(() => {
-      const sample = window.__vetorialEditor.sample;
-      return { active: sample.active, total: sample.total };
-    });
-    expect(firstRow.active).toBe(true);
-    expect(firstRow.total).toBe(5);
-
-    // aria-label="Próxima linha" substitui o glifo "▶" como nome acessível
-    // (leitor de tela não lê símbolo solto) — é o que getByRole busca agora.
-    await page.getByRole("button", { name: "Próxima linha" }).click();
-    await expect(page.locator("#sample-row-label")).toContainText("2/5");
-
-    await page.screenshot({ path: path.join(TMP, "bancada-amostra.png"), fullPage: true });
-  });
 });

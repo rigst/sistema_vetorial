@@ -20,7 +20,11 @@ class FontAssetForm(forms.ModelForm):
         }
         widgets = {
             "name": forms.TextInput(attrs={"placeholder": "Nome da fonte"}),
-            "file": forms.ClearableFileInput(attrs={"accept": ".ttf,.otf"}),
+            # FileInput, não ClearableFileInput: o widget "clearable" tenta
+            # montar um link "Arquivo atual: <a href=file.url>" ao editar, e
+            # o Storage privado (core/storage.py) recusa gerar essa URL de
+            # propósito — o formulário de edição quebrava com 500 nisso.
+            "file": forms.FileInput(attrs={"accept": ".ttf,.otf"}),
         }
         help_texts = {
             "name": "Deixe em branco para usar o nome do arquivo.",

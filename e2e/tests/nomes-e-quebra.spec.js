@@ -183,7 +183,15 @@ test.describe("Nome dos arquivos: padrão com colunas e espaços", () => {
 });
 
 test.describe("Concatenar colunas com conector num só campo", () => {
-  test("{1}-{2} junta nome e curso da planilha num campo só", async ({ page }) => {
+  // A pré-visualização "Ver com meus dados" foi removida do editor (o card
+  // "Gerar arquivos" já mostra o resultado real); a sintaxe {N} de
+  // concatenação em si é coberta a fundo no lado servidor
+  // (jobs/tests.py::ColumnTemplateTests e
+  // editor/tests.py::test_sample_endpoint_resolves_multi_column_concatenation).
+  // Aqui só interessa que o painel salve e mantenha o padrão digitado.
+  test("{1}-{2} digitado no painel é salvo e sobrevive a um recarregamento", async ({
+    page,
+  }) => {
     await openBancada(page);
     await clickField(page, CURSO_FIELD);
     await expect(page.locator("#field-panel-name")).toContainText("Curso");
@@ -196,18 +204,12 @@ test.describe("Concatenar colunas com conector num só campo", () => {
       excelColumnInput.fill("{1}-{2}"),
     ]);
     await excelColumnInput.blur();
+    await expect(page.locator("#editor-save-state")).toHaveText(/Salvo/, { timeout: 10_000 });
 
-    await page.locator("#sample-file-input").setInputFiles(EXCEL);
-    await expect(page.locator("#sample-controls")).toHaveClass(/is-active/, { timeout: 30_000 });
-
-    const cursoText = await page.evaluate(() => {
-      const field = window.__vetorialEditor.fields.find((f) => f.name === "Curso");
-      const obj = window.__vetorialEditor.canvas
-        .getObjects()
-        .find((o) => o.vetFieldId === field.id);
-      return obj.text;
-    });
-    expect(cursoText).toBe("ana paula de souza-Design");
+    await page.reload();
+    await expect(page.locator("#editor-status-text")).not.toHaveText(/Carregando/);
+    await clickField(page, CURSO_FIELD);
+    await expect(page.locator("#field-excel-column")).toHaveValue("{1}-{2}");
   });
 });
 

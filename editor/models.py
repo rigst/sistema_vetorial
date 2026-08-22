@@ -107,6 +107,8 @@ class TemplateField(TimeStampedModel):
     )
     transform_exceptions = models.CharField(max_length=255, blank=True)
     color = models.CharField(max_length=20, default="#000000")
+    text_underline = models.BooleanField(default=False)
+    text_strikethrough = models.BooleanField(default=False)
     border_enabled = models.BooleanField(default=False)
     border_color = models.CharField(max_length=20, default="#000000")
     border_size_ratio = models.DecimalField(max_digits=5, decimal_places=2, default=0)

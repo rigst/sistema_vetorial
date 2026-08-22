@@ -14,6 +14,9 @@ from jobs.models import GenerationJob
 
 from .models import UserProfile
 
+_INTER_DIR = Path(__file__).resolve().parent.parent / "fonts" / "vendor" / "inter"
+_WIX_DIR = Path(__file__).resolve().parent.parent / "fonts" / "vendor" / "wix-madefor-display"
+
 DEFAULT_FONT_SOURCES = [
     ("Dejavu Sans", Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")),
     ("Dejavu Sans Bold", Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")),
@@ -21,6 +24,40 @@ DEFAULT_FONT_SOURCES = [
     ("Dejavu Serif Bold", Path("/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf")),
     ("Dejavu Mono", Path("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf")),
     ("Dejavu Mono Bold", Path("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf")),
+    # Inter: única família padrão que traz a escala inteira de peso
+    # (Thin…Black) com itálico real em cada peso — é o que dá conteúdo de
+    # verdade ao seletor de "espessura" do painel, em vez de só Regular/Bold.
+    # Arquivos vendorizados em fonts/vendor/inter/ (SIL OFL 1.1, ver LICENSE.txt).
+    ("Inter Thin", _INTER_DIR / "Inter-Thin.ttf"),
+    ("Inter Thin Italic", _INTER_DIR / "Inter-ThinItalic.ttf"),
+    ("Inter Extra Light", _INTER_DIR / "Inter-ExtraLight.ttf"),
+    ("Inter Extra Light Italic", _INTER_DIR / "Inter-ExtraLightItalic.ttf"),
+    ("Inter Light", _INTER_DIR / "Inter-Light.ttf"),
+    ("Inter Light Italic", _INTER_DIR / "Inter-LightItalic.ttf"),
+    ("Inter Regular", _INTER_DIR / "Inter-Regular.ttf"),
+    ("Inter Italic", _INTER_DIR / "Inter-Italic.ttf"),
+    ("Inter Medium", _INTER_DIR / "Inter-Medium.ttf"),
+    ("Inter Medium Italic", _INTER_DIR / "Inter-MediumItalic.ttf"),
+    ("Inter SemiBold", _INTER_DIR / "Inter-SemiBold.ttf"),
+    ("Inter SemiBold Italic", _INTER_DIR / "Inter-SemiBoldItalic.ttf"),
+    ("Inter Bold", _INTER_DIR / "Inter-Bold.ttf"),
+    ("Inter Bold Italic", _INTER_DIR / "Inter-BoldItalic.ttf"),
+    ("Inter Extra Bold", _INTER_DIR / "Inter-ExtraBold.ttf"),
+    ("Inter Extra Bold Italic", _INTER_DIR / "Inter-ExtraBoldItalic.ttf"),
+    ("Inter Black", _INTER_DIR / "Inter-Black.ttf"),
+    ("Inter Black Italic", _INTER_DIR / "Inter-BlackItalic.ttf"),
+    # Wix Madefor Display: só existe como fonte variável no Google Fonts (um
+    # arquivo só, peso 400-800 controlado por eixo) — sem itálico. Os 5
+    # arquivos aqui são instâncias estáticas de verdade (glifo já "assado"
+    # naquele peso), geradas uma vez com fontTools.varLib.instancer a partir
+    # do .ttf variável oficial; o pipeline de contorno vetorial deste app não
+    # lê eixo de variação, só glyf estático. Ver fonts/vendor/wix-madefor-
+    # display/OFL.txt para a licença (SIL Open Font License).
+    ("Wix Madefor Display", _WIX_DIR / "WixMadeforDisplay-Regular.ttf"),
+    ("Wix Madefor Display Medium", _WIX_DIR / "WixMadeforDisplay-Medium.ttf"),
+    ("Wix Madefor Display SemiBold", _WIX_DIR / "WixMadeforDisplay-SemiBold.ttf"),
+    ("Wix Madefor Display Bold", _WIX_DIR / "WixMadeforDisplay-Bold.ttf"),
+    ("Wix Madefor Display ExtraBold", _WIX_DIR / "WixMadeforDisplay-ExtraBold.ttf"),
 ]
 
 

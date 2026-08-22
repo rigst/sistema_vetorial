@@ -83,6 +83,49 @@ class FontTests(TestCase):
         font.refresh_from_db()
         self.assertFalse(font.is_active)
 
+    def test_edit_page_does_not_crash_on_private_storage(self):
+        # Regressão: o widget padrão do Django para FileField (Clearable
+        # FileInput) monta um link "Arquivo atual: <a href=file.url>" ao
+        # editar — e o Storage privado (core/storage.py) recusa gerar url()
+        # de propósito, o que derrubava a página com 500 antes de o
+        # usuário conseguir ver o formulário.
+        font = FontAsset.objects.create(
+            user=self.user,
+            name="Fonte Teste",
+            family="Fonte Teste",
+            variant="Regular",
+            file=SimpleUploadedFile(
+                "DejaVuSans.ttf", self.font_path.read_bytes(), content_type="font/ttf"
+            ),
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("fonts:update", kwargs={"pk": font.pk}))
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_edit_without_reuploading_keeps_the_existing_file(self):
+        font = FontAsset.objects.create(
+            user=self.user,
+            name="Fonte Teste",
+            family="Fonte Teste",
+            variant="Regular",
+            file=SimpleUploadedFile(
+                "DejaVuSans.ttf", self.font_path.read_bytes(), content_type="font/ttf"
+            ),
+        )
+        original_file_name = font.file.name
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("fonts:update", kwargs={"pk": font.pk}), data={"name": "Nome Novo"}
+        )
+
+        self.assertEqual(response.status_code, 302)
+        font.refresh_from_db()
+        self.assertEqual(font.name, "Nome Novo")
+        self.assertEqual(font.file.name, original_file_name)
+
     def test_font_file_endpoint_serves_only_owner(self):
         font = FontAsset.objects.create(
             user=self.user,
