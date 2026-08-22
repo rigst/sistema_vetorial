@@ -15,6 +15,10 @@
   --accent: #1f7a72;
   --accent-soft: rgba(31, 122, 114, 0.1);
   --accent-2: #3d5f8c;
+  /* Mesmo verde do ícone do app (static/img/icon.svg) — só os botões
+   * principais usam este par, não o --accent do resto da interface. */
+  --brand-green: #5ec2b7;
+  --brand-green-deep: #2f9c8d;
   --signal: #b97f2e;
   --success: #2f8a5f;
   --danger: #c04545;
@@ -233,21 +237,20 @@ button[type="submit"] {
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
-  border: 1px solid var(--accent);
-  background: var(--accent);
+  border: 1px solid transparent;
+  background: linear-gradient(135deg, var(--brand-green) 0%, var(--brand-green-deep) 100%);
   color: #fff;
   font-weight: 600;
   font-size: 0.92rem;
   cursor: pointer;
   padding: 0.58rem 0.95rem;
   border-radius: var(--radius-sm);
-  transition: background var(--transition), border-color var(--transition), transform var(--transition);
+  transition: background var(--transition), border-color var(--transition), transform var(--transition), filter var(--transition);
 }
 
 .button:hover,
 button[type="submit"]:hover {
-  background: #196860;
-  border-color: #196860;
+  filter: brightness(1.06);
 }
 
 .button:focus-visible,
@@ -702,6 +705,17 @@ main {
   align-items: start;
   gap: 1rem;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+/* Rodapé do formulário de template: Voltar à esquerda, Salvar (o CTA de
+ * verdade da tela) no canto inferior direito do próprio cartão. */
+.template-form-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
 }
 
 .filter-action-group {
@@ -2540,6 +2554,9 @@ label.toolbar-button {
   scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) transparent;
+  /* Sem isto, rolar o popover até o fim "vazava" o resto do gesto pra
+   * página por baixo, que pulava inteira pra baixo. */
+  overscroll-behavior: contain;
 }
 
 .field-popover::-webkit-scrollbar {
@@ -3111,22 +3128,19 @@ label.toolbar-button {
   margin: 0.5rem 0 1.5rem;
 }
 
-/* ---- "+ Novo projeto": único CTA em degradê da tela — a mesma dupla de
- * cores da barra de progresso, só que num botão, pra puxar o olho pro
- * ponto de partida de um projeto novo. */
+/* ---- "+ Novo projeto": o mesmo degradê verde dos outros botões
+ * principais (.button), só que com uma sombra mais forte e um leve
+ * levantar no hover — pra puxar o olho pro ponto de partida de um projeto
+ * novo sem precisar de uma cor diferente do resto do app. */
 .button-cta {
-  border-color: transparent;
-  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
-  box-shadow: 0 8px 20px rgba(31, 122, 114, 0.28);
+  box-shadow: 0 8px 20px rgba(47, 156, 141, 0.32);
   transition: transform var(--transition), box-shadow var(--transition), filter var(--transition);
 }
 
 .button-cta:hover {
-  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
-  border-color: transparent;
   filter: brightness(1.07);
   transform: translateY(-1px);
-  box-shadow: 0 10px 26px rgba(31, 122, 114, 0.36);
+  box-shadow: 0 10px 26px rgba(47, 156, 141, 0.4);
 }
 
 .button-cta:focus-visible {

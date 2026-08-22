@@ -100,6 +100,11 @@ class TemplateField(TimeStampedModel):
         DOWN = "down", "Para baixo"
         UP = "up", "Para cima"
 
+    class VerticalAlign(models.TextChoices):
+        TOP = "top", "Topo"
+        MIDDLE = "middle", "Meio"
+        BOTTOM = "bottom", "Base"
+
     template = models.ForeignKey(DocumentTemplate, on_delete=models.CASCADE, related_name="fields")
     name = models.CharField(max_length=100)
     excel_column = models.CharField(max_length=255, blank=True)
@@ -112,11 +117,21 @@ class TemplateField(TimeStampedModel):
     y = models.DecimalField(max_digits=8, decimal_places=2)
     width = models.DecimalField(max_digits=8, decimal_places=2, default=0)
     height = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    # Com a caixa travada, largura/altura ficam fixas: mudar o tamanho da
+    # fonte não redimensiona a caixa, e as alças de redimensionar livre saem
+    # do canvas (só a de rotação continua disponível).
+    lock_size = models.BooleanField(default=False)
     # rotação em graus, sentido horário, em torno do canto superior-esquerdo.
     rotation = models.DecimalField(max_digits=6, decimal_places=2, default=0)
     font = models.ForeignKey(FontAsset, on_delete=models.PROTECT, related_name="template_fields")
     font_size = models.DecimalField(max_digits=6, decimal_places=2)
     text_align = models.CharField(max_length=10, choices=TextAlign.choices, default=TextAlign.LEFT)
+    # Posição do bloco de texto dentro da altura da caixa quando ela é maior
+    # que o texto (comum com lock_size ligado) — "top" é o comportamento de
+    # sempre, sem nenhuma mudança visual pra quem nunca mexer nisto.
+    vertical_align = models.CharField(
+        max_length=10, choices=VerticalAlign.choices, default=VerticalAlign.TOP
+    )
     text_transform = models.CharField(
         max_length=20, choices=TextTransform.choices, default=TextTransform.NONE
     )

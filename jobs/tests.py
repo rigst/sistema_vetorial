@@ -1404,6 +1404,99 @@ class WrapGrowDirectionTests(TestCase):
         self.assertLess(long_bbox[1], short_bbox[1] - 5)
 
 
+class VerticalAlignTests(TestCase):
+    """`vertical_align` decide onde o bloco de texto senta quando a caixa
+    (field.height) é mais alta que o texto — o cenário normal é combinado
+    com lock_size (caixa de tamanho fixo), mas o efeito em si só depende de
+    height ser maior que o texto."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = get_user_model().objects.create_user(username="valign-user", password="senha123")
+        font_path = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+        cls.font = FontAsset.objects.create(
+            user=cls.user,
+            name="Dejavu Sans",
+            family="Dejavu Sans",
+            variant="Regular",
+            file=SimpleUploadedFile(
+                "DejaVuSans.ttf", font_path.read_bytes(), content_type="font/ttf"
+            ),
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(TEST_MEDIA_ROOT, ignore_errors=True)
+
+    def _build_excel_upload(self, rows) -> SimpleUploadedFile:
+        buffer = io.BytesIO()
+        workbook = Workbook()
+        workbook.active.append(["Nome"])
+        for row in rows:
+            workbook.active.append(row)
+        workbook.save(buffer)
+        return SimpleUploadedFile(
+            "dados.xlsx",
+            buffer.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+    def _render(self, vertical_align):
+        buffer = io.BytesIO()
+        pdf_canvas = canvas.Canvas(buffer, pagesize=(400, 200))
+        pdf_canvas.showPage()
+        pdf_canvas.save()
+        template = DocumentTemplate.objects.create(
+            user=self.user,
+            name="Valign",
+            slug=f"valign-{vertical_align}",
+            background_pdf=SimpleUploadedFile(
+                "background.pdf", buffer.getvalue(), content_type="application/pdf"
+            ),
+        )
+        update_template_pdf_metadata(template)
+        TemplateField.objects.create(
+            template=template,
+            name="texto",
+            excel_column="1",
+            x=20,
+            y=20,
+            width=160,
+            # Bem mais alta que uma linha de texto em font_size=18, pra
+            # sobrar bastante espaço e o alinhamento vertical ficar óbvio.
+            height=150,
+            lock_size=True,
+            font=self.font,
+            font_size=18,
+            vertical_align=vertical_align,
+            order_index=1,
+        )
+        job = GenerationJob.objects.create(
+            user=self.user,
+            template=template,
+            name="Job",
+            source_excel=self._build_excel_upload([["Ana"]]),
+            kind=GenerationJob.Kind.PREVIEW,
+            status=GenerationJob.Status.QUEUED,
+        )
+        process_job(job)
+        job.refresh_from_db()
+        item = job.items.get()
+        with item.output_pdf.open("rb") as output_file:
+            bbox, _size = _ink_bbox(output_file.read(), resolution=150)
+        self.assertIsNotNone(bbox, f"nada desenhado para vertical_align={vertical_align!r}")
+        return bbox
+
+    def test_top_sits_higher_than_middle_which_sits_higher_than_bottom(self):
+        top_bbox = self._render(TemplateField.VerticalAlign.TOP)
+        middle_bbox = self._render(TemplateField.VerticalAlign.MIDDLE)
+        bottom_bbox = self._render(TemplateField.VerticalAlign.BOTTOM)
+        # bbox[1] é o topo da tinta em pixels, crescendo para baixo na imagem.
+        self.assertLess(top_bbox[1], middle_bbox[1] - 5)
+        self.assertLess(middle_bbox[1], bottom_bbox[1] - 5)
+
+
 def _dark_pixel_count(image) -> int:
     # Soma pixels abaixo de um limiar de cinza — não precisa ser exato:
     # o que os testes comparam é a diferença entre com/sem decoração.

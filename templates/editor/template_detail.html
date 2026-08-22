@@ -138,14 +138,36 @@
                         <input id="field-width" name="width" type="number" min="10" step="1">
                     </div>
                     <div class="field-group">
-                        <label for="field-text-align">Alinhamento</label>
+                        <label for="field-height">Altura (pt)</label>
+                        <input id="field-height" name="height" type="number" min="10" step="1">
+                    </div>
+                </div>
+                <div class="field-group-row">
+                    <div class="field-group">
+                        <label for="field-text-align">Alinhamento horizontal</label>
                         <select id="field-text-align" name="text_align">
                             <option value="left">Esquerda</option>
                             <option value="center">Centro</option>
                             <option value="right">Direita</option>
                         </select>
                     </div>
+                    <div class="field-group">
+                        <label for="field-vertical-align">Alinhamento vertical</label>
+                        <select id="field-vertical-align" name="vertical_align">
+                            <option value="top">Topo</option>
+                            <option value="middle">Meio</option>
+                            <option value="bottom">Base</option>
+                        </select>
+                    </div>
                 </div>
+                <div class="field-group field-toggle-row">
+                    <input type="checkbox" id="field-lock-size" name="lock_size">
+                    <label for="field-lock-size">Fixar largura e altura</label>
+                </div>
+                <p class="field-hint">
+                    Com o tamanho fixo, mudar a fonte não redimensiona a caixa, e as alças de
+                    redimensionar livre saem do canvas — só a de girar continua.
+                </p>
             </div>
 
             <details class="field-advanced">
@@ -418,7 +440,7 @@
 <script src="{% static 'js/job_launcher.js' %}?v=20260822-05"></script>
 {% if preview_pages %}
 <script src="{% static 'js/fabric.min.js' %}?v=6.7.1"></script>
-<script src="{% static 'js/template_editor.js' %}?v=20260822-12"></script>
+<script src="{% static 'js/template_editor.js' %}?v=20260822-13"></script>
 <script>
 VetorialTemplateEditor.init({
   canvasId: "editor-canvas",

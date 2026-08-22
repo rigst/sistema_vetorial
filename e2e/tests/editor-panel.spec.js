@@ -103,6 +103,62 @@ test.describe("Painel do campo: organização e estados", () => {
 
     await expect(page.locator("#field-border-opacity")).toBeDisabled();
   });
+
+  test("fixar tamanho trava as alças de redimensionar e persiste", async ({ page }) => {
+    await openBancadaAndSelectField(page);
+
+    const tlBefore = await page.evaluate(
+      () => window.__vetorialEditor.canvas.getActiveObject()._controlsVisibility.tl
+    );
+    expect(tlBefore).toBe(true);
+
+    await page.locator("#field-lock-size").check();
+    await expect(page.locator("#editor-save-state")).toHaveText(/Salvo/, { timeout: 10_000 });
+
+    const tlAfter = await page.evaluate(
+      () => window.__vetorialEditor.canvas.getActiveObject()._controlsVisibility.tl
+    );
+    expect(tlAfter).toBe(false);
+
+    await page.reload();
+    await expect(page.locator("#editor-status-text")).not.toHaveText(/Carregando/);
+    await clickField(page, "Nome");
+    await expect(page.locator("#field-lock-size")).toBeChecked();
+
+    // Outros testes reaproveitam o campo "Nome" neste mesmo banco (sem
+    // reseed entre arquivos) — destrava de novo pra não afetar quem espera
+    // redimensionar/arrastar esse campo livremente.
+    await page.locator("#field-lock-size").uncheck();
+    await expect(page.locator("#editor-save-state")).toHaveText(/Salvo/, { timeout: 10_000 });
+  });
+
+  test("alinhamento vertical salva e sobrevive a um recarregamento", async ({ page }) => {
+    await openBancadaAndSelectField(page);
+
+    await Promise.all([
+      page.waitForResponse(
+        (res) => res.url().includes("/campos/") && res.request().method() === "PATCH"
+      ),
+      page.locator("#field-vertical-align").selectOption("middle"),
+    ]);
+    await expect(page.locator("#editor-save-state")).toHaveText(/Salvo/, { timeout: 10_000 });
+
+    await page.reload();
+    await expect(page.locator("#editor-status-text")).not.toHaveText(/Carregando/);
+    await clickField(page, "Nome");
+    await expect(page.locator("#field-vertical-align")).toHaveValue("middle");
+
+    // Outros testes reaproveitam o campo "Nome" neste mesmo banco (sem
+    // reseed entre arquivos) — devolve o padrão "top" pra não afetar a
+    // geometria que eles esperam.
+    await Promise.all([
+      page.waitForResponse(
+        (res) => res.url().includes("/campos/") && res.request().method() === "PATCH"
+      ),
+      page.locator("#field-vertical-align").selectOption("top"),
+    ]);
+    await expect(page.locator("#editor-save-state")).toHaveText(/Salvo/, { timeout: 10_000 });
+  });
 });
 
 test.describe("Botões de ícone: ação destrutiva não parece CTA primário", () => {

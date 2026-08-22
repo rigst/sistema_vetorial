@@ -337,6 +337,28 @@
         });
       }
 
+      // Tamanho da própria caixa: largura rente à base, altura rente à
+      // direita — junto com os vãos até a página acima, dá pra ler a
+      // posição e o tamanho sem abrir o menu de edição.
+      {
+        const y = sy(bottom) + 22;
+        drawDimension(ctx, {
+          x1: sx(left), y1: y, x2: sx(right), y2: y,
+          tickAxis: "x",
+          label: formatCm(right - left),
+          labelX: sx(midX), labelY: y,
+        });
+      }
+      {
+        const x = sx(right) + 22;
+        drawDimension(ctx, {
+          x1: x, y1: sy(top), x2: x, y2: sy(bottom),
+          tickAxis: "y",
+          label: formatCm(bottom - top),
+          labelX: x, labelY: sy(midY),
+        });
+      }
+
       ctx.restore();
     };
 
@@ -505,9 +527,36 @@
       return (numLines - 1) * perLine;
     };
 
+    // Quando a caixa (field.height) é mais alta que o texto — comum com a
+    // altura travada, ver field.lock_size — "Alinhamento vertical" decide
+    // onde o bloco de texto senta na sobra. Mesma aproximação de altura do
+    // bloco usada em jobs/services.py::baseline_y, pelo mesmo motivo: sem
+    // depender da métrica exata da fonte, só font_size/line_height.
+    const verticalAlignOffset = (obj, field) => {
+      if (!field || !field.vertical_align || field.vertical_align === "top") return 0;
+      const numLines = (obj._textLines && obj._textLines.length) || 1;
+      const fontSize = Number(field.font_size) || 24;
+      const lineHeight = fontSize * (Number(field.line_height) || 1.1);
+      const textBlockHeight = fontSize + (numLines - 1) * lineHeight;
+      const slack = (Number(field.height) || 0) - textBlockHeight;
+      if (slack <= 0) return 0;
+      return field.vertical_align === "middle" ? slack / 2 : slack;
+    };
+
     const applyGrowDirection = (obj, field) => {
-      obj.set("top", Number(field.y) - growOffset(obj, field));
+      obj.set("top", Number(field.y) - growOffset(obj, field) + verticalAlignOffset(obj, field));
       obj.setCoords();
+    };
+
+    // Caixa travada (field.lock_size): tira as alças de redimensionar livre
+    // (cantos e laterais) do canvas — só a de rotação (mtr) continua. mt/mb
+    // ficam sempre desligadas (ver createObject), travada ou não.
+    const updateLockControls = (obj, field) => {
+      const free = !field.lock_size;
+      obj.setControlsVisibility({
+        tl: free, tr: free, bl: free, br: free, ml: free, mr: free,
+        mt: false, mb: false, mtr: true,
+      });
     };
 
     const applyFieldToObject = (obj, field) => {
@@ -529,6 +578,7 @@
       });
       obj.set("text", textFor(field));
       applyGrowDirection(obj, field);
+      updateLockControls(obj, field);
       obj.setCoords();
     };
 
@@ -553,7 +603,6 @@
         borderScaleFactor: 1.4,
         padding: 2,
       });
-      obj.setControlsVisibility({ mt: false, mb: false });
       obj.vetFieldId = field.id;
       applyFieldToObject(obj, field);
       objectsById.set(field.id, obj);
@@ -604,7 +653,10 @@
     const commitObject = (obj) => {
       const field = fieldsById.get(obj.vetFieldId);
       if (!field) return;
-      if (!obj.group && Math.abs((obj.scaleX || 1) - 1) > 0.001) {
+      // Caixa travada: as alças de redimensionar livre já saem do canvas
+      // (ver createObject/updateLockControls), mas a mudança de fonte por
+      // scale também não deve mexer no tamanho salvo da caixa.
+      if (!field.lock_size && !obj.group && Math.abs((obj.scaleX || 1) - 1) > 0.001) {
         const scale = obj.scaleX;
         obj.set({
           fontSize: Math.max(round2(obj.fontSize * scale), 4),
@@ -615,14 +667,16 @@
       }
       const geo = absoluteGeometry(obj);
       field.x = round2(geo.left);
-      // O "top" visível já vem deslocado por applyGrowDirection quando a
-      // caixa cresce para cima; para não acumular esse deslocamento a cada
-      // arrasto, field.y guarda a âncora original (soma de volta o quanto
-      // applyGrowDirection subtraiu).
-      field.y = round2(geo.top + growOffset(obj, field));
+      // O "top" visível já vem deslocado por applyGrowDirection (crescer pra
+      // cima e/ou alinhamento vertical) — pra não acumular esse deslocamento
+      // a cada arrasto, field.y guarda a âncora original (soma de volta o
+      // quanto applyGrowDirection tirou/pôs).
+      field.y = round2(geo.top + growOffset(obj, field) - verticalAlignOffset(obj, field));
       field.rotation = round2(((geo.angle % 360) + 360) % 360);
-      field.width = round2(obj.width);
-      field.height = round2(obj.height);
+      if (!field.lock_size) {
+        field.width = round2(obj.width);
+        field.height = round2(obj.height);
+      }
       field.font_size = round2(obj.fontSize);
       obj.set(strokeProps(field));
       obj.setCoords();
@@ -886,9 +940,9 @@
     const formEl = document.getElementById("field-form");
     const panelInputs = {};
     const PANEL_KEYS = [
-      "name", "excel_column", "font_id", "color", "font_size", "rotation", "width",
-      "text_align", "text_transform", "value_type", "line_height", "max_lines",
-      "overflow_mode", "grow_direction", "empty_value", "transform_exceptions",
+      "name", "excel_column", "font_id", "color", "font_size", "rotation", "width", "height",
+      "lock_size", "text_align", "vertical_align", "text_transform", "value_type", "line_height",
+      "max_lines", "overflow_mode", "grow_direction", "empty_value", "transform_exceptions",
       "text_underline", "text_strikethrough",
       "border_enabled", "border_color", "border_size_ratio", "border_opacity", "border_blur",
     ];
@@ -902,7 +956,7 @@
       border_opacity: document.getElementById("field-border-opacity-range"),
       border_blur: document.getElementById("field-border-blur-range"),
     };
-    const GEOMETRY_KEYS = new Set(["font_size", "rotation", "width"]);
+    const GEOMETRY_KEYS = new Set(["font_size", "rotation", "width", "height", "vertical_align"]);
 
     // Cor/espessura/opacidade/blur do contorno não fazem nada com o contorno
     // desligado. O CSS já esconde isso visualmente (:has() em style.css); os
@@ -1173,7 +1227,7 @@
       if (!selected.length) return;
       selected.forEach((field) => {
         let value = rawValue;
-        if (typeof value === "string" && ["font_size", "rotation", "width", "line_height", "border_size_ratio", "border_opacity", "border_blur"].includes(key)) {
+        if (typeof value === "string" && ["font_size", "rotation", "width", "height", "line_height", "border_size_ratio", "border_opacity", "border_blur"].includes(key)) {
           value = Number(String(value).replace(",", "."));
           if (!Number.isFinite(value)) return;
         }

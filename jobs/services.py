@@ -507,6 +507,22 @@ def _draw_field(pdf_canvas, field: TemplateField, value: str, page_height: float
             return draw_x + max_width - pdfmetrics.stringWidth(line, font_name, adjusted_size)
         return draw_x
 
+    # Quando a caixa é mais alta que o bloco de texto (comum com a largura/
+    # altura travadas — TemplateField.lock_size), "vertical_align" decide
+    # onde o texto senta dentro da sobra: no topo (de sempre, sem nenhuma
+    # mudança pra quem nunca mexeu nisto), no meio, ou na base. Aproximação
+    # do bloco: a primeira linha ocupa font_size cheio, cada linha extra
+    # soma line_height — deliberadamente simples, sem depender da métrica
+    # exata da fonte (que já entra no FIRST_BASELINE_FACTOR de cada linha).
+    text_block_height = adjusted_size + (len(lines) - 1) * line_height
+    vertical_slack = float(field.height or 0) - text_block_height
+    if field.vertical_align == TemplateField.VerticalAlign.MIDDLE and vertical_slack > 0:
+        vertical_offset = vertical_slack / 2
+    elif field.vertical_align == TemplateField.VerticalAlign.BOTTOM and vertical_slack > 0:
+        vertical_offset = vertical_slack
+    else:
+        vertical_offset = 0
+
     def baseline_y(index):
         offset = -((FIRST_BASELINE_FACTOR * adjusted_size) + (index * line_height))
         if field.grow_direction == TemplateField.GrowDirection.UP:
@@ -515,7 +531,7 @@ def _draw_field(pdf_canvas, field: TemplateField, value: str, page_height: float
             # empurram o bloco para cima, sem inverter a ordem de leitura:
             # a primeira linha do texto continua sendo a de cima.
             offset += (len(lines) - 1) * line_height
-        return offset
+        return offset - vertical_offset
 
     def draw_text_line(
         draw_x, baseline_y, line, *, fill_color=None, stroke_color=None, line_width=1, alpha=1

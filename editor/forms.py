@@ -172,17 +172,13 @@ class DocumentTemplateForm(forms.ModelForm):
 
     class Meta:
         model = DocumentTemplate
-        fields = ["name", "description", "background_pdf"]
+        fields = ["name", "background_pdf"]
         labels = {
             "name": "Nome",
-            "description": "Descrição",
             "background_pdf": "Fundo (PDF, PNG, JPG ou WebP)",
         }
         widgets = {
             "name": forms.TextInput(attrs={"placeholder": "Ex.: Certificado Base 2026"}),
-            "description": forms.Textarea(
-                attrs={"rows": 4, "placeholder": "Observações do template."}
-            ),
             "background_pdf": forms.FileInput(attrs={"accept": ".pdf,.png,.jpg,.jpeg,.webp"}),
         }
 
