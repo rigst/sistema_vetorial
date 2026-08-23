@@ -89,7 +89,8 @@ O procedimento completo está em [docs/CONFORMIDADE.md](docs/CONFORMIDADE.md).
 
 ## Licença
 
-[AGPL-3.0](LICENSE) — Copyright (C) 2026 Rodrigo Caballero Stölben.
+[AGPL-3.0](LICENSE) — Copyright (C) 2026 Rodrigo Caballero Stölben. Código-fonte:
+[github.com/rigst/sistema_vetorial](https://github.com/rigst/sistema_vetorial).
 
 O uso do serviço hospedado em vetorial.stolben.com é regido também pelos Termos de Uso
 e pela Política de Privacidade publicados no próprio serviço. Fontes tipográficas
