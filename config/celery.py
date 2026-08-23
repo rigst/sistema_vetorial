@@ -15,6 +15,10 @@ app.conf.beat_schedule = {
     "cleanup-expired-assets-daily": {
         "task": "core.tasks.cleanup_expired_assets",
         "schedule": crontab(hour=3, minute=0),
-    }
+    },
+    "cleanup-expired-visitors-hourly": {
+        "task": "core.tasks.cleanup_expired_visitor_accounts",
+        "schedule": crontab(minute=0),
+    },
 }
 app.conf.timezone = settings.TIME_ZONE

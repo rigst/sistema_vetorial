@@ -26,7 +26,7 @@ from pathlib import Path
 # --------------------------------------------------------------------------
 
 PROJETO = "StölbenVetorial"
-LICENCA_PROJETO = "licença proprietária"
+LICENCA_PROJETO = "AGPL-3.0-or-later"
 
 # Programas chamados por subprocess (não linkados ao código do projeto).
 # Formato: (nome, versão, licença, observação)
@@ -39,6 +39,21 @@ PROGRAMAS_EXTERNOS: list[tuple[str, str, str, str]] = [
     ),
 ]
 
+# Fontes vendorizadas no repositório (fonts/vendor/), fora do alcance do
+# inventário de pacotes Python abaixo. Formato: (nome, licença, observação)
+FONTES_VENDORIZADAS: list[tuple[str, str, str]] = [
+    (
+        "Inter",
+        "SIL OFL 1.1",
+        "`fonts/vendor/inter/` — texto completo em `LICENSE.txt` no mesmo diretório",
+    ),
+    (
+        "Wix Madefor Display",
+        "SIL OFL 1.1",
+        "`fonts/vendor/wix-madefor-display/` — texto completo em `OFL.txt` no mesmo diretório",
+    ),
+]
+
 # Observações que valem manutenção contínua.
 NOTAS: list[str] = [
     "**Redis**: o servidor em uso é a série 7.0 (BSD-3-Clause). As versões 7.4 a "
@@ -48,6 +63,9 @@ NOTAS: list[str] = [
     "linha de comando. Não há linkagem com o código deste projeto, e o serviço não "
     "distribui os binários — por isso as obrigações de reciprocidade da GPL não se "
     "estendem a este código.",
+    "A SIL OFL 1.1 permite embutir e redistribuir a fonte junto com software sob "
+    "qualquer licença, inclusive AGPL — a única restrição relevante aqui é não "
+    "vender a fonte isoladamente, o que este projeto não faz.",
 ]
 
 # --------------------------------------------------------------------------
@@ -189,6 +207,19 @@ def main() -> int:
             "| Programa | Versão | Licença | Observação |",
             "|---|---|---|---|",
             *[f"| {n} | {v} | {lic} | {obs} |" for n, v, lic, obs in PROGRAMAS_EXTERNOS],
+            "",
+        ]
+
+    if FONTES_VENDORIZADAS:
+        linhas += [
+            "## Fontes vendorizadas",
+            "",
+            "Arquivos de fonte embutidos no repositório como builtins do editor "
+            "(`fonts/vendor/`), fora do inventário de pacotes Python acima.",
+            "",
+            "| Fonte | Licença | Observação |",
+            "|---|---|---|",
+            *[f"| {n} | {lic} | {obs} |" for n, lic, obs in FONTES_VENDORIZADAS],
             "",
         ]
 

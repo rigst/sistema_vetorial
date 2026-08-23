@@ -78,13 +78,41 @@ class AceiteFormTests(TestCase):
     def test_aceita_marcado(self):
         self.assertTrue(AceiteForm(data={"aceite_legal": "on"}).is_valid())
 
-    def test_tela_de_aceite_de_visitante_nao_existe_aqui(self):
-        """O acesso visitante está desativado: sem LEGAL_VISITOR_ACTION a tela
-        responde 404 em vez de oferecer um caminho que não leva a lugar nenhum."""
+    def test_tela_de_aceite_de_visitante_responde_404_sem_documento_publicado(self):
+        self.assertEqual(self.client.get(reverse("legal:aceite_visitante")).status_code, 404)
+
+
+class AceiteVisitanteTests(TestCase):
+    """Fluxo completo: tela de aceite -> `core:criar_visitante` (LEGAL_VISITOR_ACTION)."""
+
+    def setUp(self):
         criar_documento()
         criar_documento(tipo=TipoDocumento.PRIVACIDADE)
 
-        self.assertEqual(self.client.get(reverse("legal:aceite_visitante")).status_code, 404)
+    def test_tela_de_aceite_mostra_os_documentos_vigentes(self):
+        resposta = self.client.get(reverse("legal:aceite_visitante"))
+        self.assertEqual(resposta.status_code, 200)
+        self.assertContains(resposta, "aceite_legal")
+
+    def test_sem_marcar_o_checkbox_nao_cria_conta(self):
+        resposta = self.client.post(reverse("core:criar_visitante"), {})
+        self.assertEqual(resposta.status_code, 400)
+        self.assertFalse(Usuario.objects.filter(username__startswith="visitante_").exists())
+
+    def test_marcar_o_checkbox_cria_visitante_loga_e_registra_aceite(self):
+        resposta = self.client.post(
+            reverse("core:criar_visitante"), {"aceite_legal": "on"}, follow=True
+        )
+        self.assertEqual(resposta.status_code, 200)
+
+        usuario = Usuario.objects.get(username__startswith="visitante_")
+        self.assertEqual(usuario.profile.role, "visitor")
+        self.assertFalse(usuario.has_usable_password())
+        self.assertEqual(int(self.client.session["_auth_user_id"]), usuario.pk)
+
+        aceites = AceiteLegal.objects.filter(usuario=usuario)
+        self.assertEqual(aceites.count(), 2)
+        self.assertTrue(aceites.filter(origem=OrigemAceite.VISITANTE, e_visitante=True).exists())
 
 
 class ReaceiteMiddlewareTests(TestCase):

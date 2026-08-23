@@ -175,8 +175,14 @@ UNFOLD = {
 # Destino após o aceite nas telas do app `legal`.
 LEGAL_REDIRECT_URL = "editor:list"
 
-# Sem LEGAL_VISITOR_ACTION: o acesso visitante está desativado neste sistema, e
-# a tela de aceite de visitante responde 404 enquanto assim for.
+# View que cria a conta de visitante depois do aceite em /legal/aceite/.
+LEGAL_VISITOR_ACTION = "core:criar_visitante"
+
+# Conta de visitante: apagada ao sair, e também automaticamente depois deste
+# prazo, para não sobreviver ao SESSION_COOKIE_AGE padrão (2 semanas) numa aba
+# esquecida aberta sem logout explícito.
+VISITOR_ACCOUNT_TTL_HOURS = int(os.environ.get("VISITOR_ACCOUNT_TTL_HOURS", "24"))
+
 LOGOUT_REDIRECT_URL = "login"
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"

@@ -10,10 +10,9 @@ from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
 
-from editor.models import DocumentTemplate
 from fonts.models import FontAsset
-from jobs.models import GenerationJob
 
+from .cleanup import cleanup_visitor_data
 from .models import UserProfile
 
 _INTER_DIR = Path(__file__).resolve().parent.parent / "fonts" / "vendor" / "inter"
@@ -131,17 +130,6 @@ def ensure_default_fonts(user) -> dict[str, int]:
     return result
 
 
-def cleanup_visitor_data(user) -> None:
-    if not user or not hasattr(user, "profile"):
-        return
-    if user.profile.role != UserProfile.Role.VISITOR:
-        return
-    GenerationJob.objects.filter(user=user).delete()
-    DocumentTemplate.objects.filter(user=user).delete()
-    FontAsset.objects.filter(user=user).delete()
-    user.delete()
-
-
 class UsuarioLoginView(LoginView):
     template_name = "auth/login.html"
 
@@ -153,11 +141,7 @@ class UsuarioLoginView(LoginView):
 
     def post(self, request, *args, **kwargs):
         if "entrar_visitante" in request.POST:
-            messages.warning(
-                request,
-                "O acesso visitante está temporariamente desativado.",
-            )
-            return redirect(reverse("login"))
+            return redirect(reverse("legal:aceite_visitante"))
         response = super().post(request, *args, **kwargs)
         if request.user.is_authenticated:
             ensure_user_profile(request.user)

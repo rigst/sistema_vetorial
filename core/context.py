@@ -1,3 +1,5 @@
+from django.conf import settings
+
 from .auth import ensure_user_profile
 from .models import UserProfile
 
@@ -12,4 +14,5 @@ def app_shell(request):
         or request.user.get_full_name()
         or request.user.username,
         "is_visitor_user": profile.role == UserProfile.Role.VISITOR,
+        "visitor_ttl_hours": settings.VISITOR_ACCOUNT_TTL_HOURS,
     }

@@ -13,6 +13,19 @@
             {{ form.as_p }}
             <button type="submit">Entrar</button>
         </form>
+
+        <div class="auth-visitor">
+            <p class="muted">Só quer conhecer o sistema? Não precisa de conta.</p>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="entrar_visitante" value="1">
+                <button type="submit" class="button-secondary">Experimentar sem criar conta</button>
+            </form>
+            <p class="auth-visitor-hint">
+                Cria uma conta temporária: os dados somem ao sair, ou automaticamente
+                depois de algumas horas.
+            </p>
+        </div>
     </div>
 </section>
 {% endblock %}

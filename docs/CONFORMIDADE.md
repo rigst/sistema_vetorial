@@ -16,17 +16,22 @@ visitante, IP, navegador, data, sessão, origem, o hash do texto **no momento do
 um JSON de evidência (host, path, método, `Referer`, `X-Forwarded-For` bruto, idioma e as
 versões vigentes na hora).
 
-O ponto mais importante do desenho: **o aceite sobrevive à exclusão do usuário.** `core/auth.py:cleanup_visitor_data` apaga o usuário visitante no logout, e a prova não
-pode ir junto — daí `usuario` ser `SET_NULL` e existir o `usuario_label` congelado. Vale
-mesmo com o visitante desativado: o código continua lá.
+O ponto mais importante do desenho: **o aceite sobrevive à exclusão do usuário.**
+`core/cleanup.py:cleanup_visitor_data` apaga o usuário visitante no logout — e o mesmo
+módulo, via `cleanup_expired_visitors`, apaga por tempo (`VISITOR_ACCOUNT_TTL_HOURS`) uma
+sessão de visitante abandonada sem logout explícito. A prova não pode ir junto — daí
+`usuario` ser `SET_NULL` e existir o `usuario_label` congelado.
 
 ### Onde o aceite é capturado
 
-- **Acesso visitante:** desativado neste sistema. Sem `LEGAL_VISITOR_ACTION` nas settings,
-  a tela `/legal/aceite/` responde 404 — o caminho fica pronto para o dia em que o
-  visitante voltar, sem oferecer uma porta que não leva a lugar nenhum.
-- **Cadastro:** não existe. As contas são criadas por administrador, e o aceite dessas
-  contas acontece pelo interstitial de re-aceite no primeiro acesso.
+- **Acesso visitante:** tela pública `/legal/aceite/` (link "Experimentar sem criar
+  conta" no login). O aceite é validado e registrado por `core.views.criar_visitante` —
+  o destino configurado em `LEGAL_VISITOR_ACTION` — **antes** de a conta existir; só
+  depois do aceite válido a conta de visitante é criada, logada e fica sujeita à
+  expiração automática (`core.cleanup.cleanup_expired_visitors`, `VISITOR_ACCOUNT_TTL_HOURS`,
+  além da exclusão imediata ao sair).
+- **Cadastro:** não existe. As contas permanentes são criadas por administrador, e o
+  aceite dessas contas acontece pelo interstitial de re-aceite no primeiro acesso.
 - **Login normal**: sem checkbox. Quem já tem conta já aceitou; versão nova é tratada pelo
   middleware.
 - **Versão nova** (`legal/middleware.py`): `AceiteObrigatorioMiddleware` redireciona

@@ -8,8 +8,8 @@ from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.management import call_command
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -56,13 +56,41 @@ class CoreTests(TestCase):
 
         self.assertIn(reverse("login"), final.redirect_chain[-1][0])
 
-    def test_visitor_access_is_disabled(self):
-        response = self.client.post(reverse("login"), {"entrar_visitante": "1"}, follow=True)
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "O acesso visitante está temporariamente desativado.")
-        self.assertFalse(
-            get_user_model().objects.filter(username__startswith="visitante_").exists()
+    def test_entrar_visitante_leva_para_a_tela_de_aceite(self):
+        response = self.client.post(reverse("login"), {"entrar_visitante": "1"})
+        # fetch_redirect_response=False: este teste não publica documentos
+        # legais, então a própria tela de destino responderia 404 (coberto
+        # em legal.tests.AceiteVisitanteTests) — o que importa aqui é o alvo.
+        self.assertRedirects(
+            response, reverse("legal:aceite_visitante"), fetch_redirect_response=False
         )
+
+    def test_cleanup_expired_visitors_removes_only_old_visitor_accounts(self):
+        from core.cleanup import cleanup_expired_visitors
+        from core.models import UserProfile
+
+        antigo = get_user_model().objects.create_user(username="visitante_antigo")
+        UserProfile.objects.filter(user=antigo).update(role=UserProfile.Role.VISITOR)
+        get_user_model().objects.filter(pk=antigo.pk).update(
+            date_joined=timezone.now() - timezone.timedelta(hours=48)
+        )
+
+        recente = get_user_model().objects.create_user(username="visitante_recente")
+        UserProfile.objects.filter(user=recente).update(role=UserProfile.Role.VISITOR)
+
+        nao_visitante = get_user_model().objects.create_user(
+            username="editora-antiga", password="senha123"
+        )
+        get_user_model().objects.filter(pk=nao_visitante.pk).update(
+            date_joined=timezone.now() - timezone.timedelta(hours=48)
+        )
+
+        result = cleanup_expired_visitors(ttl_hours=24)
+
+        self.assertEqual(result["deleted_visitors"], 1)
+        self.assertFalse(get_user_model().objects.filter(pk=antigo.pk).exists())
+        self.assertTrue(get_user_model().objects.filter(pk=recente.pk).exists())
+        self.assertTrue(get_user_model().objects.filter(pk=nao_visitante.pk).exists())
 
     def test_authenticated_nav_links_to_jobs(self):
         user = get_user_model().objects.create_user(username="nav-user", password="senha123")

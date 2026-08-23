@@ -1,11 +1,40 @@
 from __future__ import annotations
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from editor.models import DocumentTemplate
 from fonts.models import FontAsset
 from jobs.models import GenerationJob
+
+from .models import UserProfile
+
+
+def cleanup_visitor_data(user) -> None:
+    if not user or not hasattr(user, "profile"):
+        return
+    if user.profile.role != UserProfile.Role.VISITOR:
+        return
+    GenerationJob.objects.filter(user=user).delete()
+    DocumentTemplate.objects.filter(user=user).delete()
+    FontAsset.objects.filter(user=user).delete()
+    user.delete()
+
+
+def cleanup_expired_visitors(ttl_hours: int | None = None) -> dict[str, int]:
+    ttl_hours = ttl_hours if ttl_hours is not None else settings.VISITOR_ACCOUNT_TTL_HOURS
+    cutoff = timezone.now() - timezone.timedelta(hours=ttl_hours)
+
+    expired = list(
+        get_user_model()
+        .objects.filter(profile__role=UserProfile.Role.VISITOR, date_joined__lt=cutoff)
+        .select_related("profile")
+    )
+    for user in expired:
+        cleanup_visitor_data(user)
+
+    return {"ttl_hours": ttl_hours, "deleted_visitors": len(expired)}
 
 
 def cleanup_expired_records(retention_days: int | None = None) -> dict[str, int]:

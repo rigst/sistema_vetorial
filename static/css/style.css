@@ -119,6 +119,20 @@ textarea {
   font-size: 0.85rem;
 }
 
+.visitor-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--warning);
+  background: rgba(155, 109, 51, 0.14);
+  border: 1px solid rgba(155, 109, 51, 0.35);
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  cursor: help;
+}
+
 .nav {
   display: grid;
   gap: 0.7rem;
@@ -698,6 +712,20 @@ main {
 .auth-form {
   display: grid;
   gap: 1rem;
+}
+
+.auth-visitor {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 0.6rem;
+}
+
+.auth-visitor-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--warning);
 }
 
 .form-grid {

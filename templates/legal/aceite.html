@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Entrar como visitante · Vetorial{% endblock %}
+
+{% block content %}
+<div class="legal-page legal-page--portao">
+    <div class="legal-doc">
+        <header class="legal-doc-header">
+            <p class="legal-eyebrow">Acesso visitante</p>
+            <h1>Experimente sem criar conta</h1>
+            <p class="legal-lead">
+                Isto cria uma conta <strong>temporária</strong>: templates, fontes e
+                arquivos gerados nela são apagados assim que você sair, e também
+                automaticamente em até <strong>{{ visitor_ttl_hours }} horas</strong>, o
+                que vier primeiro. Não guarde nada importante aqui — para uso
+                contínuo, peça uma conta ao administrador.
+            </p>
+        </header>
+
+        {% for documento in documentos %}
+            <section class="legal-painel">
+                <header class="legal-painel-topo">
+                    <h2>{{ documento.titulo }}</h2>
+                    {% include "legal/_registro.html" %}
+                </header>
+                <div class="legal-corpo legal-corpo--rolagem" tabindex="0" role="region"
+                     aria-label="{{ documento.titulo }} — texto completo">
+                    {{ documento.corpo_html|safe }}
+                </div>
+            </section>
+        {% endfor %}
+
+        <form method="post" action="{{ action }}" class="legal-acao">
+            {% csrf_token %}
+            {% for nome, valor in campos_extras.items %}
+                <input type="hidden" name="{{ nome }}" value="{{ valor }}">
+            {% endfor %}
+            {% include "legal/_checkbox_aceite.html" with field=form.aceite_legal %}
+            <div class="legal-acao-botoes">
+                <button class="btn btn-primary" type="submit">Entrar como visitante</button>
+            </div>
+        </form>
+
+        <p class="legal-recusa"><a href="{% url 'login' %}">Voltar para o login</a>.</p>
+    </div>
+</div>
+{% endblock %}

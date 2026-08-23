@@ -19,7 +19,10 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 django.setup()
 
 from django.contrib.auth import get_user_model  # noqa: E402
+from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.files.uploadedfile import SimpleUploadedFile  # noqa: E402
+from django.core.management import call_command
+from django.test import RequestFactory
 from openpyxl import Workbook  # noqa: E402
 from PIL import Image, ImageDraw  # noqa: E402
 
@@ -28,6 +31,8 @@ from editor.forms import _image_to_pdf  # noqa: E402
 from editor.models import DocumentTemplate, TemplateField  # noqa: E402
 from editor.services import update_template_pdf_metadata  # noqa: E402
 from fonts.models import FontAsset  # noqa: E402
+from legal.models import OrigemAceite
+from legal.services import documentos_vigentes, registrar_aceite
 
 USERNAME = "e2e"
 PASSWORD = "e2e-senha-123"
@@ -53,6 +58,28 @@ def build_background() -> SimpleUploadedFile:
     return _image_to_pdf(SimpleUploadedFile("fundo.png", buffer.getvalue()), "fundo")
 
 
+def ensure_legal_docs_and_acceptance(user) -> None:
+    """Publica os documentos legais reais do repositório e já registra o
+    aceite do usuário `e2e` — sem isto, o teste do acesso visitante (que
+    precisa de documentos vigentes) e o interstitial de re-aceite (que bloquearia
+    o usuário `e2e` de primeira, quebrando toda suíte que loga com ele) entram
+    em conflito.
+    """
+    call_command("importar_documentos_legais", "--publicar", verbosity=0)
+    vigentes = documentos_vigentes()
+    if not vigentes:
+        return
+    request = RequestFactory().get("/")
+    SessionMiddleware(lambda r: None).process_request(request)
+    request.session.save()
+    registrar_aceite(
+        request,
+        usuario=user,
+        origem=OrigemAceite.CADASTRO,
+        documentos=list(vigentes.values()),
+    )
+
+
 def main() -> None:
     TMP_DIR.mkdir(parents=True, exist_ok=True)
     build_excel(
@@ -76,6 +103,8 @@ def main() -> None:
     user.set_password(PASSWORD)
     user.is_staff = True
     user.save()
+
+    ensure_legal_docs_and_acceptance(user)
 
     DocumentTemplate.objects.filter(user=user).delete()
     FontAsset.objects.filter(user=user).delete()

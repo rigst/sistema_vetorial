@@ -1,11 +1,13 @@
 # StölbenVetorial
 
+[![Licença: AGPL v3](https://img.shields.io/badge/licen%C3%A7a-AGPL--3.0-blue.svg)](LICENSE)
+
 Sistema Django para edição visual de templates em PDF e geração de arquivos por lote a partir de Excel.
 
 ## Principais recursos
 
 - login com acesso visitante temporário;
-- exclusão automática dos dados do visitante ao sair;
+- exclusão automática dos dados do visitante ao sair, ou por tempo (`VISITOR_ACCOUNT_TTL_HOURS`);
 - templates com fundo em PDF de uma página ou imagem (PNG/JPG/WebP, convertida para PDF);
 - editor visual baseado em Fabric.js: arraste, redimensione, gire, multi-seleção, snap com guias, zoom, undo/redo, atalhos de teclado e edição de texto com duplo clique;
 - pré-visualização fiel: as fontes do usuário são carregadas no navegador e a métrica de texto do editor é replicada na geração do PDF;
@@ -47,6 +49,7 @@ Fallback manual:
 
 ```bash
 python manage.py cleanup_expired_files
+python manage.py cleanup_expired_visitors
 ```
 
 ## Testes
@@ -69,9 +72,10 @@ mídia ou a fila de produção. Screenshots e relatório ficam em `e2e/.tmp/`.
 ## Conformidade legal (LGPD / Marco Civil)
 
 O app `legal` versiona os Termos de Uso e a Política de Privacidade e registra cada aceite
-com data, hora, IP, navegador e o `sha256` do texto exato aceito. Como aqui as contas são
-criadas por administrador e o acesso visitante está desativado, o aceite acontece pelo
-interstitial de re-aceite no primeiro acesso.
+com data, hora, IP, navegador e o `sha256` do texto exato aceito. Contas criadas por
+administrador aceitam pelo interstitial de re-aceite no primeiro acesso; o acesso
+visitante (autoatendido, na tela de login) aceita antes mesmo de a conta existir, na
+tela `/legal/aceite/`.
 
 Os registros de acesso do nginx são mantidos por **6 meses**, como exige o art. 15 do
 Marco Civil (`deploy/logrotate/stolben-acesso` e `deploy/nginx_acesso.py`).
@@ -85,12 +89,15 @@ O procedimento completo está em [docs/CONFORMIDADE.md](docs/CONFORMIDADE.md).
 
 ## Licença
 
-Software **proprietário** — todos os direitos reservados (ver [LICENSE](LICENSE)).
-O código não é aberto nem redistribuível; o uso do serviço é regido pelos Termos de
-Uso publicados em vetorial.stolben.com.
+[AGPL-3.0](LICENSE) — Copyright (C) 2026 Rodrigo Caballero Stölben.
 
-As bibliotecas de terceiros permanecem sob suas próprias licenças; o inventário está
-em [docs/LICENCAS-TERCEIROS.md](docs/LICENCAS-TERCEIROS.md), regenerável com:
+O uso do serviço hospedado em vetorial.stolben.com é regido também pelos Termos de Uso
+e pela Política de Privacidade publicados no próprio serviço. Fontes tipográficas
+enviadas pelos usuários permanecem sob a licença de seus respectivos titulares.
+
+As bibliotecas de terceiros (e as fontes vendorizadas em `fonts/vendor/`) permanecem
+sob suas próprias licenças; o inventário está em
+[docs/LICENCAS-TERCEIROS.md](docs/LICENCAS-TERCEIROS.md), regenerável com:
 
 ```bash
 ./venv/bin/python scripts/licencas_terceiros.py
