@@ -698,7 +698,10 @@ def _merge_overlay(background_pdf_path: str, overlay_bytes: bytes, geometry: Pag
         with Pdf.open(background_pdf_path) as base_pdf, Pdf.open(overlay_temp.name) as overlay_pdf:
             destination_page = Page(base_pdf.pages[0])
             overlay_page = Page(overlay_pdf.pages[0])
-            overlay_box = [float(value) for value in overlay_page.obj.MediaBox]
+            # pikepdf 10.5.1 tipa Object.__iter__ como Iterable[Object], não
+            # Iterator[Object] (bug do stub, não do nosso código) — o `for`
+            # funciona normalmente em runtime.
+            overlay_box = [float(value) for value in overlay_page.obj.MediaBox]  # type: ignore[attr-defined]
             overlay_width = overlay_box[2] - overlay_box[0]
             overlay_height = overlay_box[3] - overlay_box[1]
             if (
@@ -852,7 +855,10 @@ def _build_zip_for_job(job: GenerationJob) -> None:
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
         for item in completed_items:
             with item.output_pdf.open("rb") as generated:
-                entry_name = item.display_filename or Path(item.output_pdf.name).name
+                output_name = item.output_pdf.name
+                # Garantido pelo filtro output_pdf__gt="" acima: nunca vazio/None aqui.
+                assert output_name
+                entry_name = item.display_filename or Path(output_name).name
                 archive.writestr(entry_name, generated.read())
     job.zip_file.save(
         f"{job.name.lower().replace(' ', '_')}.zip", ContentFile(buffer.getvalue()), save=False
@@ -979,13 +985,14 @@ def process_job(job: GenerationJob) -> GenerationJob:
 
 def clone_preview_to_full(preview_job: GenerationJob) -> GenerationJob:
     with preview_job.source_excel.open("rb") as source_file:
+        source_name = preview_job.source_excel.name
+        # O `with` acima já abriu o arquivo com sucesso: nunca None aqui.
+        assert source_name
         full_job = GenerationJob.objects.create(
             user=preview_job.user,
             template=preview_job.template,
             name=f"{preview_job.name} - lote completo",
-            source_excel=ContentFile(
-                source_file.read(), name=Path(preview_job.source_excel.name).name
-            ),
+            source_excel=ContentFile(source_file.read(), name=Path(source_name).name),
             kind=GenerationJob.Kind.FULL,
             status=GenerationJob.Status.QUEUED,
         )
