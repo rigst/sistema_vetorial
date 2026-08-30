@@ -6,7 +6,6 @@ import tempfile
 from pathlib import Path
 
 import pikepdf
-
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
@@ -233,7 +232,7 @@ class EditorFlowTests(TestCase):
         self.client.force_login(self.user)
         create_response = self.client.post(
             reverse("editor:fields-api", kwargs={"pk": template.pk}),
-            data='{"name":"Nome","excel_column":1,"font_id":%s,"color":"#111111"}' % self.font.pk,
+            data=f'{{"name":"Nome","excel_column":1,"font_id":{self.font.pk},"color":"#111111"}}',
             content_type="application/json",
         )
         self.assertEqual(create_response.status_code, 201)
@@ -274,7 +273,7 @@ class EditorFlowTests(TestCase):
         self.client.force_login(self.user)
         create_response = self.client.post(
             reverse("editor:fields-api", kwargs={"pk": template.pk}),
-            data='{"name":"Novo campo","font_id":%s}' % self.font.pk,
+            data=f'{{"name":"Novo campo","font_id":{self.font.pk}}}',
             content_type="application/json",
         )
 
