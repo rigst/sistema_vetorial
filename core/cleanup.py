@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import timedelta
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.utils import timezone
@@ -24,7 +26,7 @@ def cleanup_visitor_data(user) -> None:
 
 def cleanup_expired_visitors(ttl_hours: int | None = None) -> dict[str, int]:
     ttl_hours = ttl_hours if ttl_hours is not None else settings.VISITOR_ACCOUNT_TTL_HOURS
-    cutoff = timezone.now() - timezone.timedelta(hours=ttl_hours)
+    cutoff = timezone.now() - timedelta(hours=ttl_hours)
 
     expired = list(
         get_user_model()
@@ -39,7 +41,7 @@ def cleanup_expired_visitors(ttl_hours: int | None = None) -> dict[str, int]:
 
 def cleanup_expired_records(retention_days: int | None = None) -> dict[str, int]:
     retention_days = retention_days or settings.FILE_RETENTION_DAYS
-    cutoff = timezone.now() - timezone.timedelta(days=retention_days)
+    cutoff = timezone.now() - timedelta(days=retention_days)
 
     expired_jobs = GenerationJob.objects.filter(created_at__lt=cutoff)
     expired_templates = DocumentTemplate.objects.filter(created_at__lt=cutoff)
