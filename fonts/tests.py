@@ -294,10 +294,11 @@ class FontFamilyGroupingTests(TestCase):
         self.assertEqual(bold.variant, "Bold")
 
     def test_editor_context_groups_fonts_by_family(self):
+        from reportlab.pdfgen import canvas as rl_canvas
+
         from editor.forms import DocumentTemplateForm
         from editor.services import update_template_pdf_metadata
         from editor.views import _template_editor_context
-        from reportlab.pdfgen import canvas as rl_canvas
 
         self._upload("DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
         self._upload("DejaVuSans-Bold.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
