@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING, cast
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -17,6 +19,9 @@ from editor.models import DocumentTemplate
 from .forms import GenerationJobForm
 from .models import GenerationItem, GenerationJob
 from .runner import spawn_job_process
+
+if TYPE_CHECKING:
+    from django.contrib.auth.models import User
 
 
 class GenerationJobListView(UserOwnedQuerysetMixin, ListView):
@@ -64,6 +69,8 @@ class GenerationJobCreateView(LoginRequiredMixin, CreateView):
         )
         form.instance.status = GenerationJob.Status.QUEUED
         response = super().form_valid(form)
+        # form_valid do Django sempre popula self.object antes de retornar.
+        assert self.object is not None
         try:
             spawn_job_process(settings.BASE_DIR, self.object.pk)
         except Exception:
@@ -76,6 +83,7 @@ class GenerationJobCreateView(LoginRequiredMixin, CreateView):
         return response
 
     def get_success_url(self):
+        assert self.object is not None
         return reverse("jobs:detail", kwargs={"pk": self.object.pk})
 
     def get_context_data(self, **kwargs):
@@ -83,8 +91,11 @@ class GenerationJobCreateView(LoginRequiredMixin, CreateView):
         template_id = self.request.GET.get("template") or self.request.POST.get("template")
         template_obj = None
         if template_id:
+            # LoginRequiredMixin já garantiu autenticação antes de chegar aqui.
             template_obj = (
-                DocumentTemplate.objects.filter(pk=template_id, user=self.request.user)
+                DocumentTemplate.objects.filter(
+                    pk=template_id, user=cast("User", self.request.user)
+                )
                 .prefetch_related("fields")
                 .first()
             )
@@ -167,13 +178,16 @@ class PromotePreviewJobView(LoginRequiredMixin, View):
             return redirect("jobs:list")
 
         with preview_job.source_excel.open("rb") as source_file:
+            preview_source_name = preview_job.source_excel.name
+            # O `with` acima já abriu o arquivo com sucesso: nunca None aqui.
+            assert preview_source_name
             full_job = GenerationJob.objects.create(
                 user=preview_job.user,
                 template=preview_job.template,
                 name=f"{preview_job.name} - lote completo",
                 source_excel=ContentFile(
                     source_file.read(),
-                    name=preview_job.source_excel.name.split("/")[-1],
+                    name=preview_source_name.split("/")[-1],
                 ),
                 kind=GenerationJob.Kind.FULL,
                 status=GenerationJob.Status.QUEUED,
@@ -202,13 +216,16 @@ class RerunJobView(LoginRequiredMixin, View):
             return redirect("jobs:list")
 
         with source_job.source_excel.open("rb") as source_file:
+            rerun_source_name = source_job.source_excel.name
+            # O `with` acima já abriu o arquivo com sucesso: nunca None aqui.
+            assert rerun_source_name
             new_job = GenerationJob.objects.create(
                 user=request.user,
                 template=source_job.template,
                 name=f"{source_job.name} - reprocessado",
                 source_excel=ContentFile(
                     source_file.read(),
-                    name=source_job.source_excel.name.split("/")[-1],
+                    name=rerun_source_name.split("/")[-1],
                 ),
                 kind=source_job.kind,
                 status=GenerationJob.Status.QUEUED,
@@ -284,7 +301,7 @@ class GenerationJobStatusView(LoginRequiredMixin, View):
 class GenerationJobZipDownloadView(LoginRequiredMixin, View):
     def get(self, request, *args, **kwargs):
         job = GenerationJob.objects.filter(pk=kwargs["pk"], user=request.user).first()
-        if not job or not job.zip_file:
+        if not job or not job.zip_file.name:
             return JsonResponse({"error": "not_found"}, status=404)
         return FileResponse(
             job.zip_file.open("rb"), as_attachment=True, filename=job.zip_file.name.split("/")[-1]
@@ -294,7 +311,7 @@ class GenerationJobZipDownloadView(LoginRequiredMixin, View):
 class GenerationJobSourceExcelDownloadView(LoginRequiredMixin, View):
     def get(self, request, *args, **kwargs):
         job = GenerationJob.objects.filter(pk=kwargs["pk"], user=request.user).first()
-        if not job or not job.source_excel:
+        if not job or not job.source_excel.name:
             return JsonResponse({"error": "not_found"}, status=404)
         return FileResponse(
             job.source_excel.open("rb"),
@@ -313,7 +330,7 @@ class GenerationJobBackgroundDownloadView(LoginRequiredMixin, View):
             .select_related("template")
             .first()
         )
-        if not job or not job.template.background_pdf:
+        if not job or not job.template.background_pdf.name:
             return JsonResponse({"error": "not_found"}, status=404)
         return FileResponse(
             job.template.background_pdf.open("rb"),
@@ -329,7 +346,7 @@ class GenerationItemDownloadView(LoginRequiredMixin, View):
             .select_related("job")
             .first()
         )
-        if not item or not item.output_pdf:
+        if not item or not item.output_pdf.name:
             return JsonResponse({"error": "not_found"}, status=404)
         return FileResponse(
             item.output_pdf.open("rb"),
