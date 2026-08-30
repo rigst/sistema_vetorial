@@ -8,7 +8,7 @@ pillow==12.3.0
 fonttools==4.62.1
 
 # Conformidade legal (app `legal`): render e sanitização das políticas.
-markdown==3.10.2
+markdown==3.10.3
 nh3==0.3.6
 
 # Tema do admin.
