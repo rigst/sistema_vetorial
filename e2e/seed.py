@@ -19,10 +19,10 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 django.setup()
 
 from django.contrib.auth import get_user_model  # noqa: E402
-from django.contrib.sessions.middleware import SessionMiddleware
+from django.contrib.sessions.middleware import SessionMiddleware  # noqa: E402
 from django.core.files.uploadedfile import SimpleUploadedFile  # noqa: E402
-from django.core.management import call_command
-from django.test import RequestFactory
+from django.core.management import call_command  # noqa: E402
+from django.test import RequestFactory  # noqa: E402
 from openpyxl import Workbook  # noqa: E402
 from PIL import Image, ImageDraw  # noqa: E402
 
@@ -31,8 +31,8 @@ from editor.forms import _image_to_pdf  # noqa: E402
 from editor.models import DocumentTemplate, TemplateField  # noqa: E402
 from editor.services import update_template_pdf_metadata  # noqa: E402
 from fonts.models import FontAsset  # noqa: E402
-from legal.models import OrigemAceite
-from legal.services import documentos_vigentes, registrar_aceite
+from legal.models import OrigemAceite  # noqa: E402
+from legal.services import documentos_vigentes, registrar_aceite  # noqa: E402
 
 USERNAME = "e2e"
 PASSWORD = "e2e-senha-123"

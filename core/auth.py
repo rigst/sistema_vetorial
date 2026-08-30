@@ -79,9 +79,7 @@ def ensure_default_fonts(user) -> dict[str, int]:
         if not font_path.exists():
             continue
         source_sha256 = _file_sha256(font_path)
-        existing = FontAsset.objects.filter(
-            user=user, name=font_name, is_builtin=True
-        ).first()
+        existing = FontAsset.objects.filter(user=user, name=font_name, is_builtin=True).first()
         if existing and existing.metadata.get("builtin_sha256") == source_sha256:
             result["unchanged"] += 1
             continue
