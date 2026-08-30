@@ -13,9 +13,11 @@ def iter_file_fields(instance):
 
 
 def delete_field_file(field_file: FieldFile | None) -> None:
-    if not field_file or not getattr(field_file, "name", ""):
+    if not field_file:
+        return
+    name = field_file.name
+    if not name:
         return
     storage = field_file.storage
-    name = field_file.name
     if storage.exists(name):
         storage.delete(name)

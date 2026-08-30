@@ -2,7 +2,7 @@ import json
 import random
 from copy import deepcopy
 from tempfile import NamedTemporaryFile
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar, cast
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -22,6 +22,9 @@ from jobs.services import format_field_value, load_excel_rows, resolve_field_raw
 from .forms import DocumentTemplateForm
 from .models import DocumentTemplate, TemplateField, TemplatePreviewPage
 from .services import update_template_pdf_metadata
+
+if TYPE_CHECKING:
+    from django.contrib.auth.models import User
 
 DEFAULT_EXCEPTIONS = (
     "a, as, o, os, de, da, das, do, dos, e, em, com, para, por, na, nas, no, nos, à, às"
@@ -126,7 +129,9 @@ class DocumentTemplateListView(UserOwnedQuerysetMixin, ListView):
         context["query"] = self.request.GET.get("q", "").strip()
         context["show_inactive"] = self.request.GET.get("inativos") == "1"
         context["greeting"] = _greeting_for(timezone.localtime())
-        context["display_name"] = self.request.user.get_full_name() or self.request.user.username
+        # LoginRequiredMixin já garantiu autenticação antes de chegar aqui.
+        user = cast("User", self.request.user)
+        context["display_name"] = user.get_full_name() or user.username
         context["motivational_phrase"] = random.choice(MOTIVATIONAL_PHRASES)
         return context
 
@@ -139,6 +144,8 @@ class DocumentTemplateCreateView(LoginRequiredMixin, CreateView):
     def form_valid(self, form):
         form.instance.user = self.request.user
         response = super().form_valid(form)
+        # form_valid do Django sempre popula self.object antes de retornar.
+        assert self.object is not None
         try:
             update_template_pdf_metadata(self.object)
         except Exception:
@@ -151,6 +158,7 @@ class DocumentTemplateCreateView(LoginRequiredMixin, CreateView):
         return response
 
     def get_success_url(self):
+        assert self.object is not None
         return reverse("editor:detail", kwargs={"pk": self.object.pk})
 
 
@@ -272,14 +280,15 @@ class DocumentTemplateDuplicateView(LoginRequiredMixin, View):
             clone_slug = f"{base_slug}-{counter}"
             counter += 1
         with source.background_pdf.open("rb") as pdf_file:
+            background_name = source.background_pdf.name
+            # O `with` acima já abriu o arquivo com sucesso: nunca None aqui.
+            assert background_name
             duplicated = DocumentTemplate.objects.create(
                 user=request.user,
                 name=clone_name,
                 slug=clone_slug,
                 description=source.description,
-                background_pdf=ContentFile(
-                    pdf_file.read(), name=source.background_pdf.name.split("/")[-1]
-                ),
+                background_pdf=ContentFile(pdf_file.read(), name=background_name.split("/")[-1]),
                 page_width=source.page_width,
                 page_height=source.page_height,
                 page_count=1,

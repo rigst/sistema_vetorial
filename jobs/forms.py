@@ -1,3 +1,5 @@
+from typing import cast
+
 from django import forms
 from openpyxl import load_workbook
 
@@ -55,14 +57,14 @@ class GenerationJobForm(forms.ModelForm):
         user = kwargs.pop("user")
         template_id = kwargs.pop("template_id", None)
         super().__init__(*args, **kwargs)
-        self.fields["template"].queryset = DocumentTemplate.objects.filter(
-            user=user, is_active=True
-        ).order_by("name")
+        cast(
+            forms.ModelChoiceField, self.fields["template"]
+        ).queryset = DocumentTemplate.objects.filter(user=user, is_active=True).order_by("name")
         if template_id:
             self.fields["template"].initial = template_id
 
     def clean(self):
-        cleaned = super().clean()
+        cleaned = super().clean() or {}
         template = cleaned.get("template")
         headers = getattr(self, "_uploaded_headers", []) or []
         if template and headers:

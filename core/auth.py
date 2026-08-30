@@ -6,6 +6,7 @@ from pathlib import Path
 from django.contrib import messages
 from django.contrib.auth import logout
 from django.contrib.auth.views import LoginView
+from django.core.files import File
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
@@ -93,7 +94,7 @@ def ensure_default_fonts(user) -> dict[str, int]:
             if not existing:
                 font.is_active = True
             old_file_name = font.file.name if existing and font.file else ""
-            font.file.save(font_path.name, font_file, save=False)
+            font.file.save(font_path.name, File(font_file), save=False)
             font.metadata = {
                 **metadata,
                 "builtin": True,

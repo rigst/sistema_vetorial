@@ -1,4 +1,5 @@
 import io
+from typing import cast
 
 import pikepdf
 from django import forms
@@ -73,7 +74,7 @@ def _image_to_pdf(uploaded, base_name: str) -> ContentFile:
     uploaded.seek(0)
     original_bytes = uploaded.read()
     try:
-        image = Image.open(io.BytesIO(original_bytes))
+        image: Image.Image = Image.open(io.BytesIO(original_bytes))
         image.load()
     except Exception as exc:
         raise forms.ValidationError(
@@ -217,6 +218,6 @@ class TemplateFieldForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         user = kwargs.pop("user")
         super().__init__(*args, **kwargs)
-        self.fields["font"].queryset = FontAsset.objects.filter(user=user, is_active=True).order_by(
-            "name"
-        )
+        cast(forms.ModelChoiceField, self.fields["font"]).queryset = FontAsset.objects.filter(
+            user=user, is_active=True
+        ).order_by("name")
