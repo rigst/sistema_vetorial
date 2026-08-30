@@ -14,9 +14,8 @@ from django.db import connection
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 from openpyxl import Workbook
-from reportlab.pdfgen import canvas
-
 from PIL import Image, ImageChops
+from reportlab.pdfgen import canvas
 
 from editor.forms import DocumentTemplateForm
 from editor.models import DocumentTemplate, TemplateField

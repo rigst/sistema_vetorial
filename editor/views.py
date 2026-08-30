@@ -2,6 +2,7 @@ import json
 import random
 from copy import deepcopy
 from tempfile import NamedTemporaryFile
+from typing import ClassVar
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -91,8 +92,8 @@ def field_to_dict(field: TemplateField) -> dict:
 def _parse_json_body(request):
     try:
         return json.loads(request.body.decode("utf-8") or "{}")
-    except json.JSONDecodeError:
-        raise ValueError("Requisição inválida.")
+    except json.JSONDecodeError as exc:
+        raise ValueError("Requisição inválida.") from exc
 
 
 def _next_excel_column(template_obj: DocumentTemplate) -> int:
@@ -469,8 +470,12 @@ class TemplateFilenamePatternUpdateView(LoginRequiredMixin, View):
     """Salva as opções de nome dos PDFs gerados (card "Gerar arquivos"): o
     padrão com variáveis {N} e o que fazer com espaços do texto no nome."""
 
-    VALID_SPACE_MODES = {choice for choice, _label in DocumentTemplate.FilenameSpaceMode.choices}
-    VALID_CASE_MODES = {choice for choice, _label in DocumentTemplate.FilenameCase.choices}
+    VALID_SPACE_MODES: ClassVar[set[str]] = {
+        choice for choice, _label in DocumentTemplate.FilenameSpaceMode.choices
+    }
+    VALID_CASE_MODES: ClassVar[set[str]] = {
+        choice for choice, _label in DocumentTemplate.FilenameCase.choices
+    }
 
     def post(self, request, *args, **kwargs):
         template_obj = get_object_or_404(DocumentTemplate, pk=kwargs["pk"], user=request.user)

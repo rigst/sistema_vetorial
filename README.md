@@ -69,6 +69,14 @@ O `run.sh` migra um SQLite temporário, popula um projeto de exemplo, sobe um
 worker Celery e o runserver, roda a suíte e derruba tudo. Nada toca o banco, a
 mídia ou a fila de produção. Screenshots e relatório ficam em `e2e/.tmp/`.
 
+## Deploy contínuo
+
+Push em `main` que passar no CI é implantado sozinho em produção via
+`.github/workflows/deploy.yml` + `deploy/cd-deploy.sh` — o workflow
+reutilizável `deploy-django.yml` do `rigst/ci` dispara o script por SSH.
+Procedimento completo, geração de chave e rollback manual: RUNBOOK.md do
+`rigst/ci`, seção 7.
+
 ## Conformidade legal (LGPD / Marco Civil)
 
 O app `legal` versiona os Termos de Uso e a Política de Privacidade e registra cada aceite
