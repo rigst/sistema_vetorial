@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.contrib.admin.exceptions import NotRegistered
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin
 from unfold.admin import ModelAdmin
@@ -15,7 +16,7 @@ class UserProfileAdmin(ModelAdmin):
 
 try:
     admin.site.unregister(get_user_model())
-except admin.sites.NotRegistered:
+except NotRegistered:
     pass
 
 
