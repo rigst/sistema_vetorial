@@ -67,7 +67,7 @@ class FontAssetForm(forms.ModelForm):
             return temp.name
 
     def clean(self):
-        cleaned = super().clean()
+        cleaned = super().clean() or {}
         if not cleaned.get("name") and cleaned.get("file"):
             metadata = getattr(self, "_font_metadata", None)
             # O nome que a própria fonte declara ("DejaVu Sans Bold") é mais

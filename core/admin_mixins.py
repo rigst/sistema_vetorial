@@ -1,6 +1,17 @@
-class OwnedAdminMixin:
+from typing import TYPE_CHECKING, ClassVar
+
+from django.contrib import admin
+from django.db.models import Model
+
+if TYPE_CHECKING:
+    _Base = admin.ModelAdmin
+else:
+    _Base = object
+
+
+class OwnedAdminMixin(_Base):
     owner_field_name = "user"
-    owner_related_fields = {}
+    owner_related_fields: ClassVar[dict[str, type[Model]]] = {}
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
@@ -55,5 +66,8 @@ class OwnedAdminMixin:
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         relation = self.owner_related_fields.get(db_field.name)
         if relation and not request.user.is_superuser:
-            kwargs["queryset"] = relation.objects.filter(user=request.user)
+            # `.objects` existe em toda subclasse concreta de Model (via
+            # metaclasse do Django); o stub só sabe disso pra tipos concretos,
+            # não pro `type[Model]` genérico usado aqui.
+            kwargs["queryset"] = relation.objects.filter(user=request.user)  # type: ignore[attr-defined]
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
