@@ -9,7 +9,7 @@ fonttools==4.62.1
 
 # Conformidade legal (app `legal`): render e sanitização das políticas.
 markdown==3.10.2
-nh3==0.3.6
+nh3==0.3.7
 
 # Tema do admin.
 django-unfold==0.101.0
