@@ -10,6 +10,8 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from core.testing import SENHA_TESTE
+
 from .forms import FontAssetForm
 from .models import FontAsset
 from .services import inspect_font_file
@@ -21,7 +23,7 @@ TEST_MEDIA_ROOT = tempfile.mkdtemp(prefix="sistema_vetorial_fonts_tests_")
 class FontTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.user = get_user_model().objects.create_user(username="fonts-user", password="senha123")
+        cls.user = get_user_model().objects.create_user(username="fonts-user", password=SENHA_TESTE)
         cls.font_path = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
 
     @classmethod
@@ -137,7 +139,7 @@ class FontTests(TestCase):
         )
         url = reverse("fonts:file", kwargs={"pk": font.pk})
 
-        other = get_user_model().objects.create_user(username="outro-fontes", password="senha123")
+        other = get_user_model().objects.create_user(username="outro-fontes", password=SENHA_TESTE)
         self.client.force_login(other)
         self.assertEqual(self.client.get(url).status_code, 404)
 
@@ -155,7 +157,7 @@ class FontListPreviewTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = get_user_model().objects.create_user(
-            username="fonts-preview", password="senha123"
+            username="fonts-preview", password=SENHA_TESTE
         )
         font_path = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
         cls.font = FontAsset.objects.create(
@@ -258,7 +260,7 @@ class FontFamilyGroupingTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = get_user_model().objects.create_user(
-            username="fonts-grouping", password="senha123"
+            username="fonts-grouping", password=SENHA_TESTE
         )
 
     @classmethod
@@ -333,7 +335,7 @@ class DefaultFontsIncludeBoldTests(TestCase):
     def test_ensure_default_fonts_creates_bold_variants(self):
         from core.auth import ensure_default_fonts
 
-        user = get_user_model().objects.create_user(username="fonts-defaults", password="x")
+        user = get_user_model().objects.create_user(username="fonts-defaults", password=SENHA_TESTE)
 
         ensure_default_fonts(user)
 
