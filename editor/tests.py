@@ -13,6 +13,7 @@ from django.urls import reverse
 from PIL import Image, ImageChops, ImageDraw
 from reportlab.pdfgen import canvas
 
+from core.testing import SENHA_TESTE
 from fonts.models import FontAsset
 
 from .forms import DocumentTemplateForm, _image_to_pdf
@@ -26,7 +27,9 @@ TEST_MEDIA_ROOT = tempfile.mkdtemp(prefix="sistema_vetorial_editor_tests_")
 class EditorFlowTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.user = get_user_model().objects.create_user(username="editor-user", password="senha123")
+        cls.user = get_user_model().objects.create_user(
+            username="editor-user", password=SENHA_TESTE
+        )
         font_path = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
         cls.font = FontAsset.objects.create(
             user=cls.user,
@@ -182,7 +185,7 @@ class EditorFlowTests(TestCase):
             background_pdf=self._build_pdf_upload(),
         )
         update_template_pdf_metadata(template)
-        other_user = get_user_model().objects.create_user(username="outro", password="senha123")
+        other_user = get_user_model().objects.create_user(username="outro", password=SENHA_TESTE)
 
         self.client.force_login(other_user)
         response = self.client.get(
@@ -318,7 +321,7 @@ class ImageBackgroundTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = get_user_model().objects.create_user(
-            username="editor-imagem", password="senha123"
+            username="editor-imagem", password=SENHA_TESTE
         )
 
     def _build_image_upload(
@@ -367,7 +370,7 @@ class FieldRotationAndSampleTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = get_user_model().objects.create_user(
-            username="editor-rotacao", password="senha123"
+            username="editor-rotacao", password=SENHA_TESTE
         )
         font_path = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
         cls.font = FontAsset.objects.create(
@@ -584,7 +587,7 @@ class TemplateFilenamePatternTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = get_user_model().objects.create_user(
-            username="editor-filename", password="senha123"
+            username="editor-filename", password=SENHA_TESTE
         )
 
     @classmethod
@@ -711,7 +714,7 @@ class TemplateFilenamePatternTests(TestCase):
 
     def test_post_rejects_other_users_template(self):
         template = self._build_template()
-        other = get_user_model().objects.create_user(username="outro", password="senha123")
+        other = get_user_model().objects.create_user(username="outro", password=SENHA_TESTE)
         self.client.force_login(other)
         response = self.client.post(
             reverse("editor:filename-pattern-update", kwargs={"pk": template.pk}),
