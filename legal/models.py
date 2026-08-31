@@ -9,6 +9,7 @@ apontar para linhas que podem mudar.
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+from django.utils.safestring import mark_safe
 
 from .utils import calcular_sha256, renderizar_markdown
 
@@ -103,6 +104,16 @@ class DocumentoLegal(models.Model):
     def html_preview(self):
         """Render do rascunho, sem congelar nada — para a pré-visualização."""
         return renderizar_markdown(self.corpo_md)
+
+    @property
+    def corpo_seguro(self):
+        """`corpo_html` pronto pro template, sem precisar do filtro `|safe`.
+
+        A sanitização de verdade acontece em `publicar()`, via `nh3.clean()`
+        dentro de `renderizar_markdown()` — aqui só se afirma pro Django que o
+        resultado já é seguro, o mesmo texto que `|safe` exibiria.
+        """
+        return mark_safe(self.corpo_html)
 
     def publicar(self):
         """Congela o texto, arquiva a versão anterior e passa a valer.

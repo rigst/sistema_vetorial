@@ -17,6 +17,7 @@ from openpyxl import Workbook
 from PIL import Image, ImageChops
 from reportlab.pdfgen import canvas
 
+from core.testing import SENHA_TESTE
 from editor.forms import DocumentTemplateForm
 from editor.models import DocumentTemplate, TemplateField
 from editor.services import read_page_geometry, update_template_pdf_metadata
@@ -34,7 +35,7 @@ TEST_MEDIA_ROOT = tempfile.mkdtemp(prefix="sistema_vetorial_jobs_tests_")
 class JobTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.user = get_user_model().objects.create_user(username="jobs-user", password="senha123")
+        cls.user = get_user_model().objects.create_user(username="jobs-user", password=SENHA_TESTE)
         font_path = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
         cls.font = FontAsset.objects.create(
             user=cls.user,
@@ -302,7 +303,7 @@ class JobTests(TestCase):
     def test_launch_api_ignores_templates_of_other_users(self):
         template = self._build_template()
         other_user = get_user_model().objects.create_user(
-            username="jobs-outro", password="senha123"
+            username="jobs-outro", password=SENHA_TESTE
         )
         self.client.force_login(other_user)
 
@@ -341,7 +342,7 @@ class JobTests(TestCase):
             source_excel=self._build_excel_upload(),
         )
         other_user = get_user_model().objects.create_user(
-            username="jobs-bisbilhoteiro", password="senha123"
+            username="jobs-bisbilhoteiro", password=SENHA_TESTE
         )
         self.client.force_login(other_user)
 
@@ -393,7 +394,7 @@ class JobTests(TestCase):
             source_excel=self._build_excel_upload(),
         )
         other_user = get_user_model().objects.create_user(
-            username="jobs-bisbilhoteiro-fundo", password="senha123"
+            username="jobs-bisbilhoteiro-fundo", password=SENHA_TESTE
         )
         self.client.force_login(other_user)
 
@@ -409,7 +410,7 @@ class JobProgressVisibilityTests(TransactionTestCase):
     até o commit final."""
 
     def test_process_job_saves_progress_outside_a_transaction(self):
-        user = get_user_model().objects.create_user(username="jobs-progress", password="senha123")
+        user = get_user_model().objects.create_user(username="jobs-progress", password=SENHA_TESTE)
         font_path = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
         font = FontAsset.objects.create(
             user=user,
@@ -526,7 +527,7 @@ class OutputFidelityTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.user = get_user_model().objects.create_user(username="fidelity", password="senha123")
+        cls.user = get_user_model().objects.create_user(username="fidelity", password=SENHA_TESTE)
         font_path = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
         cls.font = FontAsset.objects.create(
             user=cls.user,
@@ -748,7 +749,7 @@ class JobDetailAndStatusWindowingTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = get_user_model().objects.create_user(
-            username="jobs-windowing", password="senha123"
+            username="jobs-windowing", password=SENHA_TESTE
         )
 
     def _template(self) -> DocumentTemplate:
@@ -887,7 +888,9 @@ class JobDetailAndStatusWindowingTests(TestCase):
 
     def test_status_endpoint_hides_other_users_jobs_even_with_filters(self):
         job = self._job_with_items(total=3)
-        other = get_user_model().objects.create_user(username="jobs-window-outro", password="x")
+        other = get_user_model().objects.create_user(
+            username="jobs-window-outro", password=SENHA_TESTE
+        )
         self.client.force_login(other)
 
         response = self.client.get(
@@ -917,7 +920,7 @@ class PortugueseCopyTests(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.user = get_user_model().objects.create_user(username="jobs-copy", password="senha123")
+        cls.user = get_user_model().objects.create_user(username="jobs-copy", password=SENHA_TESTE)
 
     @classmethod
     def tearDownClass(cls):
@@ -1066,7 +1069,7 @@ class FilenamePatternTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = get_user_model().objects.create_user(
-            username="filenames-user", password="senha123"
+            username="filenames-user", password=SENHA_TESTE
         )
         font_path = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
         cls.font = FontAsset.objects.create(
@@ -1305,7 +1308,7 @@ class WrapGrowDirectionTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.user = get_user_model().objects.create_user(username="wrap-user", password="senha123")
+        cls.user = get_user_model().objects.create_user(username="wrap-user", password=SENHA_TESTE)
         font_path = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
         cls.font = FontAsset.objects.create(
             user=cls.user,
@@ -1443,7 +1446,9 @@ class VerticalAlignTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.user = get_user_model().objects.create_user(username="valign-user", password="senha123")
+        cls.user = get_user_model().objects.create_user(
+            username="valign-user", password=SENHA_TESTE
+        )
         font_path = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
         cls.font = FontAsset.objects.create(
             user=cls.user,
@@ -1545,7 +1550,7 @@ class TextDecorationTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = get_user_model().objects.create_user(
-            username="decoration-user", password="senha123"
+            username="decoration-user", password=SENHA_TESTE
         )
         font_path = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
         cls.font = FontAsset.objects.create(
