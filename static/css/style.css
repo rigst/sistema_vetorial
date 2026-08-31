@@ -11,7 +11,10 @@
   --border-strong: rgba(28, 44, 40, 0.22);
   --text: #1c2a27;
   --text-soft: #48605a;
-  --muted: #6d817b;
+  /* Um degrau mais escuro que a intenção original (#6d817b): aquele dava
+   * 4,14:1 sobre --surface, abaixo do mínimo de 4,5:1 do WCAG AA para texto
+   * pequeno (rótulos de dt/summary, .muted). Este dá 5,47:1. */
+  --muted: #5c6d68;
   --accent: #1f7a72;
   --accent-soft: rgba(31, 122, 114, 0.1);
   --accent-2: #3d5f8c;
@@ -3106,11 +3109,15 @@ label.toolbar-button {
    Onde o app define `a { color: inherit }` num seletor com classe, estes
    precisam de força equivalente para vencer. */
 
+/* Sublinhado: dentro de texto corrido, cor sozinha não distingue link de
+ * texto comum pra quem não percebe a diferença de matiz (WCAG 1.4.1). O
+ * `.link-button` fica de fora — não está em meio a frase, é um botão. */
 .legal-corpo a,
 .legal-atalhos a,
 .legal-aviso a,
 .legal-historico a,
-.confirmacao-texto a,
+.confirmacao-texto a { color: var(--legal-accent-forte); text-decoration: underline; }
+
 .legal-page .link-button { color: var(--legal-accent-forte); }
 
 .legal-corpo a:hover,
