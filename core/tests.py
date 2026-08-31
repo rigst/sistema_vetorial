@@ -18,6 +18,7 @@ from reportlab.pdfgen import canvas
 from core.auth import ensure_default_fonts
 from core.cleanup import cleanup_expired_records
 from core.storage import PrivateMediaStorage
+from core.testing import SENHA_TESTE
 from editor.models import DocumentTemplate
 from editor.services import update_template_pdf_metadata
 from fonts.models import FontAsset
@@ -79,7 +80,7 @@ class CoreTests(TestCase):
         UserProfile.objects.filter(user=recente).update(role=UserProfile.Role.VISITOR)
 
         nao_visitante = get_user_model().objects.create_user(
-            username="editora-antiga", password="senha123"
+            username="editora-antiga", password=SENHA_TESTE
         )
         get_user_model().objects.filter(pk=nao_visitante.pk).update(
             date_joined=timezone.now() - timezone.timedelta(hours=48)
@@ -93,7 +94,7 @@ class CoreTests(TestCase):
         self.assertTrue(get_user_model().objects.filter(pk=nao_visitante.pk).exists())
 
     def test_authenticated_nav_links_to_jobs(self):
-        user = get_user_model().objects.create_user(username="nav-user", password="senha123")
+        user = get_user_model().objects.create_user(username="nav-user", password=SENHA_TESTE)
         self.client.force_login(user)
 
         response = self.client.get(reverse("editor:list"))
@@ -102,14 +103,14 @@ class CoreTests(TestCase):
         self.assertContains(response, "Arquivos")
 
     def test_ensure_default_fonts_creates_builtin_fonts(self):
-        user = get_user_model().objects.create_user(username="font-user", password="senha123")
+        user = get_user_model().objects.create_user(username="font-user", password=SENHA_TESTE)
         ensure_default_fonts(user)
         self.assertGreaterEqual(FontAsset.objects.filter(user=user, is_builtin=True).count(), 1)
 
     def test_ensure_default_fonts_bundles_inter_full_weight_range(self):
         # Cada peso e itálico é um arquivo próprio e aparece diretamente no
         # seletor de fontes, sem negrito/itálico sintético no editor.
-        user = get_user_model().objects.create_user(username="inter-user", password="senha123")
+        user = get_user_model().objects.create_user(username="inter-user", password=SENHA_TESTE)
         ensure_default_fonts(user)
         inter_fonts = FontAsset.objects.filter(user=user, family="Inter", is_builtin=True)
         weights = set(inter_fonts.filter(is_italic=False).values_list("weight", flat=True))
@@ -118,7 +119,7 @@ class CoreTests(TestCase):
         self.assertEqual(italic_weights, {100, 200, 300, 400, 500, 600, 700, 800, 900})
 
     def test_ensure_default_fonts_is_idempotent_for_inter(self):
-        user = get_user_model().objects.create_user(username="inter-repeat", password="senha123")
+        user = get_user_model().objects.create_user(username="inter-repeat", password=SENHA_TESTE)
         ensure_default_fonts(user)
         ensure_default_fonts(user)
         self.assertEqual(FontAsset.objects.filter(user=user, family="Inter").count(), 18)
@@ -128,7 +129,7 @@ class CoreTests(TestCase):
         # padrão são instâncias estáticas geradas com varLib.instancer (ver
         # core/auth.py) — confere que cada peso realmente virou um FontAsset
         # com o peso certo, não 5 cópias idênticas do 400 default.
-        user = get_user_model().objects.create_user(username="wix-user", password="senha123")
+        user = get_user_model().objects.create_user(username="wix-user", password=SENHA_TESTE)
         ensure_default_fonts(user)
         wix_fonts = FontAsset.objects.filter(
             user=user, family="Wix Madefor Display", is_builtin=True
@@ -139,8 +140,8 @@ class CoreTests(TestCase):
 
     def test_provision_default_fonts_adds_wix_to_all_users(self):
         users = [
-            get_user_model().objects.create_user(username="wix-all-1", password="senha123"),
-            get_user_model().objects.create_user(username="wix-all-2", password="senha123"),
+            get_user_model().objects.create_user(username="wix-all-1", password=SENHA_TESTE),
+            get_user_model().objects.create_user(username="wix-all-2", password=SENHA_TESTE),
         ]
         output = StringIO()
 
@@ -161,7 +162,7 @@ class CoreTests(TestCase):
         self.assertIn("2 usuário(s)", output.getvalue())
 
     def test_cleanup_expired_records_removes_old_files(self):
-        user = get_user_model().objects.create_user(username="cleanup-user", password="senha123")
+        user = get_user_model().objects.create_user(username="cleanup-user", password=SENHA_TESTE)
         font_path = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
         font = FontAsset.objects.create(
             user=user,
