@@ -162,7 +162,11 @@ class CoreTests(TestCase):
         self.assertIn("2 usuário(s)", output.getvalue())
 
     def test_cleanup_expired_records_removes_old_files(self):
+        from core.models import UserProfile
+
         user = get_user_model().objects.create_user(username="cleanup-user", password=SENHA_TESTE)
+        user.profile.role = UserProfile.Role.VISITOR
+        user.profile.save()
         font_path = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
         font = FontAsset.objects.create(
             user=user,
