@@ -43,9 +43,15 @@ def cleanup_expired_records(retention_days: int | None = None) -> dict[str, int]
     retention_days = retention_days or settings.FILE_RETENTION_DAYS
     cutoff = timezone.now() - timedelta(days=retention_days)
 
-    expired_jobs = GenerationJob.objects.filter(created_at__lt=cutoff)
-    expired_templates = DocumentTemplate.objects.filter(created_at__lt=cutoff)
-    expired_fonts = FontAsset.objects.filter(created_at__lt=cutoff)
+    # Só apaga registros de contas visitante: dados de usuários reais nunca
+    # devem ser removidos por retenção temporal.
+    visitor_users = get_user_model().objects.filter(
+        profile__role=UserProfile.Role.VISITOR
+    )
+
+    expired_jobs = GenerationJob.objects.filter(created_at__lt=cutoff, user__in=visitor_users)
+    expired_templates = DocumentTemplate.objects.filter(created_at__lt=cutoff, user__in=visitor_users)
+    expired_fonts = FontAsset.objects.filter(created_at__lt=cutoff, user__in=visitor_users)
 
     deleted_jobs = expired_jobs.count()
     expired_jobs.delete()
