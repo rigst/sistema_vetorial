@@ -161,7 +161,7 @@ class CoreTests(TestCase):
             )
         self.assertIn("2 usuário(s)", output.getvalue())
 
-    def test_cleanup_expired_records_removes_old_files(self):
+    def test_cleanup_expired_records_only_removes_generated_batches(self):
         from core.models import UserProfile
 
         user = get_user_model().objects.create_user(username="cleanup-user", password=SENHA_TESTE)
@@ -197,11 +197,26 @@ class CoreTests(TestCase):
         DocumentTemplate.objects.filter(pk=template.pk).update(created_at=old_timestamp)
         GenerationJob.objects.filter(pk=job.pk).update(created_at=old_timestamp)
 
+        template_background = template.background_pdf.name
+        font_file = font.file.name
+        job_excel = job.source_excel.name
+        storage = template.background_pdf.storage
+
         result = cleanup_expired_records(retention_days=7)
 
+        # A saída gerada some, com o arquivo junto.
         self.assertEqual(result["deleted_jobs"], 1)
-        self.assertEqual(result["deleted_templates"], 1)
-        self.assertEqual(result["deleted_fonts"], 1)
+        self.assertFalse(GenerationJob.objects.filter(pk=job.pk).exists())
+        self.assertFalse(storage.exists(job_excel))
+
+        # Os insumos ficam: template, fundo e fonte sobrevivem à retenção mesmo
+        # tendo sido criados antes do corte. Regressão: a limpeza apagava os três.
+        self.assertTrue(DocumentTemplate.objects.filter(pk=template.pk).exists())
+        self.assertTrue(FontAsset.objects.filter(pk=font.pk).exists())
+        self.assertTrue(storage.exists(template_background))
+        self.assertTrue(storage.exists(font_file))
+        self.assertNotIn("deleted_templates", result)
+        self.assertNotIn("deleted_fonts", result)
 
     def test_private_storage_has_no_public_url(self):
         storage = PrivateMediaStorage(location=TEST_MEDIA_ROOT)

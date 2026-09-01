@@ -40,6 +40,14 @@ def cleanup_expired_visitors(ttl_hours: int | None = None) -> dict[str, int]:
 
 
 def cleanup_expired_records(retention_days: int | None = None) -> dict[str, int]:
+    """Retenção temporal: apaga só o que é *saída gerada* — o lote e os PDFs/ZIP
+    que saíram dele, junto com a planilha de origem.
+
+    Os insumos reutilizáveis (templates, fundos e fontes) nunca são removidos
+    por retenção: são o trabalho da pessoa, não subproduto descartável, e
+    regerar um lote a partir deles é barato. Só somem quando a própria conta é
+    apagada — ver cleanup_visitor_data.
+    """
     retention_days = retention_days or settings.FILE_RETENTION_DAYS
     cutoff = timezone.now() - timedelta(days=retention_days)
 
@@ -48,23 +56,13 @@ def cleanup_expired_records(retention_days: int | None = None) -> dict[str, int]
     visitor_users = get_user_model().objects.filter(profile__role=UserProfile.Role.VISITOR)
 
     expired_jobs = GenerationJob.objects.filter(created_at__lt=cutoff, user__in=visitor_users)
-    expired_templates = DocumentTemplate.objects.filter(
-        created_at__lt=cutoff, user__in=visitor_users
-    )
-    expired_fonts = FontAsset.objects.filter(created_at__lt=cutoff, user__in=visitor_users)
 
     deleted_jobs = expired_jobs.count()
+    # O post_delete de core.signals limpa do storage o source_excel e o zip_file,
+    # e o cascade em GenerationItem leva junto cada output_pdf.
     expired_jobs.delete()
-
-    deleted_templates = expired_templates.count()
-    expired_templates.delete()
-
-    deleted_fonts = expired_fonts.count()
-    expired_fonts.delete()
 
     return {
         "retention_days": retention_days,
         "deleted_jobs": deleted_jobs,
-        "deleted_templates": deleted_templates,
-        "deleted_fonts": deleted_fonts,
     }
