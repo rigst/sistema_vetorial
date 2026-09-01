@@ -43,10 +43,12 @@ def cleanup_expired_records(retention_days: int | None = None) -> dict[str, int]
     """Retenção temporal: apaga só o que é *saída gerada* — o lote e os PDFs/ZIP
     que saíram dele, junto com a planilha de origem.
 
-    Os insumos reutilizáveis (templates, fundos e fontes) nunca são removidos
-    por retenção: são o trabalho da pessoa, não subproduto descartável, e
-    regerar um lote a partir deles é barato. Só somem quando a própria conta é
-    apagada — ver cleanup_visitor_data.
+    Os insumos reutilizáveis (templates, fundos, fontes e a planilha guardada
+    no projeto) nunca são removidos por retenção: são o trabalho da pessoa, não
+    subproduto descartável, e regerar um lote a partir deles é barato. A cópia
+    da planilha que morre aqui é a do lote — a do projeto fica, ver
+    jobs.services.store_source_excel_on_template. Insumo só some quando a
+    própria conta é apagada — ver cleanup_visitor_data.
     """
     retention_days = retention_days or settings.FILE_RETENTION_DAYS
     cutoff = timezone.now() - timedelta(days=retention_days)

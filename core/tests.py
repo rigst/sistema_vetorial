@@ -8,6 +8,7 @@ from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import TestCase, override_settings
@@ -197,7 +198,11 @@ class CoreTests(TestCase):
         DocumentTemplate.objects.filter(pk=template.pk).update(created_at=old_timestamp)
         GenerationJob.objects.filter(pk=job.pk).update(created_at=old_timestamp)
 
+        template.source_excel.save(
+            "dados.xlsx", ContentFile(b"planilha do projeto"), save=True
+        )
         template_background = template.background_pdf.name
+        template_excel = template.source_excel.name
         font_file = font.file.name
         job_excel = job.source_excel.name
         storage = template.background_pdf.storage
@@ -215,6 +220,8 @@ class CoreTests(TestCase):
         self.assertTrue(FontAsset.objects.filter(pk=font.pk).exists())
         self.assertTrue(storage.exists(template_background))
         self.assertTrue(storage.exists(font_file))
+        # A planilha enviada fica salva no projeto e não some com o lote.
+        self.assertTrue(storage.exists(template_excel))
         self.assertNotIn("deleted_templates", result)
         self.assertNotIn("deleted_fonts", result)
 
