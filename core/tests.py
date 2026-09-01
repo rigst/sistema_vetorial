@@ -198,9 +198,7 @@ class CoreTests(TestCase):
         DocumentTemplate.objects.filter(pk=template.pk).update(created_at=old_timestamp)
         GenerationJob.objects.filter(pk=job.pk).update(created_at=old_timestamp)
 
-        template.source_excel.save(
-            "dados.xlsx", ContentFile(b"planilha do projeto"), save=True
-        )
+        template.source_excel.save("dados.xlsx", ContentFile(b"planilha do projeto"), save=True)
         template_background = template.background_pdf.name
         template_excel = template.source_excel.name
         font_file = font.file.name
