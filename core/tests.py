@@ -255,6 +255,27 @@ class CoreTests(TestCase):
         with template.source_excel.open("rb") as arquivo:
             self.assertEqual(arquivo.read(), recente.source_excel.read())
 
+    def test_backfill_pula_projeto_sem_nenhum_lote(self):
+        user = get_user_model().objects.create_user(username="backfill-vazio", password=SENHA_TESTE)
+        template = DocumentTemplate.objects.create(
+            user=user, name="Projeto", slug="projeto", background_pdf=self._build_pdf_upload()
+        )
+
+        saida = StringIO()
+        call_command("backfill_template_excel", stdout=saida)
+
+        template.refresh_from_db()
+        self.assertFalse(template.source_excel.name)
+        self.assertIn("0 planilha(s)", saida.getvalue())
+
+    def test_comando_cleanup_expired_files_relata_o_que_apagou(self):
+        saida = StringIO()
+        call_command("cleanup_expired_files", stdout=saida)
+
+        texto = saida.getvalue()
+        self.assertIn("Lotes apagados:", texto)
+        self.assertIn("Templates, fundos e fontes foram preservados.", texto)
+
     def test_backfill_nao_mexe_em_projeto_que_ja_tem_planilha(self):
         user = get_user_model().objects.create_user(username="backfill-noop", password=SENHA_TESTE)
         template = DocumentTemplate.objects.create(
