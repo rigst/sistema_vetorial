@@ -223,6 +223,59 @@ class CoreTests(TestCase):
         self.assertNotIn("deleted_templates", result)
         self.assertNotIn("deleted_fonts", result)
 
+    def test_backfill_copia_a_planilha_do_lote_mais_recente(self):
+        user = get_user_model().objects.create_user(username="backfill-user", password=SENHA_TESTE)
+        template = DocumentTemplate.objects.create(
+            user=user, name="Projeto", slug="projeto", background_pdf=self._build_pdf_upload()
+        )
+        GenerationJob.objects.create(
+            user=user,
+            template=template,
+            name="Antigo",
+            source_excel=SimpleUploadedFile("antigo.xlsx", b"antigo"),
+        )
+        recente = GenerationJob.objects.create(
+            user=user,
+            template=template,
+            name="Recente",
+            source_excel=SimpleUploadedFile("recente.xlsx", b"recente"),
+        )
+        self.assertFalse(template.source_excel.name)
+
+        # --dry-run não grava nada.
+        call_command("backfill_template_excel", "--dry-run", stdout=StringIO())
+        template.refresh_from_db()
+        self.assertFalse(template.source_excel.name)
+
+        call_command("backfill_template_excel", stdout=StringIO())
+
+        template.refresh_from_db()
+        self.assertTrue(template.source_excel.name)
+        self.assertIn("recente", template.source_excel.name)
+        with template.source_excel.open("rb") as arquivo:
+            self.assertEqual(arquivo.read(), recente.source_excel.read())
+
+    def test_backfill_nao_mexe_em_projeto_que_ja_tem_planilha(self):
+        user = get_user_model().objects.create_user(username="backfill-noop", password=SENHA_TESTE)
+        template = DocumentTemplate.objects.create(
+            user=user, name="Projeto", slug="projeto", background_pdf=self._build_pdf_upload()
+        )
+        template.source_excel.save("ja-tenho.xlsx", ContentFile(b"original"), save=True)
+        GenerationJob.objects.create(
+            user=user,
+            template=template,
+            name="Lote",
+            source_excel=SimpleUploadedFile("outro.xlsx", b"outro"),
+        )
+        antes = template.source_excel.name
+
+        saida = StringIO()
+        call_command("backfill_template_excel", stdout=saida)
+
+        template.refresh_from_db()
+        self.assertEqual(template.source_excel.name, antes)
+        self.assertIn("0 planilha(s)", saida.getvalue())
+
     def test_private_storage_has_no_public_url(self):
         storage = PrivateMediaStorage(location=TEST_MEDIA_ROOT)
         with self.assertRaises(ValueError):
