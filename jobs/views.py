@@ -19,6 +19,7 @@ from editor.models import DocumentTemplate
 from .forms import GenerationJobForm
 from .models import GenerationItem, GenerationJob
 from .runner import spawn_job_process
+from .services import store_source_excel_on_template
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import User
@@ -71,6 +72,7 @@ class GenerationJobCreateView(LoginRequiredMixin, CreateView):
         response = super().form_valid(form)
         # form_valid do Django sempre popula self.object antes de retornar.
         assert self.object is not None
+        store_source_excel_on_template(self.object)
         try:
             spawn_job_process(settings.BASE_DIR, self.object.pk)
         except Exception:
@@ -391,6 +393,7 @@ class GenerationJobLaunchApiView(LoginRequiredMixin, View):
         job.kind = kind
         job.status = GenerationJob.Status.QUEUED
         job.save()
+        store_source_excel_on_template(job)
         try:
             spawn_job_process(settings.BASE_DIR, job.pk)
         except Exception:

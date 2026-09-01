@@ -300,6 +300,25 @@ def load_excel_rows(excel_path: str):
     return headers, data_rows
 
 
+def store_source_excel_on_template(job: GenerationJob) -> None:
+    """Guarda no projeto uma cópia da planilha enviada com o lote.
+
+    A planilha é insumo, igual ao fundo: a limpeza por retenção apaga lotes e
+    saídas geradas, mas nunca projetos — então é guardando aqui que o Excel
+    sobrevive. Fica só a última enviada; ao substituir, o pre_save de
+    core.signals apaga a anterior do storage.
+    """
+    if not job.source_excel.name:
+        return
+    template = job.template
+    with job.source_excel.open("rb") as source_file:
+        template.source_excel.save(
+            Path(job.source_excel.name).name,
+            ContentFile(source_file.read()),
+            save=True,
+        )
+
+
 def get_template_expected_headers(job: GenerationJob) -> list[str]:
     return [
         f"Coluna {column_number}"
