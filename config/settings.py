@@ -14,6 +14,20 @@ if ENV_PATH.exists():
         key, value = line.split("=", 1)
         os.environ.setdefault(key.strip(), value.strip())
 
+# O .env acima é lido em qualquer execução local, inclusive a da suíte — e ele
+# traz o SENTRY_DSN de produção. Sem esta detecção, rodar os testes na máquina
+# manda evento para o projeto Sentry real.
+#
+# Três detecções porque cada forma de rodar a suíte deixa um rastro diferente:
+# `manage.py test` põe "test" no argv; `pytest` direto vira argv[0]; e
+# `python -m pytest` (que é como o venv roda) tem argv[0] = "__main__.py" e só
+# se denuncia pelo módulo importado.
+IS_TEST = (
+    "test" in sys.argv
+    or Path(sys.argv[0]).name.startswith(("pytest", "py.test"))
+    or "pytest" in sys.modules
+)
+
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "").strip()
 
 DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
@@ -270,7 +284,7 @@ LOGGING = {
 # ==============================================================================
 
 SENTRY_DSN = os.getenv("SENTRY_DSN", "").strip()
-if SENTRY_DSN:
+if SENTRY_DSN and not IS_TEST:
     try:
         import sentry_sdk
         from django.core.exceptions import DisallowedHost

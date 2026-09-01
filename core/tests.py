@@ -297,6 +297,15 @@ class CoreTests(TestCase):
         self.assertEqual(template.source_excel.name, antes)
         self.assertIn("0 planilha(s)", saida.getvalue())
 
+    def test_sentry_nao_inicializa_durante_a_suite(self):
+        """O .env da raiz é lido em qualquer execução local e traz o SENTRY_DSN
+        de produção; sem a guarda IS_TEST, rodar os testes na máquina mandava
+        evento de verdade para o projeto do Sentry."""
+        import sentry_sdk
+
+        self.assertTrue(settings.IS_TEST)
+        self.assertFalse(sentry_sdk.get_client().is_active())
+
     def test_private_storage_has_no_public_url(self):
         storage = PrivateMediaStorage(location=TEST_MEDIA_ROOT)
         with self.assertRaises(ValueError):
