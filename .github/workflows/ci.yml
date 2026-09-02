@@ -6,6 +6,12 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Botão de reprovocação. Em 02/09/2026 um merge na main (981f2f5) não gerou
+  # evento de push: zero check-runs no commit, logo nenhum CI e — porque o CD
+  # pende de `workflow_run` — nenhum deploy. Um commit entrou na main sem
+  # validação e o servidor ficou para trás, tudo em silêncio. Sem isto a única
+  # saída é um commit vazio só para provocar o push de novo.
+  workflow_dispatch:
 
 permissions:
   contents: read
