@@ -1,5 +1,5 @@
 import json
-import random
+import secrets
 from copy import deepcopy
 from tempfile import NamedTemporaryFile
 from typing import TYPE_CHECKING, ClassVar, cast
@@ -132,7 +132,13 @@ class DocumentTemplateListView(UserOwnedQuerysetMixin, ListView):
         # LoginRequiredMixin já garantiu autenticação antes de chegar aqui.
         user = cast("User", self.request.user)
         context["display_name"] = user.get_full_name() or user.username
-        context["motivational_phrase"] = random.choice(MOTIVATIONAL_PHRASES)
+        # `secrets` e não `random`: escolher frase de vitrine não é contexto de
+        # segurança — prever o resultado não dá vantagem a ninguém —, mas o
+        # sorteio acontece uma vez por carregamento de página, então o custo do
+        # gerador criptográfico é irrelevante. Sai de graça e evita tanto o
+        # S2245 do Sonar quanto um comentário de supressão, que esconderia o
+        # dia em que um `random` de verdade importasse aparecer aqui.
+        context["motivational_phrase"] = secrets.choice(MOTIVATIONAL_PHRASES)
         return context
 
 
