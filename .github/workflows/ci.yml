@@ -105,7 +105,16 @@ jobs:
       # casava, e o bloco do Sentry (que por construção não roda em teste)
       # entrava na conta de cobertura.
       #
-      # Os quatro últimos itens alinham a lista com o que o .coveragerc já
+      # `**/*.js` e `**/*.html`: não existe cobertura de JavaScript neste
+      # projeto — os testes de navegador são Playwright, que não emitem
+      # relatório — e sem relatório o Sonar conta as 1.971 linhas executáveis
+      # de static/js/ (mais o <script> embutido nos templates) como 0%
+      # coberto. Sozinhas elas puxavam a cobertura de código novo de 86% para
+      # ~50%, e nenhum teste Python movia o ponteiro porque o denominador é
+      # dominado por elas. Medir JavaScript exigiria instrumentar o navegador;
+      # enquanto isso não existir, contá-lo como descoberto mede a coisa errada.
+      #
+      # Os quatro itens anteriores alinham a lista com o que o .coveragerc já
       # omite: celery.py, scripts/, deploy/ e e2e/. Sem esse alinhamento o
       # coverage.xml não traz dado nenhum sobre eles e o Sonar os conta como
       # 0% — são 466 linhas, todas recentes (vieram com as etapas de licenças,
@@ -118,4 +127,4 @@ jobs:
       # exclusões de migrations, testes e conftest.
       sonar-args: >-
         -Dsonar.qualitygate.wait=true
-        -Dsonar.coverage.exclusions=**/migrations/**,**/tests.py,**/tests_*.py,**/test_*.py,**/tests/**,**/conftest.py,**/settings/**,**/settings.py,**/manage.py,**/wsgi.py,**/asgi.py,**/celery.py,scripts/**,deploy/**,e2e/**
+        -Dsonar.coverage.exclusions=**/migrations/**,**/tests.py,**/tests_*.py,**/test_*.py,**/tests/**,**/conftest.py,**/settings/**,**/settings.py,**/manage.py,**/wsgi.py,**/asgi.py,**/celery.py,scripts/**,deploy/**,e2e/**,**/*.js,**/*.html
