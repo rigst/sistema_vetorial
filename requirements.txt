@@ -15,4 +15,4 @@ nh3==0.3.6
 django-unfold==0.101.0
 
 # Monitoramento de erros (ativo só com SENTRY_DSN definido)
-sentry-sdk==2.67.1
+sentry-sdk==2.68.1
