@@ -17,3 +17,15 @@ django-unfold==0.101.0
 
 # Monitoramento de erros (ativo só com SENTRY_DSN definido)
 sentry-sdk==2.68.1
+
+# O pip entra aqui como qualquer outra dependência, e não como ferramenta à
+# parte. Ele é o que o CD executa a cada deploy, e enquanto não estava
+# declarado envelhecia sem que nada avisasse: em 02/09/2026 uma auditoria dos
+# venvs de produção achou o pip como o ÚNICO pacote vulnerável do parque (um
+# deles com a 24.0 e 7 achados), justamente porque nenhum PR do Dependabot o
+# cobria. Declarado, ele cai na mesma máquina do resto — Dependabot propõe,
+# lock guarda o hash, CD instala.
+#
+# Não use `pip install --upgrade pip` no deploy: isso instalaria versão não
+# fixada, que é o que o pin e o `--require-hashes` existem para evitar.
+pip==26.2.1
