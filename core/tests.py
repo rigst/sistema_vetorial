@@ -8,6 +8,7 @@ from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import TestCase, override_settings
@@ -161,8 +162,12 @@ class CoreTests(TestCase):
             )
         self.assertIn("2 usuário(s)", output.getvalue())
 
-    def test_cleanup_expired_records_removes_old_files(self):
+    def test_cleanup_expired_records_only_removes_generated_batches(self):
+        from core.models import UserProfile
+
         user = get_user_model().objects.create_user(username="cleanup-user", password=SENHA_TESTE)
+        user.profile.role = UserProfile.Role.VISITOR
+        user.profile.save()
         font_path = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
         font = FontAsset.objects.create(
             user=user,
@@ -193,11 +198,146 @@ class CoreTests(TestCase):
         DocumentTemplate.objects.filter(pk=template.pk).update(created_at=old_timestamp)
         GenerationJob.objects.filter(pk=job.pk).update(created_at=old_timestamp)
 
+        template.source_excel.save("dados.xlsx", ContentFile(b"planilha do projeto"), save=True)
+        template_background = template.background_pdf.name
+        template_excel = template.source_excel.name
+        font_file = font.file.name
+        job_excel = job.source_excel.name
+        storage = template.background_pdf.storage
+
         result = cleanup_expired_records(retention_days=7)
 
+        # A saída gerada some, com o arquivo junto.
         self.assertEqual(result["deleted_jobs"], 1)
-        self.assertEqual(result["deleted_templates"], 1)
-        self.assertEqual(result["deleted_fonts"], 1)
+        self.assertFalse(GenerationJob.objects.filter(pk=job.pk).exists())
+        self.assertFalse(storage.exists(job_excel))
+
+        # Os insumos ficam: template, fundo e fonte sobrevivem à retenção mesmo
+        # tendo sido criados antes do corte. Regressão: a limpeza apagava os três.
+        self.assertTrue(DocumentTemplate.objects.filter(pk=template.pk).exists())
+        self.assertTrue(FontAsset.objects.filter(pk=font.pk).exists())
+        self.assertTrue(storage.exists(template_background))
+        self.assertTrue(storage.exists(font_file))
+        # A planilha enviada fica salva no projeto e não some com o lote.
+        self.assertTrue(storage.exists(template_excel))
+        self.assertNotIn("deleted_templates", result)
+        self.assertNotIn("deleted_fonts", result)
+
+    def test_backfill_copia_a_planilha_do_lote_mais_recente(self):
+        user = get_user_model().objects.create_user(username="backfill-user", password=SENHA_TESTE)
+        template = DocumentTemplate.objects.create(
+            user=user, name="Projeto", slug="projeto", background_pdf=self._build_pdf_upload()
+        )
+        GenerationJob.objects.create(
+            user=user,
+            template=template,
+            name="Antigo",
+            source_excel=SimpleUploadedFile("antigo.xlsx", b"antigo"),
+        )
+        recente = GenerationJob.objects.create(
+            user=user,
+            template=template,
+            name="Recente",
+            source_excel=SimpleUploadedFile("recente.xlsx", b"recente"),
+        )
+        self.assertFalse(template.source_excel.name)
+
+        # --dry-run não grava nada.
+        call_command("backfill_template_excel", "--dry-run", stdout=StringIO())
+        template.refresh_from_db()
+        self.assertFalse(template.source_excel.name)
+
+        call_command("backfill_template_excel", stdout=StringIO())
+
+        template.refresh_from_db()
+        self.assertTrue(template.source_excel.name)
+        self.assertIn("recente", template.source_excel.name)
+        with template.source_excel.open("rb") as arquivo:
+            self.assertEqual(arquivo.read(), recente.source_excel.read())
+
+    def test_backfill_pula_projeto_sem_nenhum_lote(self):
+        user = get_user_model().objects.create_user(username="backfill-vazio", password=SENHA_TESTE)
+        template = DocumentTemplate.objects.create(
+            user=user, name="Projeto", slug="projeto", background_pdf=self._build_pdf_upload()
+        )
+
+        saida = StringIO()
+        call_command("backfill_template_excel", stdout=saida)
+
+        template.refresh_from_db()
+        self.assertFalse(template.source_excel.name)
+        self.assertIn("0 planilha(s)", saida.getvalue())
+
+    def test_comando_cleanup_expired_files_relata_o_que_apagou(self):
+        saida = StringIO()
+        call_command("cleanup_expired_files", stdout=saida)
+
+        texto = saida.getvalue()
+        self.assertIn("Lotes apagados:", texto)
+        self.assertIn("Templates, fundos e fontes foram preservados.", texto)
+
+    def test_backfill_nao_mexe_em_projeto_que_ja_tem_planilha(self):
+        user = get_user_model().objects.create_user(username="backfill-noop", password=SENHA_TESTE)
+        template = DocumentTemplate.objects.create(
+            user=user, name="Projeto", slug="projeto", background_pdf=self._build_pdf_upload()
+        )
+        template.source_excel.save("ja-tenho.xlsx", ContentFile(b"original"), save=True)
+        GenerationJob.objects.create(
+            user=user,
+            template=template,
+            name="Lote",
+            source_excel=SimpleUploadedFile("outro.xlsx", b"outro"),
+        )
+        antes = template.source_excel.name
+
+        saida = StringIO()
+        call_command("backfill_template_excel", stdout=saida)
+
+        template.refresh_from_db()
+        self.assertEqual(template.source_excel.name, antes)
+        self.assertIn("0 planilha(s)", saida.getvalue())
+
+    def test_sentry_nao_inicializa_durante_a_suite(self):
+        """O .env da raiz é lido em qualquer execução local e traz o SENTRY_DSN
+        de produção; sem a guarda IS_TEST, rodar os testes na máquina mandava
+        evento de verdade para o projeto do Sentry."""
+        import sentry_sdk
+
+        self.assertTrue(settings.IS_TEST)
+        self.assertFalse(sentry_sdk.get_client().is_active())
+
+    def test_comando_cleanup_expired_visitors_relata_o_que_apagou(self):
+        """O comando não era exercido por teste nenhum — 8 de 8 linhas
+        descobertas, e é o que o beat chama de hora em hora."""
+        from core.models import UserProfile
+
+        antigo = get_user_model().objects.create_user(username="visita-velha")
+        antigo.profile.role = UserProfile.Role.VISITOR
+        antigo.profile.save()
+        get_user_model().objects.filter(pk=antigo.pk).update(
+            date_joined=timezone.now() - timezone.timedelta(days=30)
+        )
+
+        saida = StringIO()
+        call_command("cleanup_expired_visitors", stdout=saida)
+
+        texto = saida.getvalue()
+        self.assertIn("Visitantes excluídos: 1", texto)
+        self.assertIn("TTL:", texto)
+        self.assertFalse(get_user_model().objects.filter(pk=antigo.pk).exists())
+
+    def test_tasks_do_celery_delegam_para_a_limpeza(self):
+        """As duas tasks são o que o beat agenda; sem teste, um erro de import
+        nelas só apareceria no worker, de madrugada."""
+        from core.tasks import cleanup_expired_assets, cleanup_expired_visitor_accounts
+
+        resultado = cleanup_expired_assets()
+        self.assertIn("deleted_jobs", resultado)
+        self.assertIn("retention_days", resultado)
+
+        resultado = cleanup_expired_visitor_accounts()
+        self.assertIn("deleted_visitors", resultado)
+        self.assertIn("ttl_hours", resultado)
 
     def test_private_storage_has_no_public_url(self):
         storage = PrivateMediaStorage(location=TEST_MEDIA_ROOT)

@@ -26,7 +26,12 @@ from fonts.models import FontAsset
 from . import services
 from .forms import GenerationJobForm
 from .models import GenerationItem, GenerationJob
-from .services import _merge_overlay, format_field_value, process_job
+from .services import (
+    _merge_overlay,
+    format_field_value,
+    process_job,
+    store_source_excel_on_template,
+)
 
 TEST_MEDIA_ROOT = tempfile.mkdtemp(prefix="sistema_vetorial_jobs_tests_")
 
@@ -168,6 +173,136 @@ class JobTests(TestCase):
         self.assertEqual(response.status_code, 302)
         job.refresh_from_db()
         self.assertFalse(job.is_active)
+
+    def test_launch_api_keeps_the_excel_on_the_template(self):
+        """A planilha é insumo: fica guardada no projeto para sobreviver à
+        limpeza por retenção, que só apaga lotes."""
+        template = self._build_template()
+        self.assertFalse(template.source_excel.name)
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("jobs:launch"),
+            {
+                "template": template.pk,
+                "kind": GenerationJob.Kind.PREVIEW,
+                "name": "Lote com planilha",
+                "source_excel": self._build_excel_upload(),
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+
+        template.refresh_from_db()
+        self.assertTrue(template.source_excel.name)
+        self.assertTrue(template.source_excel.storage.exists(template.source_excel.name))
+        # Guardada sob o projeto, não sob o lote: é isso que a limpeza preserva.
+        self.assertIn(f"templates/{template.storage_slug}/excel/", template.source_excel.name)
+
+    def test_create_view_tambem_guarda_a_planilha_no_projeto(self):
+        """O CreateView é o outro caminho que sobe planilha; a API de launch
+        não passa por ele."""
+        template = self._build_template()
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("jobs:create"),
+            {
+                "name": "Lote pelo formulário",
+                "template": template.pk,
+                "source_excel": self._build_excel_upload(),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        template.refresh_from_db()
+        self.assertTrue(template.source_excel.name)
+        self.assertIn(f"templates/{template.storage_slug}/excel/", template.source_excel.name)
+
+    def test_store_source_excel_ignora_lote_sem_planilha(self):
+        template = self._build_template()
+        job = GenerationJob.objects.create(
+            user=self.user, template=template, name="Sem planilha", source_excel=""
+        )
+
+        store_source_excel_on_template(job)
+
+        template.refresh_from_db()
+        self.assertFalse(template.source_excel.name)
+
+    def _lote(self, kind=GenerationJob.Kind.PREVIEW, template=None, user=None):
+        return GenerationJob.objects.create(
+            user=user or self.user,
+            template=template or self._build_template(),
+            name="Lote",
+            source_excel=self._build_excel_upload(),
+            kind=kind,
+            status=GenerationJob.Status.COMPLETED,
+        )
+
+    def test_promover_previa_cria_o_lote_completo_com_copia_da_planilha(self):
+        """Promover e reprocessar copiam a planilha byte a byte para o lote
+        novo: reprocessar um lote antigo tem de usar os dados com que ele
+        rodou, não a planilha que estiver no projeto agora."""
+        previa = self._lote(kind=GenerationJob.Kind.PREVIEW)
+        self.client.force_login(self.user)
+
+        resposta = self.client.post(reverse("jobs:promote", kwargs={"pk": previa.pk}))
+
+        completo = GenerationJob.objects.exclude(pk=previa.pk).get()
+        self.assertRedirects(
+            resposta,
+            reverse("jobs:detail", kwargs={"pk": completo.pk}),
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(completo.kind, GenerationJob.Kind.FULL)
+        self.assertEqual(completo.template, previa.template)
+        self.assertNotEqual(completo.source_excel.name, previa.source_excel.name)
+        self.assertEqual(completo.source_excel.read(), previa.source_excel.read())
+
+    def test_promover_lote_que_nao_e_previa_nao_cria_nada(self):
+        completo = self._lote(kind=GenerationJob.Kind.FULL)
+        self.client.force_login(self.user)
+
+        resposta = self.client.post(reverse("jobs:promote", kwargs={"pk": completo.pk}))
+
+        self.assertRedirects(resposta, reverse("jobs:list"), fetch_redirect_response=False)
+        self.assertEqual(GenerationJob.objects.count(), 1)
+
+    def test_promover_previa_de_outro_usuario_nao_cria_nada(self):
+        outro = get_user_model().objects.create_user(
+            username="promove-alheio", password=SENHA_TESTE
+        )
+        alheia = self._lote(user=outro)
+        self.client.force_login(self.user)
+
+        resposta = self.client.post(reverse("jobs:promote", kwargs={"pk": alheia.pk}))
+
+        self.assertRedirects(resposta, reverse("jobs:list"), fetch_redirect_response=False)
+        self.assertEqual(GenerationJob.objects.count(), 1)
+
+    def test_reprocessar_mantem_o_tipo_e_copia_a_planilha(self):
+        original = self._lote(kind=GenerationJob.Kind.FULL)
+        self.client.force_login(self.user)
+
+        resposta = self.client.post(reverse("jobs:rerun", kwargs={"pk": original.pk}))
+
+        novo = GenerationJob.objects.exclude(pk=original.pk).get()
+        self.assertRedirects(
+            resposta, reverse("jobs:detail", kwargs={"pk": novo.pk}), fetch_redirect_response=False
+        )
+        self.assertEqual(novo.kind, GenerationJob.Kind.FULL)
+        self.assertIn("reprocessado", novo.name)
+        self.assertEqual(novo.source_excel.read(), original.source_excel.read())
+
+    def test_reprocessar_lote_de_outro_usuario_nao_cria_nada(self):
+        outro = get_user_model().objects.create_user(username="rerun-alheio", password=SENHA_TESTE)
+        alheio = self._lote(user=outro)
+        self.client.force_login(self.user)
+
+        resposta = self.client.post(reverse("jobs:rerun", kwargs={"pk": alheio.pk}))
+
+        self.assertRedirects(resposta, reverse("jobs:list"), fetch_redirect_response=False)
+        self.assertEqual(GenerationJob.objects.count(), 1)
 
     def test_launch_api_generates_preview_files(self):
         template = self._build_template()

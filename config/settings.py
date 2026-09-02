@@ -14,6 +14,20 @@ if ENV_PATH.exists():
         key, value = line.split("=", 1)
         os.environ.setdefault(key.strip(), value.strip())
 
+# O .env acima é lido em qualquer execução local, inclusive a da suíte — e ele
+# traz o SENTRY_DSN de produção. Sem esta detecção, rodar os testes na máquina
+# manda evento para o projeto Sentry real.
+#
+# Três detecções porque cada forma de rodar a suíte deixa um rastro diferente:
+# `manage.py test` põe "test" no argv; `pytest` direto vira argv[0]; e
+# `python -m pytest` (que é como o venv roda) tem argv[0] = "__main__.py" e só
+# se denuncia pelo módulo importado.
+IS_TEST = (
+    "test" in sys.argv
+    or Path(sys.argv[0]).name.startswith(("pytest", "py.test"))
+    or "pytest" in sys.modules
+)
+
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "").strip()
 
 DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
@@ -251,3 +265,42 @@ CONTENT_SECURITY_POLICY_ADMIN = (
     "base-uri 'self'; "
     "form-action 'self'"
 )
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "padrao": {"format": "{asctime} {levelname} {name} {message}", "style": "{"},
+    },
+    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "padrao"}},
+    "root": {"handlers": ["console"], "level": os.getenv("DJANGO_LOG_LEVEL", "INFO")},
+    "loggers": {
+        "django.request": {"handlers": ["console"], "level": "ERROR", "propagate": False},
+    },
+}
+
+# ==============================================================================
+# Monitoramento de erros (Sentry) — ativo só quando SENTRY_DSN está definido.
+# ==============================================================================
+
+SENTRY_DSN = os.getenv("SENTRY_DSN", "").strip()
+if SENTRY_DSN and not IS_TEST:
+    try:
+        import sentry_sdk
+        from django.core.exceptions import DisallowedHost
+        from sentry_sdk.integrations.celery import CeleryIntegration
+        from sentry_sdk.integrations.django import DjangoIntegration
+
+        sentry_sdk.init(
+            dsn=SENTRY_DSN,
+            integrations=[DjangoIntegration(), CeleryIntegration()],
+            environment=os.getenv("SENTRY_ENVIRONMENT", "production"),
+            release=os.getenv("SENTRY_RELEASE") or None,
+            traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.0")),
+            send_default_pii=False,
+            ignore_errors=[DisallowedHost],
+        )
+    except Exception:
+        # Pacote ausente ou integração indisponível (ex.: Celery não instalado):
+        # seguimos sem monitoramento, sem quebrar o app.
+        pass
