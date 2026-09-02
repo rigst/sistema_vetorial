@@ -306,6 +306,39 @@ class CoreTests(TestCase):
         self.assertTrue(settings.IS_TEST)
         self.assertFalse(sentry_sdk.get_client().is_active())
 
+    def test_comando_cleanup_expired_visitors_relata_o_que_apagou(self):
+        """O comando não era exercido por teste nenhum — 8 de 8 linhas
+        descobertas, e é o que o beat chama de hora em hora."""
+        from core.models import UserProfile
+
+        antigo = get_user_model().objects.create_user(username="visita-velha")
+        antigo.profile.role = UserProfile.Role.VISITOR
+        antigo.profile.save()
+        get_user_model().objects.filter(pk=antigo.pk).update(
+            date_joined=timezone.now() - timezone.timedelta(days=30)
+        )
+
+        saida = StringIO()
+        call_command("cleanup_expired_visitors", stdout=saida)
+
+        texto = saida.getvalue()
+        self.assertIn("Visitantes excluídos: 1", texto)
+        self.assertIn("TTL:", texto)
+        self.assertFalse(get_user_model().objects.filter(pk=antigo.pk).exists())
+
+    def test_tasks_do_celery_delegam_para_a_limpeza(self):
+        """As duas tasks são o que o beat agenda; sem teste, um erro de import
+        nelas só apareceria no worker, de madrugada."""
+        from core.tasks import cleanup_expired_assets, cleanup_expired_visitor_accounts
+
+        resultado = cleanup_expired_assets()
+        self.assertIn("deleted_jobs", resultado)
+        self.assertIn("retention_days", resultado)
+
+        resultado = cleanup_expired_visitor_accounts()
+        self.assertIn("deleted_visitors", resultado)
+        self.assertIn("ttl_hours", resultado)
+
     def test_private_storage_has_no_public_url(self):
         storage = PrivateMediaStorage(location=TEST_MEDIA_ROOT)
         with self.assertRaises(ValueError):

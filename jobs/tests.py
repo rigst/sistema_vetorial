@@ -229,6 +229,81 @@ class JobTests(TestCase):
         template.refresh_from_db()
         self.assertFalse(template.source_excel.name)
 
+    def _lote(self, kind=GenerationJob.Kind.PREVIEW, template=None, user=None):
+        return GenerationJob.objects.create(
+            user=user or self.user,
+            template=template or self._build_template(),
+            name="Lote",
+            source_excel=self._build_excel_upload(),
+            kind=kind,
+            status=GenerationJob.Status.COMPLETED,
+        )
+
+    def test_promover_previa_cria_o_lote_completo_com_copia_da_planilha(self):
+        """Promover e reprocessar copiam a planilha byte a byte para o lote
+        novo: reprocessar um lote antigo tem de usar os dados com que ele
+        rodou, não a planilha que estiver no projeto agora."""
+        previa = self._lote(kind=GenerationJob.Kind.PREVIEW)
+        self.client.force_login(self.user)
+
+        resposta = self.client.post(reverse("jobs:promote", kwargs={"pk": previa.pk}))
+
+        completo = GenerationJob.objects.exclude(pk=previa.pk).get()
+        self.assertRedirects(
+            resposta,
+            reverse("jobs:detail", kwargs={"pk": completo.pk}),
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(completo.kind, GenerationJob.Kind.FULL)
+        self.assertEqual(completo.template, previa.template)
+        self.assertNotEqual(completo.source_excel.name, previa.source_excel.name)
+        self.assertEqual(completo.source_excel.read(), previa.source_excel.read())
+
+    def test_promover_lote_que_nao_e_previa_nao_cria_nada(self):
+        completo = self._lote(kind=GenerationJob.Kind.FULL)
+        self.client.force_login(self.user)
+
+        resposta = self.client.post(reverse("jobs:promote", kwargs={"pk": completo.pk}))
+
+        self.assertRedirects(resposta, reverse("jobs:list"), fetch_redirect_response=False)
+        self.assertEqual(GenerationJob.objects.count(), 1)
+
+    def test_promover_previa_de_outro_usuario_nao_cria_nada(self):
+        outro = get_user_model().objects.create_user(
+            username="promove-alheio", password=SENHA_TESTE
+        )
+        alheia = self._lote(user=outro)
+        self.client.force_login(self.user)
+
+        resposta = self.client.post(reverse("jobs:promote", kwargs={"pk": alheia.pk}))
+
+        self.assertRedirects(resposta, reverse("jobs:list"), fetch_redirect_response=False)
+        self.assertEqual(GenerationJob.objects.count(), 1)
+
+    def test_reprocessar_mantem_o_tipo_e_copia_a_planilha(self):
+        original = self._lote(kind=GenerationJob.Kind.FULL)
+        self.client.force_login(self.user)
+
+        resposta = self.client.post(reverse("jobs:rerun", kwargs={"pk": original.pk}))
+
+        novo = GenerationJob.objects.exclude(pk=original.pk).get()
+        self.assertRedirects(
+            resposta, reverse("jobs:detail", kwargs={"pk": novo.pk}), fetch_redirect_response=False
+        )
+        self.assertEqual(novo.kind, GenerationJob.Kind.FULL)
+        self.assertIn("reprocessado", novo.name)
+        self.assertEqual(novo.source_excel.read(), original.source_excel.read())
+
+    def test_reprocessar_lote_de_outro_usuario_nao_cria_nada(self):
+        outro = get_user_model().objects.create_user(username="rerun-alheio", password=SENHA_TESTE)
+        alheio = self._lote(user=outro)
+        self.client.force_login(self.user)
+
+        resposta = self.client.post(reverse("jobs:rerun", kwargs={"pk": alheio.pk}))
+
+        self.assertRedirects(resposta, reverse("jobs:list"), fetch_redirect_response=False)
+        self.assertEqual(GenerationJob.objects.count(), 1)
+
     def test_launch_api_generates_preview_files(self):
         template = self._build_template()
         self.client.force_login(self.user)
