@@ -105,9 +105,17 @@ jobs:
       # casava, e o bloco do Sentry (que por construção não roda em teste)
       # entrava na conta de cobertura.
       #
+      # Os quatro últimos itens alinham a lista com o que o .coveragerc já
+      # omite: celery.py, scripts/, deploy/ e e2e/. Sem esse alinhamento o
+      # coverage.xml não traz dado nenhum sobre eles e o Sonar os conta como
+      # 0% — são 466 linhas, todas recentes (vieram com as etapas de licenças,
+      # e2e e o trabalho do nginx), e sozinhas puxavam o "código novo" de ~80%
+      # para 49%. Arquivo fora da medição não pode contar como descoberto.
+      # questoes e financas já traziam scripts/ e deploy/ por esse motivo.
+      #
       # A lista vem repetida por inteiro de propósito: propriedade repetida no
       # scanner é substituída, não somada — passar só o item novo apagaria as
       # exclusões de migrations, testes e conftest.
       sonar-args: >-
         -Dsonar.qualitygate.wait=true
-        -Dsonar.coverage.exclusions=**/migrations/**,**/tests.py,**/tests_*.py,**/test_*.py,**/tests/**,**/conftest.py,**/settings/**,**/settings.py,**/manage.py,**/wsgi.py,**/asgi.py
+        -Dsonar.coverage.exclusions=**/migrations/**,**/tests.py,**/tests_*.py,**/test_*.py,**/tests/**,**/conftest.py,**/settings/**,**/settings.py,**/manage.py,**/wsgi.py,**/asgi.py,**/celery.py,scripts/**,deploy/**,e2e/**
