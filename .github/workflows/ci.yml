@@ -98,4 +98,16 @@ jobs:
       sonar-organization: rigst
       # `qualitygate.wait`: sem isto o job termina verde assim que envia a
       # análise, e o gate reprovando não aparece no CI.
-      sonar-args: -Dsonar.qualitygate.wait=true
+      #
+      # `sonar.coverage.exclusions` acrescenta `**/settings.py` à lista do
+      # pipeline compartilhado, que só traz `**/settings/**` — a forma de
+      # pacote. Este projeto tem settings em arquivo único, então o glob não
+      # casava, e o bloco do Sentry (que por construção não roda em teste)
+      # entrava na conta de cobertura.
+      #
+      # A lista vem repetida por inteiro de propósito: propriedade repetida no
+      # scanner é substituída, não somada — passar só o item novo apagaria as
+      # exclusões de migrations, testes e conftest.
+      sonar-args: >-
+        -Dsonar.qualitygate.wait=true
+        -Dsonar.coverage.exclusions=**/migrations/**,**/tests.py,**/tests_*.py,**/test_*.py,**/tests/**,**/conftest.py,**/settings/**,**/settings.py,**/manage.py,**/wsgi.py,**/asgi.py
