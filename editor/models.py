@@ -12,6 +12,10 @@ def preview_upload_to(instance: "DocumentTemplate", filename: str) -> str:
     return f"users/{instance.user_id}/templates/{instance.storage_slug}/preview/{filename}"
 
 
+def excel_upload_to(instance: "DocumentTemplate", filename: str) -> str:
+    return f"users/{instance.user_id}/templates/{instance.storage_slug}/excel/{filename}"
+
+
 def preview_page_upload_to(instance: "TemplatePreviewPage", filename: str) -> str:
     return f"users/{instance.template.user_id}/templates/{instance.template.storage_slug}/preview_pages/{filename}"
 
@@ -32,6 +36,11 @@ class DocumentTemplate(OwnedModel):
     description = models.TextField(blank=True)
     background_pdf = models.FileField(upload_to=background_upload_to)
     preview_image = models.ImageField(upload_to=preview_upload_to, blank=True)
+    # Última planilha enviada para este projeto. É insumo, não saída: fica
+    # guardada aqui para sobreviver à limpeza por retenção, que só apaga
+    # lotes (ver core.cleanup.cleanup_expired_records). O lote continua com
+    # a própria cópia, porque cada um precisa dos dados exatos com que rodou.
+    source_excel = models.FileField(upload_to=excel_upload_to, blank=True)
     page_width = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     page_height = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     page_count = models.PositiveIntegerField(default=1)

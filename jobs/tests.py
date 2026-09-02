@@ -26,7 +26,12 @@ from fonts.models import FontAsset
 from . import services
 from .forms import GenerationJobForm
 from .models import GenerationItem, GenerationJob
-from .services import _merge_overlay, format_field_value, process_job
+from .services import (
+    _merge_overlay,
+    format_field_value,
+    process_job,
+    store_source_excel_on_template,
+)
 
 TEST_MEDIA_ROOT = tempfile.mkdtemp(prefix="sistema_vetorial_jobs_tests_")
 
@@ -168,6 +173,61 @@ class JobTests(TestCase):
         self.assertEqual(response.status_code, 302)
         job.refresh_from_db()
         self.assertFalse(job.is_active)
+
+    def test_launch_api_keeps_the_excel_on_the_template(self):
+        """A planilha é insumo: fica guardada no projeto para sobreviver à
+        limpeza por retenção, que só apaga lotes."""
+        template = self._build_template()
+        self.assertFalse(template.source_excel.name)
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("jobs:launch"),
+            {
+                "template": template.pk,
+                "kind": GenerationJob.Kind.PREVIEW,
+                "name": "Lote com planilha",
+                "source_excel": self._build_excel_upload(),
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+
+        template.refresh_from_db()
+        self.assertTrue(template.source_excel.name)
+        self.assertTrue(template.source_excel.storage.exists(template.source_excel.name))
+        # Guardada sob o projeto, não sob o lote: é isso que a limpeza preserva.
+        self.assertIn(f"templates/{template.storage_slug}/excel/", template.source_excel.name)
+
+    def test_create_view_tambem_guarda_a_planilha_no_projeto(self):
+        """O CreateView é o outro caminho que sobe planilha; a API de launch
+        não passa por ele."""
+        template = self._build_template()
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("jobs:create"),
+            {
+                "name": "Lote pelo formulário",
+                "template": template.pk,
+                "source_excel": self._build_excel_upload(),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        template.refresh_from_db()
+        self.assertTrue(template.source_excel.name)
+        self.assertIn(f"templates/{template.storage_slug}/excel/", template.source_excel.name)
+
+    def test_store_source_excel_ignora_lote_sem_planilha(self):
+        template = self._build_template()
+        job = GenerationJob.objects.create(
+            user=self.user, template=template, name="Sem planilha", source_excel=""
+        )
+
+        store_source_excel_on_template(job)
+
+        template.refresh_from_db()
+        self.assertFalse(template.source_excel.name)
 
     def test_launch_api_generates_preview_files(self):
         template = self._build_template()
