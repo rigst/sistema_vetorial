@@ -10,6 +10,7 @@ from django.core.files import File
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from fonts.models import FontAsset
 
@@ -148,6 +149,11 @@ class UsuarioLoginView(LoginView):
         return response
 
 
+# Só POST: sair é ação com efeito — encerra a sessão e, no caso do visitante,
+# apaga os dados temporários do acesso. Por GET, qualquer `<img src=/logout/>`
+# em página de terceiro deslogaria quem passasse por ela. Os dois pontos de
+# chamada (base.html e legal/reaceite.html) já são formulários POST.
+@require_POST
 def logout_and_cleanup(request):
     user = request.user if request.user.is_authenticated else None
     was_visitor = bool(
