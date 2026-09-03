@@ -157,7 +157,7 @@
         paginação enquanto a página já está aberta. O JS decide a visibilidade
         a cada resposta do polling — sem isso, só um F5 revelaria a página 2.
         {% endcomment %}
-        <div class="job-items-pagination" id="job-items-pagination" {% if page_obj.paginator.num_pages <= 1 %}hidden{% endif %}>
+        <div class="job-items-pagination" id="job-items-pagination" {% if not page_obj.has_other_pages %}hidden{% endif %}>
             <a class="button button-secondary" id="job-items-prev"
                href="?{% if estado %}estado={{ estado }}&{% endif %}page={{ prev_page }}"
                {% if not page_obj.has_previous %}hidden{% endif %}>Anterior</a>
@@ -284,7 +284,7 @@
     if (chipPending) chipPending.textContent = data.pending_rows;
     if (itemsBody) renderItems(data.items);
 
-    if (pagination) pagination.hidden = data.items_num_pages <= 1;
+    if (pagination) pagination.hidden = !(data.items_num_pages > 1);
     if (pageLabel) pageLabel.textContent = `Página ${data.items_page} de ${data.items_num_pages}`;
     if (prevLink) {
       prevLink.hidden = !data.items_has_previous;
