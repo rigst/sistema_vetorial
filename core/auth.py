@@ -12,7 +12,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from fonts.models import FontAsset
+from fonts.models import FontAsset, font_upload_to
 
 from .cleanup import cleanup_visitor_data
 from .models import UserProfile
@@ -95,6 +95,18 @@ def ensure_default_fonts(user) -> dict[str, int]:
             if not existing:
                 font.is_active = True
             old_file_name = font.file.name if existing and font.file else ""
+            # O storage sufixa o nome quando o destino já existe
+            # (Inter-Regular_a1b2c3d.ttf). Como a builtin é sempre a mesma
+            # fonte no mesmo caminho, esse sufixo só produzia uma cópia nova a
+            # cada regravação, e a antiga virava órfã sempre que o delete lá
+            # embaixo falhava. Liberar o destino antes faz a gravação reusar o
+            # nome determinístico e manter uma cópia por fonte/usuário.
+            target_name = font_upload_to(font, font_path.name)
+            if font.file.storage.exists(target_name):
+                try:
+                    font.file.storage.delete(target_name)
+                except PermissionError:
+                    pass
             font.file.save(font_path.name, File(font_file), save=False)
             font.metadata = {
                 **metadata,
