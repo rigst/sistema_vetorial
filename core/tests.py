@@ -171,6 +171,33 @@ class CoreTests(TestCase):
             ):
                 self.assertTrue((media_root / nome).exists(), f"referência quebrada: {nome}")
 
+    def test_ensure_default_fonts_sobrevive_a_delete_sem_permissao(self):
+        # O diretório da mídia é compartilhado entre o www-data do web e o
+        # usuário do deploy, então liberar o destino pode esbarrar em
+        # permissão. Nesse caso o provisionamento tem que seguir — cai no
+        # comportamento antigo, com nome sufixado, em vez de estourar no meio
+        # do login e deixar o usuário sem fonte nenhuma.
+        media_root = Path(tempfile.mkdtemp(prefix="sistema_vetorial_perm_"))
+        self.addCleanup(shutil.rmtree, media_root, ignore_errors=True)
+        campo = FontAsset._meta.get_field("file")
+        storage = PrivateMediaStorage(location=str(media_root))
+
+        user = get_user_model().objects.create_user(username="perm-user", password=SENHA_TESTE)
+        with mock.patch.object(campo, "storage", storage):
+            ensure_default_fonts(user)
+            FontAsset.objects.filter(user=user, is_builtin=True).update(
+                metadata={"builtin_sha256": "nao-confere"}
+            )
+
+            with mock.patch.object(storage, "delete", side_effect=PermissionError):
+                resultado = ensure_default_fonts(user)
+
+            self.assertEqual(resultado["updated"], 29)
+            for nome in FontAsset.objects.filter(user=user, is_builtin=True).values_list(
+                "file", flat=True
+            ):
+                self.assertTrue((media_root / nome).exists(), f"referência quebrada: {nome}")
+
     def test_ensure_default_fonts_bundles_wix_madefor_display(self):
         # Só existe como fonte variável no Google Fonts; os 5 arquivos
         # padrão são instâncias estáticas geradas com varLib.instancer (ver
