@@ -5,6 +5,7 @@ import shutil
 import tempfile
 from io import StringIO
 from pathlib import Path
+from unittest import mock
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -124,6 +125,78 @@ class CoreTests(TestCase):
         ensure_default_fonts(user)
         ensure_default_fonts(user)
         self.assertEqual(FontAsset.objects.filter(user=user, family="Inter").count(), 18)
+
+    def test_ensure_default_fonts_reusa_o_nome_a_cada_regravacao(self):
+        # Regressão: o storage sufixa o nome quando o destino já existe
+        # (DejaVuSans_6vH6Qcs.ttf), então cada regravação criava um arquivo
+        # novo e dependia de apagar o anterior para não deixar lixo. Onde esse
+        # delete falha — o `except PermissionError` de core/auth.py, entre o
+        # www-data do web e o usuário do deploy — a cópia velha fica órfã, e
+        # foi assim que a mídia privada juntou centenas de cópias das mesmas
+        # fontes. O teste de idempotência acima não pega isso porque só conta
+        # linhas no banco, que continuam 29.
+        #
+        # Storage próprio: MEDIA_ROOT é sobrescrito pela classe, mas o
+        # `location` do storage é congelado na importação (ver
+        # config/settings.py), e o diretório da classe é compartilhado pelos
+        # outros testes — que já deixam builtin-1-*.ttf lá e mascarariam o
+        # sufixo que este teste quer observar.
+        media_root = Path(tempfile.mkdtemp(prefix="sistema_vetorial_orfas_"))
+        self.addCleanup(shutil.rmtree, media_root, ignore_errors=True)
+        campo = FontAsset._meta.get_field("file")
+
+        user = get_user_model().objects.create_user(username="orfa-user", password=SENHA_TESTE)
+        with mock.patch.object(campo, "storage", PrivateMediaStorage(location=str(media_root))):
+            ensure_default_fonts(user)
+            apos_primeira = sorted(p.name for p in media_root.glob(f"builtin-{user.pk}-*"))
+            self.assertTrue(apos_primeira)
+            for nome in apos_primeira:
+                self.assertNotRegex(nome, r"_[A-Za-z0-9]{7}\.ttf$")
+
+            # Invalida o sha gravado para forçar o caminho de regravação, e
+            # confere a cada rodada: sem nome determinístico o nome alterna
+            # entre limpo e sufixado, então checar só no fim de um número par
+            # de regravações passaria por acidente de paridade.
+            for rodada in range(3):
+                FontAsset.objects.filter(user=user, is_builtin=True).update(
+                    metadata={"builtin_sha256": "nao-confere"}
+                )
+                ensure_default_fonts(user)
+                agora = sorted(p.name for p in media_root.glob(f"builtin-{user.pk}-*"))
+                self.assertEqual(agora, apos_primeira, f"nome mudou na rodada {rodada}")
+
+            # E o banco continua apontando para arquivo que existe.
+            for nome in FontAsset.objects.filter(user=user, is_builtin=True).values_list(
+                "file", flat=True
+            ):
+                self.assertTrue((media_root / nome).exists(), f"referência quebrada: {nome}")
+
+    def test_ensure_default_fonts_sobrevive_a_delete_sem_permissao(self):
+        # O diretório da mídia é compartilhado entre o www-data do web e o
+        # usuário do deploy, então liberar o destino pode esbarrar em
+        # permissão. Nesse caso o provisionamento tem que seguir — cai no
+        # comportamento antigo, com nome sufixado, em vez de estourar no meio
+        # do login e deixar o usuário sem fonte nenhuma.
+        media_root = Path(tempfile.mkdtemp(prefix="sistema_vetorial_perm_"))
+        self.addCleanup(shutil.rmtree, media_root, ignore_errors=True)
+        campo = FontAsset._meta.get_field("file")
+        storage = PrivateMediaStorage(location=str(media_root))
+
+        user = get_user_model().objects.create_user(username="perm-user", password=SENHA_TESTE)
+        with mock.patch.object(campo, "storage", storage):
+            ensure_default_fonts(user)
+            FontAsset.objects.filter(user=user, is_builtin=True).update(
+                metadata={"builtin_sha256": "nao-confere"}
+            )
+
+            with mock.patch.object(storage, "delete", side_effect=PermissionError):
+                resultado = ensure_default_fonts(user)
+
+            self.assertEqual(resultado["updated"], 29)
+            for nome in FontAsset.objects.filter(user=user, is_builtin=True).values_list(
+                "file", flat=True
+            ):
+                self.assertTrue((media_root / nome).exists(), f"referência quebrada: {nome}")
 
     def test_ensure_default_fonts_bundles_wix_madefor_display(self):
         # Só existe como fonte variável no Google Fonts; os 5 arquivos
