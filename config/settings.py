@@ -140,11 +140,17 @@ MEDIA_ROOT = Path(
     os.environ.get("DJANGO_MEDIA_ROOT", "/var/www/sistema_vetorial/shared/private_media")
 )
 
-# `"test" in sys.argv` sozinho só pega `manage.py test`: sob pytest o argv é
-# `.../pytest`, a guarda não fecha e a suíte grava direto na mídia de
-# produção. `pytest` em sys.modules é o sinal confiável — o pytest-django
-# importa os settings depois que o pytest já está carregado.
-EXECUTANDO_TESTES = "test" in sys.argv or "pytest" in sys.modules
+# `"test" in sys.argv` sozinho só pega `manage.py test`, e sob pytest a
+# guarda não fechava: a suíte gravava direto na mídia de produção. As duas
+# primeiras condições são o mesmo idioma dos outros projetos (arq, finanças,
+# orçamentos); a terceira cobre `python -m pytest`, onde o argv[0] é o
+# `__main__.py` do pacote e o prefixo não bate. O pytest-django importa os
+# settings depois que o pytest já está em sys.modules.
+EXECUTANDO_TESTES = (
+    "test" in sys.argv
+    or Path(sys.argv[0]).name.startswith(("pytest", "py.test"))
+    or "pytest" in sys.modules
+)
 
 if EXECUTANDO_TESTES:
     # A suíte grava fontes e PDFs de verdade. Apontando para a mídia de
