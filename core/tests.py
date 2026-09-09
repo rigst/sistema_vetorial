@@ -198,6 +198,15 @@ class CoreTests(TestCase):
             ):
                 self.assertTrue((media_root / nome).exists(), f"referência quebrada: {nome}")
 
+    def test_a_suite_nao_grava_na_midia_de_producao(self):
+        # A guarda em config/settings.py era `"test" in sys.argv`, que fecha
+        # para `manage.py test` mas não para o pytest — e aí a suíte gravava
+        # fontes de verdade em /var/www/.../private_media, com os nomes
+        # sufixados que ninguém mais ia limpar. Foi assim que a mídia do
+        # vetorial juntou centenas de arquivos órfãos.
+        storage = FontAsset._meta.get_field("file").storage
+        self.assertIn("vetorial-test-media-", storage.location)
+
     def test_ensure_default_fonts_bundles_wix_madefor_display(self):
         # Só existe como fonte variável no Google Fonts; os 5 arquivos
         # padrão são instâncias estáticas geradas com varLib.instancer (ver
