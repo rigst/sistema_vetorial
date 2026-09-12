@@ -1,4 +1,16 @@
 Django==6.0.8
+
+# Driver do banco. Produção roda com DB_ENGINE=django.db.backends.postgresql
+# (shared/.env), e por muito tempo o psycopg existiu só no venv do servidor,
+# instalado à mão e fora deste arquivo. Não quebrava o deploy — o cd-deploy
+# instala por cima do venv existente, sem remover nada —, mas um venv
+# reconstruído do zero subia um app incapaz de falar com o banco, e o lock,
+# que existe para descrever produção, descrevia outra coisa.
+#
+# O extra [binary] traz o psycopg-binary, que é o que dispensa libpq e
+# compilador no runner e no servidor.
+psycopg[binary]==3.3.3
+
 celery==5.6.3
 gunicorn==25.3.0
 redis==7.4.0
