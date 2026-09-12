@@ -18,7 +18,7 @@ openpyxl==3.1.5
 reportlab==4.4.10
 pikepdf==10.5.1
 pillow==12.3.0
-fonttools==4.62.1
+fonttools==4.64.0
 
 # Conformidade legal (app `legal`): render e sanitização das políticas.
 markdown==3.10.2
