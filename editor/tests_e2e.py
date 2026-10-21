@@ -122,8 +122,16 @@ def template_com_campo(usuario_e2e, tmp_path):
     )
     update_template_pdf_metadata(template)
     TemplateField.objects.create(
-        template=template, name="Nome", excel_column="1",
-        x=20, y=40, width=200, height=24, font=font, font_size=18, order_index=1,
+        template=template,
+        name="Nome",
+        excel_column="1",
+        x=20,
+        y=40,
+        width=200,
+        height=24,
+        font=font,
+        font_size=18,
+        order_index=1,
     )
     return template
 
@@ -132,7 +140,9 @@ def _abrir_editor(page, live_server, usuario_e2e, template):
     _logar(page, live_server, usuario_e2e)
     page.wait_for_url(f"{live_server.url}/templates/")
     page.goto(f"{live_server.url}/templates/{template.pk}/")
-    page.wait_for_function("() => window.__vetorialEditor && window.__vetorialEditor.fields.length > 0")
+    page.wait_for_function(
+        "() => window.__vetorialEditor && window.__vetorialEditor.fields.length > 0"
+    )
 
 
 def _selecionar_campo(page, nome):
@@ -157,7 +167,9 @@ def _servidor_recusa(page, metodo):
 
     def _rota(rota):
         if rota.request.method == metodo:
-            rota.fulfill(status=500, content_type="application/json", body='{"error": "falha simulada"}')
+            rota.fulfill(
+                status=500, content_type="application/json", body='{"error": "falha simulada"}'
+            )
         else:
             rota.continue_()
 
