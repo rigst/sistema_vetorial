@@ -20,9 +20,9 @@
   const rgba = (hex, alpha) => {
     const safeAlpha = clamp(Number(alpha ?? 1), 0, 1);
     if (typeof hex === "string" && hex.startsWith("#") && hex.length === 7) {
-      const r = parseInt(hex.slice(1, 3), 16);
-      const g = parseInt(hex.slice(3, 5), 16);
-      const b = parseInt(hex.slice(5, 7), 16);
+      const r = Number.parseInt(hex.slice(1, 3), 16);
+      const g = Number.parseInt(hex.slice(3, 5), 16);
+      const b = Number.parseInt(hex.slice(5, 7), 16);
       return `rgba(${r}, ${g}, ${b}, ${safeAlpha})`;
     }
     return hex;
@@ -62,7 +62,13 @@
   function init(config) {
     const canvasEl = document.getElementById(config.canvasId || "editor-canvas");
     if (!canvasEl || typeof fabric === "undefined") return;
-    bootstrap(config, canvasEl);
+    // Uma falha fora dos try/catch internos deixaria o editor parado sem
+    // aviso nenhum: aqui ela vira mensagem na barra de status.
+    bootstrap(config, canvasEl).catch((err) => {
+      console.error("Falha ao iniciar o editor de template.", err);
+      const statusText = document.getElementById("editor-status-text");
+      if (statusText) statusText.textContent = "Não foi possível carregar o editor. Recarregue a página.";
+    });
   }
 
   async function bootstrap(config, canvasEl) {
@@ -712,6 +718,8 @@
       return response.json();
     };
 
+    // flushSaves, saveAll, duplicateSelected e deleteSelected tratam as próprias
+    // falhas (setSaveState/setStatus); as chamadas sem espera usam `void`.
     const flushSaves = async () => {
       if (readOnly || !pendingSaves.size) return;
       const batch = [...pendingSaves.entries()];
@@ -767,7 +775,7 @@
 
     window.addEventListener("beforeunload", (event) => {
       if (pendingSaves.size || inflightSaves > 0) {
-        flushSaves();
+        void flushSaves();
         event.preventDefault();
         event.returnValue = "";
       }
@@ -1478,17 +1486,17 @@
         }
         if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
           event.preventDefault();
-          saveAll();
+          void saveAll();
           return;
         }
         if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "d") {
           event.preventDefault();
-          duplicateSelected();
+          void duplicateSelected();
           return;
         }
         if (event.key === "Delete") {
           event.preventDefault();
-          deleteSelected();
+          void deleteSelected();
           return;
         }
         if (event.key === "Escape") {

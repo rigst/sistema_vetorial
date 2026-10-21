@@ -151,6 +151,9 @@
       show(resultBox, total > 0 || Boolean(data.zip_url));
     };
 
+    // As funções async deste arquivo (poll, save*, readFirstRowFromFile) tratam
+    // as próprias falhas com try/catch e mensagem na tela; por isso as chamadas
+    // sem espera usam `void`.
     const poll = async (statusUrl, kind) => {
       let data;
       try {
@@ -225,7 +228,7 @@
       }
 
       if (progressText) progressText.textContent = "Na fila…";
-      poll(data.status_url, kind);
+      void poll(data.status_url, kind);
     };
 
     fileInput?.addEventListener("change", () => {
@@ -316,7 +319,7 @@
       });
       filenamePatternInput.addEventListener("blur", () => {
         window.clearTimeout(saveTimer);
-        saveFilenamePattern();
+        void saveFilenamePattern();
       });
     }
 
@@ -351,7 +354,7 @@
 
       spaceModeSelect.addEventListener("change", () => {
         syncReplacementVisibility();
-        saveSpaceMode();
+        void saveSpaceMode();
         renderFilenamePreview();
       });
       spaceReplacementInput?.addEventListener("input", () => {
@@ -362,7 +365,7 @@
       });
       spaceReplacementInput?.addEventListener("blur", () => {
         window.clearTimeout(spaceSaveTimer);
-        saveSpaceMode();
+        void saveSpaceMode();
       });
     }
 
@@ -411,10 +414,10 @@
         base = base.replace(/\s+/g, " ").trim();
         const spaceMode = spaceModeSelect?.value || "keep";
         if (spaceMode === "strip") {
-          base = base.replace(/ /g, "");
+          base = base.replaceAll(" ", "");
         } else if (spaceMode === "replace") {
           const replacement = (spaceReplacementInput?.value || "-").trim() || "-";
-          base = base.replace(/ /g, replacement);
+          base = base.replaceAll(" ", replacement);
         }
 
         filenamePreview.hidden = false;
@@ -451,7 +454,7 @@
           if (filenamePreview) filenamePreview.hidden = true;
           return;
         }
-        readFirstRowFromFile(file);
+        void readFirstRowFromFile(file);
       });
 
       const columnRefsFromPattern = (pattern) => {
@@ -505,7 +508,7 @@
           input.addEventListener("change", () => {
             if (input.checked) selectedCaseColumns.add(columnNumber);
             else selectedCaseColumns.delete(columnNumber);
-            saveCaseOptions();
+            void saveCaseOptions();
             renderFilenamePreview();
           });
           label.appendChild(input);
@@ -533,12 +536,12 @@
       };
 
       stripAccentsCheckbox?.addEventListener("change", () => {
-        saveStripAccents();
+        void saveStripAccents();
         renderFilenamePreview();
       });
       caseSelect?.addEventListener("change", () => {
         syncCaseColumnsUI();
-        saveCaseOptions();
+        void saveCaseOptions();
         renderFilenamePreview();
       });
       filenamePatternInput?.addEventListener("input", () => {

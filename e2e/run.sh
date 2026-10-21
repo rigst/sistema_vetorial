@@ -9,12 +9,12 @@ TMP_DIR="$E2E_DIR/.tmp"
 PORT="${E2E_PORT:-8099}"
 
 PYTHON="${VETORIAL_PYTHON:-}"
-if [ -z "$PYTHON" ]; then
+if [[ -z "$PYTHON" ]]; then
     for candidate in "$BASE_DIR/../venv/bin/python" "$BASE_DIR/.venv/bin/python" "$(command -v python3 || true)"; do
-        if [ -x "$candidate" ]; then PYTHON="$candidate"; break; fi
+        if [[ -x "$candidate" ]]; then PYTHON="$candidate"; break; fi
     done
 fi
-[ -x "$PYTHON" ] || { echo "Python do projeto não encontrado; defina VETORIAL_PYTHON." >&2; exit 1; }
+[[ -x "$PYTHON" ]] || { echo "Python do projeto não encontrado; defina VETORIAL_PYTHON." >&2; exit 1; }
 
 rm -rf "$TMP_DIR"
 mkdir -p "$TMP_DIR/media" "$TMP_DIR/static"
@@ -41,7 +41,7 @@ cd "$BASE_DIR"
 pids=()
 cleanup() {
     for pid in "${pids[@]:-}"; do
-        [ -n "${pid:-}" ] && kill "$pid" 2>/dev/null || true
+        [[ -n "${pid:-}" ]] && kill "$pid" 2>/dev/null || true
     done
     wait 2>/dev/null || true
 }
