@@ -12,7 +12,7 @@ Django==6.0.8
 psycopg[binary]==3.3.3
 
 celery==5.6.3
-gunicorn==25.3.0
+gunicorn==26.2.0
 redis==7.4.0
 openpyxl==3.1.5
 reportlab==4.4.10
