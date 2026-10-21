@@ -94,3 +94,110 @@ def test_criar_template_com_fundo_e_abrir_o_editor_sem_erro_de_js(
     from editor.models import DocumentTemplate
 
     assert DocumentTemplate.objects.filter(user=usuario_e2e, name="Certificado E2E").exists()
+
+
+@pytest.fixture
+def template_com_campo(usuario_e2e, tmp_path):
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from editor.models import DocumentTemplate, TemplateField
+    from editor.services import update_template_pdf_metadata
+    from fonts.models import FontAsset
+
+    fonte = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+    font = FontAsset.objects.create(
+        user=usuario_e2e,
+        name="Dejavu Sans",
+        family="Dejavu Sans",
+        variant="Regular",
+        file=SimpleUploadedFile("DejaVuSans.ttf", fonte.read_bytes(), content_type="font/ttf"),
+    )
+    template = DocumentTemplate.objects.create(
+        user=usuario_e2e,
+        name="Falhas E2E",
+        slug="falhas-e2e",
+        background_pdf=SimpleUploadedFile(
+            "fundo.pdf", _build_pdf_on_disk(tmp_path).read_bytes(), content_type="application/pdf"
+        ),
+    )
+    update_template_pdf_metadata(template)
+    TemplateField.objects.create(
+        template=template, name="Nome", excel_column="1",
+        x=20, y=40, width=200, height=24, font=font, font_size=18, order_index=1,
+    )
+    return template
+
+
+def _abrir_editor(page, live_server, usuario_e2e, template):
+    _logar(page, live_server, usuario_e2e)
+    page.wait_for_url(f"{live_server.url}/templates/")
+    page.goto(f"{live_server.url}/templates/{template.pk}/")
+    page.wait_for_function("() => window.__vetorialEditor && window.__vetorialEditor.fields.length > 0")
+
+
+def _selecionar_campo(page, nome):
+    """Clica no centro do campo pela posição real dele no canvas (mundo -> tela)."""
+    canvas_el = page.locator("#editor-canvas")
+    canvas_el.scroll_into_view_if_needed()
+    caixa = canvas_el.bounding_box()
+    ponto = page.evaluate(
+        """(nome) => {
+            const ed = window.__vetorialEditor;
+            const f = ed.fields.find((x) => x.name === nome);
+            const vpt = ed.canvas.viewportTransform, zoom = ed.canvas.getZoom();
+            return { x: (f.x + f.width / 2) * zoom + vpt[4], y: (f.y + f.height / 2) * zoom + vpt[5] };
+        }""",
+        nome,
+    )
+    page.mouse.click(caixa["x"] + ponto["x"], caixa["y"] + ponto["y"])
+
+
+def _servidor_recusa(page, metodo):
+    """500 só para `metodo` na API de um campo; o resto segue normal."""
+
+    def _rota(rota):
+        if rota.request.method == metodo:
+            rota.fulfill(status=500, content_type="application/json", body='{"error": "falha simulada"}')
+        else:
+            rota.continue_()
+
+    page.route("**/campos/*/", _rota)
+
+
+@pytest.mark.e2e
+def test_excluir_campo_com_servidor_recusando_mantem_o_campo(
+    live_server, page, usuario_e2e, template_com_campo
+):
+    """Antes, o DELETE não checava response.ok: o campo sumia da tela sem ter
+    sido excluído, e voltava ao recarregar."""
+    from playwright.sync_api import expect
+
+    from editor.models import TemplateField
+
+    _abrir_editor(page, live_server, usuario_e2e, template_com_campo)
+    _servidor_recusa(page, "DELETE")
+    page.on("dialog", lambda d: d.accept())
+
+    _selecionar_campo(page, "Nome")
+    page.locator("#delete-field-button").click()
+
+    expect(page.locator("#editor-status-text")).to_contain_text("Falha ao excluir")
+    assert "Nome" in page.evaluate("() => window.__vetorialEditor.fields.map((f) => f.name)")
+    assert TemplateField.objects.filter(template=template_com_campo, name="Nome").exists()
+
+
+@pytest.mark.e2e
+def test_salvar_tudo_com_servidor_recusando_nao_anuncia_sucesso(
+    live_server, page, usuario_e2e, template_com_campo
+):
+    """Antes, "Todas as posições foram salvas." aparecia mesmo depois da falha."""
+    from playwright.sync_api import expect
+
+    _abrir_editor(page, live_server, usuario_e2e, template_com_campo)
+    _servidor_recusa(page, "PATCH")
+
+    page.locator("#save-layout-button").click()
+
+    status = page.locator("#editor-status-text")
+    expect(status).to_contain_text("Não foi possível salvar todas as posições")
+    expect(status).not_to_contain_text("foram salvas")

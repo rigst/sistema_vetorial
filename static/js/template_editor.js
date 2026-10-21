@@ -720,8 +720,12 @@
 
     // flushSaves, saveAll, duplicateSelected e deleteSelected tratam as próprias
     // falhas (setSaveState/setStatus); as chamadas sem espera usam `void`.
+    // Devolve true se tudo que estava pendente foi salvo (ou não havia nada),
+    // false se alguma requisição falhou — o saveAll depende disso para não
+    // anunciar "salvas" depois de uma falha.
     const flushSaves = async () => {
-      if (readOnly || !pendingSaves.size) return;
+      if (readOnly) return false;
+      if (!pendingSaves.size) return true;
       const batch = [...pendingSaves.entries()];
       pendingSaves.clear();
       inflightSaves += 1;
@@ -746,8 +750,10 @@
           }
         }
         setSaveState("Salvo ✓", "ok");
+        return true;
       } catch (err) {
         setSaveState(`Falha ao salvar: ${err.message}`, "error");
+        return false;
       } finally {
         inflightSaves -= 1;
         canvas.requestRenderAll();
@@ -769,8 +775,8 @@
           rotation: field.rotation, font_size: field.font_size,
         });
       });
-      await flushSaves();
-      setStatus("Todas as posições foram salvas.");
+      const salvou = await flushSaves();
+      setStatus(salvou ? "Todas as posições foram salvas." : "Não foi possível salvar todas as posições. Tente de novo.");
     };
 
     window.addEventListener("beforeunload", (event) => {
@@ -1410,12 +1416,17 @@
       const selected = selectedFields();
       if (!selected.length) { setStatus("Selecione um campo para excluir."); return; }
       if (!window.confirm(`Excluir ${selected.length} campo(s)? Essa ação não pode ser desfeita.`)) return;
+      // `request` lança em resposta não-OK: antes, um 403/404/500 passava
+      // pelo fetch sem erro e o campo sumia da tela sem ter sido excluído.
+      // Numa falha no meio de uma exclusão múltipla, o que já foi excluído sai
+      // da tela e o resto fica; a tela é atualizada nos dois casos.
+      let falha = null;
       for (const field of selected) {
         try {
-          await fetch(fieldUrl(field.id), { method: "DELETE", headers: { "X-CSRFToken": csrfToken } });
+          await request(fieldUrl(field.id), "DELETE");
         } catch (err) {
-          setStatus(`Falha ao excluir: ${err.message}`);
-          return;
+          falha = err;
+          break;
         }
         pendingSaves.delete(field.id);
         const obj = objectsById.get(field.id);
@@ -1429,7 +1440,7 @@
       canvas.requestRenderAll();
       resetHistory();
       syncPanel();
-      setStatus("Campo(s) excluído(s).");
+      setStatus(falha ? `Falha ao excluir: ${falha.message}` : "Campo(s) excluído(s).");
     };
     document.getElementById("delete-field-button")?.addEventListener("click", deleteSelected);
 
