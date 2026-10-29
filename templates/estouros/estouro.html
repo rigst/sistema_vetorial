@@ -41,7 +41,7 @@
             <legend class="estouro-secao-titulo">2. Tamanho</legend>
             <div class="estouro-segmentos" role="radiogroup" aria-label="{{ form.modo_tamanho.label }}">
                 {% for opcao in form.modo_tamanho %}
-                    <label class="estouro-segmento">{{ opcao.tag }}<span>{{ opcao.choice_label }}</span></label>
+                    <span class="estouro-segmento">{{ opcao.tag }}<label for="{{ opcao.id_for_label }}">{{ opcao.choice_label }}</label></span>
                 {% endfor %}
             </div>
 
@@ -91,7 +91,7 @@
             <legend class="estouro-secao-titulo">3. Preenchimento</legend>
             <div class="estouro-opcoes">
                 {% for opcao in form.preenchimento %}
-                    <label class="estouro-opcao">
+                    <label class="estouro-opcao" for="{{ opcao.id_for_label }}">
                         {{ opcao.tag }}
                         <span class="estouro-opcao-ilustra estouro-opcao-ilustra--{{ opcao.data.value }}" aria-hidden="true"></span>
                         <span class="estouro-opcao-texto">
@@ -118,7 +118,7 @@
             <div class="field-advanced-body">
                 <div class="estouro-opcoes estouro-opcoes--simples">
                     {% for opcao in form.referencia %}
-                        <label class="estouro-opcao estouro-opcao--simples">{{ opcao.tag }}<span>{{ opcao.choice_label }}</span></label>
+                        <label class="estouro-opcao estouro-opcao--simples" for="{{ opcao.id_for_label }}">{{ opcao.tag }}<span>{{ opcao.choice_label }}</span></label>
                     {% endfor %}
                 </div>
                 <label class="field-toggle-row estouro-marcas" for="{{ form.marcas_corte.id_for_label }}">

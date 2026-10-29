@@ -50,6 +50,12 @@ MARCA_MARGEM_PT = MARCA_AFASTAMENTO_PT + MARCA_COMPRIMENTO_PT + 2 * 72 / 25.4
 MARCA_ESPESSURA_PT = 0.25
 
 PREENCHIMENTOS = ("espelhar", "esticar", "cor", "branco")
+
+# Chaves do dicionário da página usadas mais de uma vez.
+CONTENTS = "/Contents"
+GROUP = "/Group"
+RESOURCES = "/Resources"
+ARTBOX = "/ArtBox"
 REFERENCIAS = ("pagina", "corte")
 
 
@@ -307,7 +313,7 @@ def _marcas_de_corte(corte: Caixa, estouro: Caixa, unidade_usuario: float) -> st
 # --------------------------------------------------------- por página
 
 
-def _recursos_com_form(pdf: pikepdf.Pdf, recursos, nome: str, form) -> pikepdf.Dictionary:
+def _recursos_com_form(recursos, nome: str, form) -> pikepdf.Dictionary:
     """Recursos novos para a página: as mesmas entradas (por referência, nada é
     copiado de verdade) mais o Form XObject do estouro. Não se altera o
     dicionário original, que pode ser compartilhado com outras páginas e é o
@@ -335,7 +341,7 @@ def _form_da_pagina(pdf: pikepdf.Pdf, pagina: pikepdf.Page, media: Caixa, recurs
     eles são concatenados (sem perdas). As imagens são referenciadas, não
     copiadas: o arquivo cresce só o tamanho comprimido do desenho.
     """
-    atuais = pagina.obj.get("/Contents")
+    atuais = pagina.obj.get(CONTENTS)
     form: pikepdf.Object
     if isinstance(atuais, pikepdf.Stream):
         form = pikepdf.Stream(pdf, atuais.read_raw_bytes())
@@ -344,12 +350,12 @@ def _form_da_pagina(pdf: pikepdf.Pdf, pagina: pikepdf.Page, media: Caixa, recurs
                 form.stream_dict[chave] = atuais.stream_dict[chave]
         form.stream_dict["/Type"] = pikepdf.Name.XObject
         form.stream_dict["/Subtype"] = pikepdf.Name.Form
-        if "/Group" in pagina.obj:
-            form.stream_dict["/Group"] = pagina.obj["/Group"]
+        if GROUP in pagina.obj:
+            form.stream_dict[GROUP] = pagina.obj[GROUP]
     else:
         form = pagina.as_form_xobject(False)
     form["/BBox"] = media.como_array()
-    form["/Resources"] = recursos if recursos is not None else pikepdf.Dictionary()
+    form[RESOURCES] = recursos if recursos is not None else pikepdf.Dictionary()
     return pdf.make_indirect(form)
 
 
@@ -403,12 +409,12 @@ def _processar_pagina(
     conteudo = visivel.intersecao(estouro)
     _validar_espelho(config, conteudo, estouro, uu, indice)
 
-    recursos = _herdado(pagina, "/Resources")
+    recursos = _herdado(pagina, RESOURCES)
     nome_form = f"EstouroP{indice + 1}"
     usa_form = config.preenchimento in ("espelhar", "esticar") and bool(_faixas(conteudo, estouro))
     if usa_form:
         form = _form_da_pagina(pdf, pagina, media, recursos)
-        pagina.obj["/Resources"] = _recursos_com_form(pdf, recursos, nome_form, form)
+        pagina.obj[RESOURCES] = _recursos_com_form(recursos, nome_form, form)
     desenho = _desenho_estouro(config, conteudo, estouro, nome_form, uu)
 
     folha = estouro
@@ -441,7 +447,7 @@ def _montar_conteudo(pdf: pikepdf.Pdf, pagina: pikepdf.Page, desenho: str, conte
     intactos: o form (espelhar/esticar) serve só às faixas de estouro. Desenhar
     a arte pelo form mudaria o caminho de renderização e já gera diferença de
     antisserrilhado nas bordas — a arte precisa sair pixel a pixel igual."""
-    atuais = pagina.obj.get("/Contents")
+    atuais = pagina.obj.get(CONTENTS)
     if atuais is None:
         originais = []
     elif isinstance(atuais, pikepdf.Array):
@@ -454,7 +460,7 @@ def _montar_conteudo(pdf: pikepdf.Pdf, pagina: pikepdf.Page, desenho: str, conte
     novos.append(pdf.make_stream(f"q {_ret(conteudo)} W n\n".encode("ascii")))
     novos += originais
     novos.append(pdf.make_stream(b"\nQ\n"))
-    pagina.obj["/Contents"] = pikepdf.Array(novos)
+    pagina.obj[CONTENTS] = pikepdf.Array(novos)
 
 
 def _gravar_caixas(pagina, folha: Caixa, estouro: Caixa, corte: Caixa, rotacao: int, uu: float):
@@ -463,13 +469,13 @@ def _gravar_caixas(pagina, folha: Caixa, estouro: Caixa, corte: Caixa, rotacao: 
     obj["/CropBox"] = folha.como_array()
     obj["/BleedBox"] = estouro.como_array()
     obj["/TrimBox"] = corte.como_array()
-    arte = _caixa(obj.get("/ArtBox"))
+    arte = _caixa(obj.get(ARTBOX))
     if arte is not None:
         arte = arte.intersecao(estouro)
         if arte.valida():
-            obj["/ArtBox"] = arte.como_array()
+            obj[ARTBOX] = arte.como_array()
         else:
-            del obj["/ArtBox"]
+            del obj[ARTBOX]
     # Gravados na própria página: valores herdados da árvore continuariam
     # valendo, mas deixam de ser óbvios para quem inspeciona o arquivo.
     if rotacao:

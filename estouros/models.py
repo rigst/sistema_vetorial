@@ -29,7 +29,7 @@ class LoteEstouro(OwnedModel):
         CONCLUIDO_COM_FALHAS = "com_falhas", "Concluído com falhas"
         FALHOU = "falhou", "Falhou"
 
-    EM_ANDAMENTO = (Status.NA_FILA, Status.PROCESSANDO)
+    STATUS_EM_ANDAMENTO = (Status.NA_FILA, Status.PROCESSANDO)
 
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.NA_FILA)
     # Configuração como foi pedida (unidade, valores por lado, preenchimento...).
@@ -48,7 +48,7 @@ class LoteEstouro(OwnedModel):
 
     @property
     def em_andamento(self) -> bool:
-        return self.status in self.EM_ANDAMENTO
+        return self.status in self.STATUS_EM_ANDAMENTO
 
 
 class ArquivoEstouro(TimeStampedModel):

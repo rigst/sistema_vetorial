@@ -4,7 +4,7 @@
   const form = document.querySelector("[data-estouro-form]");
   if (form) iniciarFormulario(form);
   const lote = document.querySelector("[data-lote]");
-  if (lote && lote.dataset.emAndamento === "1") acompanhar(lote);
+  if (lote?.dataset.emAndamento === "1") acompanhar(lote);
   posicionarLinhasDeCorte();
 
   // Linha de corte sobre cada prévia, em frações da folha (vêm do PDF).
@@ -125,7 +125,7 @@
     ["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, () => drop.classList.remove("is-sobre")));
     drop.addEventListener("drop", (e) => {
       e.preventDefault();
-      if (e.dataTransfer && e.dataTransfer.files.length) {
+      if (e.dataTransfer?.files.length) {
         input.files = e.dataTransfer.files;
         listarArquivos(input);
       }

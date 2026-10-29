@@ -118,8 +118,9 @@
   pointer-events: none;
 }
 
-.estouro-segmento span {
+.estouro-segmento label {
   display: block;
+  cursor: pointer;
   padding: 0.45rem 0.85rem;
   border-radius: calc(var(--radius-sm) - 3px);
   font-size: 0.88rem;
@@ -127,13 +128,13 @@
   color: var(--text-soft);
 }
 
-.estouro-segmento input:checked + span {
+.estouro-segmento input:checked + label {
   background: var(--surface);
   color: var(--text);
   box-shadow: 0 1px 2px rgba(23, 33, 31, 0.12);
 }
 
-.estouro-segmento input:focus-visible + span {
+.estouro-segmento input:focus-visible + label {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
@@ -329,12 +330,10 @@
   font-weight: 600;
 }
 
-.estouro-marcas-texto .field-hint {
-  font-weight: 400;
-}
 
 .estouro-marcas-texto .field-hint {
   margin-top: 0;
+  font-weight: 400;
 }
 
 /* ---------- resumo ---------- */
