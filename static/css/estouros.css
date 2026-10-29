@@ -1,0 +1,574 @@
+/* Estouros: página de envio + configuração e resultados.
+   Usa os tokens do app (style.css). Sem caixa dentro de caixa: o formulário
+   é um único cartão e as seções se separam por linhas finas. */
+
+.estouro-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.estouro-form {
+  display: grid;
+  gap: 0;
+}
+
+.estouro-secao {
+  border: 0;
+  border-top: 1px solid var(--border);
+  padding: 1.15rem 0 1.25rem;
+  margin: 0;
+  display: grid;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+.estouro-secao:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.estouro-secao-titulo {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text);
+  padding: 0;
+  margin-bottom: 0.15rem;
+  float: left;
+  width: 100%;
+}
+
+.estouro-secao-titulo + * {
+  clear: both;
+}
+
+/* ---------- arquivos ---------- */
+.estouro-drop {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 1.1rem 1.15rem;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  cursor: pointer;
+  position: relative;
+}
+
+.estouro-drop:hover,
+.estouro-drop.is-sobre,
+.estouro-drop:focus-within {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.estouro-drop svg {
+  width: 1.6rem;
+  height: 1.6rem;
+  flex: none;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.estouro-drop-texto {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.estouro-drop input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.estouro-lista-envio {
+  list-style: none;
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.88rem;
+  color: var(--text-soft);
+  overflow-wrap: anywhere;
+}
+
+/* ---------- tamanho ---------- */
+.estouro-segmentos {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-strong-2);
+  width: fit-content;
+  max-width: 100%;
+}
+
+.estouro-segmento {
+  position: relative;
+  cursor: pointer;
+}
+
+.estouro-segmento input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.estouro-segmento span {
+  display: block;
+  padding: 0.45rem 0.85rem;
+  border-radius: calc(var(--radius-sm) - 3px);
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.estouro-segmento input:checked + span {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(23, 33, 31, 0.12);
+}
+
+.estouro-segmento input:focus-visible + span {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.estouro-medidas {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: minmax(0, 14rem);
+}
+
+.estouro-medidas[hidden] {
+  display: none;
+}
+
+.estouro-medidas--2 {
+  grid-template-columns: repeat(2, minmax(0, 14rem));
+}
+
+/* Um valor por lado: os campos em volta de uma folha, como a página é vista. */
+.estouro-medidas--lados {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr);
+  grid-template-areas:
+    ". topo ."
+    "esquerda folha direita"
+    ". base .";
+  align-items: center;
+  max-width: 30rem;
+}
+
+.estouro-lado--topo { grid-area: topo; }
+.estouro-lado--base { grid-area: base; }
+.estouro-lado--esquerda { grid-area: esquerda; }
+.estouro-lado--direita { grid-area: direita; }
+
+.estouro-lado-folha {
+  grid-area: folha;
+  aspect-ratio: 182 / 74;
+  border-radius: 4px;
+  background: var(--surface-strong-2);
+  border: 1px solid var(--border-strong);
+}
+
+.estouro-medida {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.estouro-medida input {
+  min-width: 0;
+  text-align: right;
+}
+
+.estouro-unidade {
+  color: var(--muted);
+  font-size: 0.88rem;
+  min-width: 1.6rem;
+}
+
+.estouro-linha {
+  display: grid;
+  grid-template-columns: minmax(0, 14rem);
+}
+
+.estouro-atalhos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.88rem;
+}
+
+/* ---------- preenchimento ---------- */
+.estouro-opcoes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.estouro-opcao {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.8rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  position: relative;
+}
+
+.estouro-opcao input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.estouro-opcao:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.estouro-opcao:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.estouro-opcao-texto {
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.88rem;
+  font-weight: 400;
+}
+
+.estouro-opcao-texto strong {
+  font-size: 0.92rem;
+}
+
+/* Ilustração de cada modo: a arte (miolo) com o estouro em volta. */
+.estouro-opcao-ilustra {
+  width: 2.6rem;
+  height: 1.8rem;
+  border-radius: 3px;
+  position: relative;
+  flex: none;
+  background: var(--surface-strong-2);
+  border: 1px dashed var(--border-strong);
+}
+
+.estouro-opcao-ilustra::after {
+  content: "";
+  position: absolute;
+  inset: 0.32rem;
+  border-radius: 2px;
+  background: linear-gradient(135deg, var(--accent) 0 45%, var(--brand-green) 45% 100%);
+}
+
+.estouro-opcao-ilustra--espelhar {
+  background:
+    linear-gradient(315deg, var(--accent) 0 45%, var(--brand-green) 45% 100%);
+}
+
+.estouro-opcao-ilustra--esticar {
+  background: linear-gradient(90deg, var(--accent) 0 50%, var(--brand-green) 50% 100%);
+}
+
+.estouro-opcao-ilustra--cor {
+  background: var(--accent-2);
+}
+
+.estouro-opcao-ilustra--branco {
+  background: #fff;
+}
+
+.estouro-opcoes--simples {
+  grid-template-columns: 1fr;
+}
+
+.estouro-opcao--simples {
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 0.55rem 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+
+.estouro-opcao--simples input {
+  position: static;
+  opacity: 1;
+  pointer-events: auto;
+  accent-color: var(--accent);
+  margin-top: 0.2rem;
+}
+
+.estouro-cor[hidden] {
+  display: none;
+}
+
+.estouro-avancado {
+  padding: 1rem 0;
+}
+
+.estouro-marcas {
+  align-items: flex-start;
+}
+
+.estouro-marcas input {
+  margin-top: 0.15rem;
+}
+
+.estouro-marcas-texto {
+  display: grid;
+  gap: 0.2rem;
+  font-weight: 600;
+}
+
+.estouro-marcas-texto .field-hint {
+  font-weight: 400;
+}
+
+.estouro-marcas-texto .field-hint {
+  margin-top: 0;
+}
+
+/* ---------- resumo ---------- */
+.estouro-resumo {
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: 1rem;
+  border-top: 1px solid var(--border);
+  padding: 1rem 0 1.15rem;
+  color: var(--text-soft);
+  font-size: 0.92rem;
+}
+
+/* Folha com o estouro (exagerado para ser visível) e a arte no meio. */
+.estouro-resumo-folha {
+  --e-topo: 8%;
+  --e-base: 8%;
+  --e-esq: 4%;
+  --e-dir: 4%;
+  --e-cor: #ffffff;
+  aspect-ratio: 182 / 74;
+  position: relative;
+  border-radius: 3px;
+  border: 1px dashed var(--border-strong);
+  background: linear-gradient(315deg, var(--accent) 0 45%, var(--brand-green) 45% 100%);
+}
+
+.estouro-resumo-folha[data-preenchimento="esticar"] {
+  background: linear-gradient(90deg, var(--accent) 0 50%, var(--brand-green) 50% 100%);
+}
+
+.estouro-resumo-folha[data-preenchimento="cor"] {
+  background: var(--e-cor);
+}
+
+.estouro-resumo-folha[data-preenchimento="branco"] {
+  background: #fff;
+}
+
+.estouro-resumo-folha span {
+  position: absolute;
+  top: var(--e-topo);
+  bottom: var(--e-base);
+  left: var(--e-esq);
+  right: var(--e-dir);
+  border-radius: 1px;
+  background: linear-gradient(135deg, var(--accent) 0 45%, var(--brand-green) 45% 100%);
+  outline: 1px solid rgba(255, 255, 255, 0.85);
+}
+
+/* ---------- resultados ---------- */
+.estouro-resultados {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.estouro-lote {
+  display: grid;
+  gap: 1rem;
+}
+
+.estouro-lote-cabeca {
+  align-items: start;
+}
+
+.estouro-arquivos {
+  list-style: none;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.estouro-arquivo {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr) auto;
+  gap: 0.85rem;
+  align-items: center;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
+}
+
+.estouro-arquivo:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.estouro-arquivo-previa {
+  position: relative;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--surface-strong-2);
+  min-height: 3.5rem;
+  display: grid;
+  place-items: center;
+}
+
+.estouro-arquivo-previa img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Linha de corte sobre a prévia: posição vem do PDF (estouros.js). */
+.estouro-linha-corte {
+  position: absolute;
+  outline: 1px dashed #d1006a;
+  pointer-events: none;
+}
+
+.estouro-arquivo-info {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  font-size: 0.9rem;
+}
+
+.estouro-arquivo-nome {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.estouro-erro {
+  color: var(--danger);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .estouro-carregando {
+    width: 1.3rem;
+    height: 1.3rem;
+    border-radius: 50%;
+    border: 2px solid var(--border-strong);
+    border-top-color: var(--accent);
+    animation: estouro-gira 0.9s linear infinite;
+  }
+}
+
+@keyframes estouro-gira {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.estouro-lote-acoes {
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+
+.estouro-recentes .list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.estouro-recentes .list a {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.estouro-recentes .list a[aria-current="page"] strong {
+  color: var(--accent);
+}
+
+.estouro-recentes .list a span {
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.estouro-retencao {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.status-pill.status-concluido {
+  color: var(--success);
+}
+
+.status-pill.status-falhou {
+  color: var(--danger);
+}
+
+.status-pill.status-processando,
+.status-pill.status-na_fila,
+.status-pill.status-com_falhas {
+  color: var(--warning);
+}
+
+@media (max-width: 960px) {
+  .estouro-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Com um envio aberto, o resultado vem antes do formulário: é o que a
+     pessoa quer ver ao voltar do envio. */
+  .estouro-grid:has(.estouro-lote) .estouro-resultados {
+    order: -1;
+  }
+}
+
+@media (max-width: 560px) {
+  .estouro-opcoes {
+    grid-template-columns: 1fr;
+  }
+
+  .estouro-medidas--2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .estouro-medidas--lados {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      "topo direita"
+      "base esquerda";
+  }
+
+  .estouro-lado-folha {
+    display: none;
+  }
+
+  .estouro-arquivo {
+    grid-template-columns: 6rem minmax(0, 1fr);
+  }
+
+  .estouro-arquivo > .button {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .estouro-resumo {
+    grid-template-columns: 5.5rem minmax(0, 1fr);
+  }
+}

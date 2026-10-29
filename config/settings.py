@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     "fonts",
     "editor",
     "jobs",
+    "estouros",
     "legal",
 ]
 
@@ -214,6 +215,10 @@ LOGOUT_REDIRECT_URL = "login"
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 FILE_RETENTION_DAYS = int(os.environ.get("FILE_RETENTION_DAYS", "7"))
+# Estouros: arquivos por envio e por quanto tempo os resultados ficam guardados
+# (são subproduto — o original está com quem enviou).
+ESTOUROS_MAX_ARQUIVOS = int(os.environ.get("ESTOUROS_MAX_ARQUIVOS", "20"))
+ESTOUROS_RETENCAO_DIAS = int(os.environ.get("ESTOUROS_RETENCAO_DIAS", "7"))
 
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", CELERY_BROKER_URL)

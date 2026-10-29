@@ -5,13 +5,22 @@ from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 
 from editor.models import DocumentTemplate, TemplatePreviewPage
+from estouros.models import ArquivoEstouro, LoteEstouro
 from fonts.models import FontAsset
 from jobs.models import GenerationItem, GenerationJob
 
 from .files import delete_field_file, iter_file_fields
 from .models import UserProfile
 
-FILE_MODELS = (DocumentTemplate, TemplatePreviewPage, FontAsset, GenerationJob, GenerationItem)
+FILE_MODELS = (
+    DocumentTemplate,
+    TemplatePreviewPage,
+    FontAsset,
+    GenerationJob,
+    GenerationItem,
+    LoteEstouro,
+    ArquivoEstouro,
+)
 
 
 @receiver(post_delete)

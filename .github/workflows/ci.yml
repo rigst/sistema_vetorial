@@ -29,7 +29,7 @@ jobs:
     with:
       python-version: "3.12"
       django-settings-module: config.settings
-      source-paths: "config core editor fonts jobs legal"
+      source-paths: "config core editor estouros fonts jobs legal"
 
       # O banco cai em SQLite quando DB_ENGINE não é definido, então o job de
       # testes não precisa de Postgres.

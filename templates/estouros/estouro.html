@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Estouros | Vetorial{% endblock %}
+
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/estouros.css' %}?v=1">{% endblock %}
+
+{% block content %}
+<section class="hero-shell">
+    <div class="section-header">
+        <div>
+            <div class="eyebrow">Estouros</div>
+            <h1 class="hero-title">Estouro para testeiras</h1>
+            <p class="hero-copy">Envie os PDFs, escolha o estouro e baixe prontos. A arte sai intacta: mesma resolução, mesmas cores e mesmas medidas, só com a área a mais.</p>
+        </div>
+    </div>
+</section>
+
+<section class="estouro-grid">
+    <form method="post" enctype="multipart/form-data" class="form-shell estouro-form" data-estouro-form novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+            <div class="form-alert form-alert-error" role="alert">
+                <span class="ui-icon ui-icon-soft" aria-hidden="true">!</span>
+                <div>{% for erro in form.non_field_errors %}<p>{{ erro }}</p>{% endfor %}</div>
+            </div>
+        {% endif %}
+
+        <fieldset class="estouro-secao">
+            <legend class="estouro-secao-titulo">1. Arquivos</legend>
+            <label class="estouro-drop" for="{{ form.arquivos.id_for_label }}" data-drop>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4"/><path d="m6 10 6-6 6 6"/><path d="M4 20h16"/></svg>
+                <span class="estouro-drop-texto"><strong>Escolha ou arraste os PDFs</strong><span class="muted">Até {{ max_arquivos }} arquivos, 50 MB no total</span></span>
+                {{ form.arquivos }}
+            </label>
+            <ul class="estouro-lista-envio" data-lista-envio hidden></ul>
+            {{ form.arquivos.errors }}
+        </fieldset>
+
+        <fieldset class="estouro-secao">
+            <legend class="estouro-secao-titulo">2. Tamanho</legend>
+            <div class="estouro-segmentos" role="radiogroup" aria-label="{{ form.modo_tamanho.label }}">
+                {% for opcao in form.modo_tamanho %}
+                    <label class="estouro-segmento">{{ opcao.tag }}<span>{{ opcao.choice_label }}</span></label>
+                {% endfor %}
+            </div>
+
+            <div class="estouro-medidas" data-modo="igual">
+                <div class="field-group">
+                    <label for="{{ form.todos.id_for_label }}">{{ form.todos.label }}</label>
+                    <div class="estouro-medida">{{ form.todos }}<span class="estouro-unidade" data-rotulo-unidade>cm</span></div>
+                </div>
+            </div>
+            <div class="estouro-medidas estouro-medidas--2" data-modo="eixos">
+                <div class="field-group">
+                    <label for="{{ form.horizontal.id_for_label }}">{{ form.horizontal.label }}</label>
+                    <div class="estouro-medida">{{ form.horizontal }}<span class="estouro-unidade" data-rotulo-unidade>cm</span></div>
+                </div>
+                <div class="field-group">
+                    <label for="{{ form.vertical.id_for_label }}">{{ form.vertical.label }}</label>
+                    <div class="estouro-medida">{{ form.vertical }}<span class="estouro-unidade" data-rotulo-unidade>cm</span></div>
+                </div>
+            </div>
+            <div class="estouro-medidas estouro-medidas--lados" data-modo="lados">
+                {% for campo in form %}{% if campo.name == "topo" or campo.name == "direita" or campo.name == "base" or campo.name == "esquerda" %}
+                    <div class="field-group estouro-lado estouro-lado--{{ campo.name }}">
+                        <label for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+                        <div class="estouro-medida">{{ campo }}<span class="estouro-unidade" data-rotulo-unidade>cm</span></div>
+                    </div>
+                {% endif %}{% endfor %}
+                <div class="estouro-lado-folha" aria-hidden="true"></div>
+            </div>
+
+            <div class="estouro-linha">
+                <div class="field-group">
+                    <label for="{{ form.unidade.id_for_label }}">{{ form.unidade.label }}</label>
+                    {{ form.unidade }}
+                </div>
+            </div>
+            <div class="estouro-atalhos" aria-label="Tamanhos comuns">
+                <span class="muted">Comuns:</span>
+                <button type="button" class="button-compact button-secondary" data-atalho="0.5">5 mm</button>
+                <button type="button" class="button-compact button-secondary" data-atalho="1">1 cm</button>
+                <button type="button" class="button-compact button-secondary" data-atalho="2">2 cm</button>
+                <button type="button" class="button-compact button-secondary" data-atalho="3">3 cm</button>
+                <button type="button" class="button-compact button-secondary" data-atalho="5">5 cm</button>
+            </div>
+        </fieldset>
+
+        <fieldset class="estouro-secao">
+            <legend class="estouro-secao-titulo">3. Preenchimento</legend>
+            <div class="estouro-opcoes">
+                {% for opcao in form.preenchimento %}
+                    <label class="estouro-opcao">
+                        {{ opcao.tag }}
+                        <span class="estouro-opcao-ilustra estouro-opcao-ilustra--{{ opcao.data.value }}" aria-hidden="true"></span>
+                        <span class="estouro-opcao-texto">
+                            <strong>{{ opcao.choice_label }}</strong>
+                            <span class="muted">
+                                {% if opcao.data.value == "espelhar" %}Continua a arte refletida na borda. O mais natural para fundos e texturas.
+                                {% elif opcao.data.value == "esticar" %}Puxa a última linha da borda para fora. Bom para fundos lisos ou degradês.
+                                {% elif opcao.data.value == "cor" %}Preenche o estouro com uma cor escolhida.
+                                {% else %}A página só cresce; o estouro fica em branco.{% endif %}
+                            </span>
+                        </span>
+                    </label>
+                {% endfor %}
+            </div>
+            <div class="field-group estouro-cor" data-so-cor>
+                <label for="{{ form.cor.id_for_label }}">{{ form.cor.label }}</label>
+                <div class="color-input-row">{{ form.cor }}<span class="muted" data-cor-hex>{{ form.cor.value|default:"#FFFFFF" }}</span></div>
+                {{ form.cor.errors }}
+            </div>
+        </fieldset>
+
+        <details class="field-advanced estouro-avancado" {% if form.referencia.value == "corte" or form.marcas_corte.value %}open{% endif %}>
+            <summary><span class="field-advanced-title">Opções de gráfica</span><span class="field-advanced-hint">medir pela linha de corte e marcas de corte</span></summary>
+            <div class="field-advanced-body">
+                <div class="estouro-opcoes estouro-opcoes--simples">
+                    {% for opcao in form.referencia %}
+                        <label class="estouro-opcao estouro-opcao--simples">{{ opcao.tag }}<span>{{ opcao.choice_label }}</span></label>
+                    {% endfor %}
+                </div>
+                <label class="field-toggle-row estouro-marcas" for="{{ form.marcas_corte.id_for_label }}">
+                    {{ form.marcas_corte }}
+                    <span class="estouro-marcas-texto"><span>{{ form.marcas_corte.label }}</span><span class="field-hint">{{ form.marcas_corte.help_text }}</span></span>
+                </label>
+            </div>
+        </details>
+
+        <div class="estouro-resumo" aria-live="polite">
+            <div class="estouro-resumo-folha" data-folha aria-hidden="true"><span data-folha-arte></span></div>
+            <p data-resumo-texto>Estouro de 3 cm em todos os lados.</p>
+        </div>
+
+        <div class="inline-actions">
+            <button type="submit" data-enviar>Aplicar estouro</button>
+        </div>
+    </form>
+
+    <div class="estouro-resultados">
+        {% if lote %}
+            <section class="panel estouro-lote" data-lote data-status-url="{% url 'estouros:status' lote.pk %}" data-em-andamento="{{ lote.em_andamento|yesno:'1,0' }}">
+                <div class="section-header estouro-lote-cabeca">
+                    <div>
+                        <h2 class="section-title">Resultado</h2>
+                        <p class="muted">{{ lote.resumo_configuracao }}</p>
+                    </div>
+                    <span class="status-pill status-{{ lote.status }}" data-lote-status><span class="status-dot" aria-hidden="true"></span>{{ lote.get_status_display }}</span>
+                </div>
+
+                {% if lote.erro %}<div class="form-alert form-alert-error"><span class="ui-icon ui-icon-soft" aria-hidden="true">!</span><div>{{ lote.erro }}</div></div>{% endif %}
+
+                <ul class="estouro-arquivos">
+                    {% for arquivo in lote.arquivos.all %}
+                        <li class="estouro-arquivo" data-arquivo="{{ arquivo.pk }}" data-status="{{ arquivo.status }}">
+                            <div class="estouro-arquivo-previa">
+                                {% if arquivo.previa %}
+                                    <img src="{% url 'estouros:previa' arquivo.pk %}" alt="Prévia de {{ arquivo.nome_original }} com o estouro" loading="lazy">
+                                    {% with c=arquivo.medidas.corte %}{% if c %}
+                                        <span class="estouro-linha-corte" data-corte="{{ c.0|stringformat:'.4f' }} {{ c.1|stringformat:'.4f' }} {{ c.2|stringformat:'.4f' }} {{ c.3|stringformat:'.4f' }}" title="Linha de corte" hidden></span>
+                                    {% endif %}{% endwith %}
+                                {% elif arquivo.status == "pendente" %}
+                                    <span class="estouro-carregando" aria-hidden="true"></span>
+                                {% endif %}
+                            </div>
+                            <div class="estouro-arquivo-info">
+                                <strong class="estouro-arquivo-nome" title="{{ arquivo.nome_original }}">{{ arquivo.nome_original }}</strong>
+                                {% if arquivo.status == "concluido" %}
+                                    {% with m=arquivo.medidas_cm %}
+                                        <span class="muted estouro-arquivo-medidas">{{ m.antes }} → <strong>{{ m.depois }}</strong>{% if arquivo.paginas > 1 %} · {{ arquivo.paginas }} páginas{% endif %}</span>
+                                    {% endwith %}
+                                {% elif arquivo.status == "falhou" %}
+                                    <span class="estouro-erro">{{ arquivo.erro }}</span>
+                                {% else %}
+                                    <span class="muted">Processando…</span>
+                                {% endif %}
+                            </div>
+                            {% if arquivo.status == "concluido" %}
+                                <a class="button button-small" href="{% url 'estouros:baixar' arquivo.pk %}">Baixar</a>
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+
+                <div class="inline-actions estouro-lote-acoes">
+                    {% if lote.zip_file %}<a class="button" href="{% url 'estouros:baixar-zip' lote.pk %}">Baixar todos (.zip)</a>{% endif %}
+                    <form method="post" action="{% url 'estouros:excluir' lote.pk %}">
+                        {% csrf_token %}
+                        <button type="submit" class="button button-secondary">Excluir</button>
+                    </form>
+                </div>
+            </section>
+        {% endif %}
+
+        <section class="panel estouro-recentes">
+            <h2 class="section-title">Envios recentes</h2>
+            {% if recentes %}
+                <ul class="list">
+                    {% for item in recentes %}
+                        <li>
+                            <a href="{% url 'estouros:lote' item.pk %}" {% if lote and item.pk == lote.pk %}aria-current="page"{% endif %}>
+                                <strong>{{ item.arquivos.all|length }} arquivo{{ item.arquivos.all|length|pluralize }}</strong>
+                                <span class="muted">{{ item.resumo_configuracao }}</span>
+                            </a>
+                            <span class="status-pill status-{{ item.status }}"><span class="status-dot" aria-hidden="true"></span>{{ item.get_status_display }}</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+                <p class="muted estouro-retencao">Os arquivos ficam disponíveis por {{ retencao_dias }} dias.</p>
+            {% else %}
+                <p class="muted">Nenhum envio ainda.</p>
+            {% endif %}
+        </section>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/estouros.js' %}?v=1"></script>
+{% endblock %}
