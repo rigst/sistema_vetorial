@@ -156,7 +156,7 @@
                         <li class="estouro-arquivo" data-arquivo="{{ arquivo.pk }}" data-status="{{ arquivo.status }}">
                             <div class="estouro-arquivo-previa">
                                 {% if arquivo.previa %}
-                                    <img src="{% url 'estouros:previa' arquivo.pk %}" alt="Prévia de {{ arquivo.nome_original }} com o estouro" loading="lazy">
+                                    <img src="{% url 'estouros:previa' arquivo.pk %}" alt="Prévia de {{ arquivo.nome_original }} com o estouro" width="{{ arquivo.previa.width }}" height="{{ arquivo.previa.height }}" loading="lazy">
                                     {% with c=arquivo.medidas.corte %}{% if c %}
                                         <span class="estouro-linha-corte" data-corte="{{ c.0|stringformat:'.4f' }} {{ c.1|stringformat:'.4f' }} {{ c.2|stringformat:'.4f' }} {{ c.3|stringformat:'.4f' }}" title="Linha de corte" hidden></span>
                                     {% endif %}{% endwith %}

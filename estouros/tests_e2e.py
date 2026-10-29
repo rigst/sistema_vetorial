@@ -58,7 +58,12 @@ def test_envia_configura_e_baixa_o_pdf_com_estouro(
 
     page.wait_for_selector("text=Baixar", timeout=15000)
     assert "Concluído" in page.locator("[data-lote-status]").inner_text()
-    assert page.locator(".estouro-arquivo-previa img").is_visible()
+    # A prévia carrega depois da página: espera a imagem decodificar.
+    previa = page.locator(".estouro-arquivo-previa img")
+    previa.wait_for(state="visible", timeout=10000)
+    page.wait_for_function(
+        "img => img.complete && img.naturalWidth > 0", arg=previa.element_handle(), timeout=10000
+    )
     with page.expect_download() as baixa:
         page.locator(".estouro-arquivo .button").first.click()
     arquivo = baixa.value
