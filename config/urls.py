@@ -17,4 +17,5 @@ urlpatterns = [
     path("fontes/", include(("fonts.urls", "fonts"), namespace="fonts")),
     path("templates/", include(("editor.urls", "editor"), namespace="editor")),
     path("jobs/", include(("jobs.urls", "jobs"), namespace="jobs")),
+    path("estouros/", include("estouros.urls")),
 ]

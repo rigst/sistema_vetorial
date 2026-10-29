@@ -9,6 +9,7 @@
     <link rel="icon" href="{% static 'favicon.ico' %}" sizes="any">
     <link rel="apple-touch-icon" href="{% static 'img/apple-touch-icon.png' %}">
     <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20260822-21">
+    {% block extra_css %}{% endblock %}
 </head>
 <body>
     <div class="side-texture side-texture-left" aria-hidden="true"></div>
@@ -26,6 +27,7 @@
                         <span class="visitor-badge" title="Conta temporária: apagada ao sair, ou automaticamente em até {{ visitor_ttl_hours }} horas.">Visitante · temporário</span>
                     {% endif %}
                     <a class="topbar-link {% if request.resolver_match.namespace == 'jobs' %}active{% endif %}" href="{% url 'jobs:list' %}">Arquivos</a>
+                    <a class="topbar-link {% if request.resolver_match.namespace == 'estouros' %}active{% endif %}" href="{% url 'estouros:inicio' %}">Estouros</a>
                     <a class="topbar-link {% if request.resolver_match.namespace == 'fonts' %}active{% endif %}" href="{% url 'fonts:list' %}">Fontes</a>
                     <span class="topbar-user">{{ app_display_name }}</span>
                     <form action="{% url 'logout' %}" method="post">

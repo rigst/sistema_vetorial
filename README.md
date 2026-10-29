@@ -18,6 +18,7 @@ Sistema Django para edição visual de templates em PDF e geração de arquivos 
 - pré-visualização fiel: as fontes do usuário são carregadas no navegador e a métrica de texto do editor é replicada na geração do PDF;
 - saída vetorial fiel: o fundo é copiado sem recompressão e o texto vira curva, sem fonte embutida (ver `docs/GERACAO-PDF.md`);
 - geração direto da bancada: envie o Excel, gere uma amostra de 3 linhas ou o lote completo e acompanhe o progresso sem sair do editor;
+- estouros para testeiras (`/estouros/`): envie PDFs e baixe com estouro em cm/mm/pol, igual, por eixo ou por lado, espelhando a arte, esticando a borda ou em cor sólida, com marcas de corte opcionais; a arte sai com os mesmos bytes (ver `docs/ESTOUROS.md`);
 - teste com dados reais no editor: envio de um Excel de amostra e navegação linha a linha;
 - campos configurados por nome, coluna numérica do Excel, fonte, cor, rotação, contorno e opções avançadas;
 - fontes ativas e inativas por usuário;
@@ -30,6 +31,7 @@ Sistema Django para edição visual de templates em PDF e geração de arquivos 
 - `editor`: templates, preview do PDF e editor visual.
 - `fonts`: cadastro e inativação de fontes.
 - `jobs`: processamento de planilhas e geração de arquivos.
+- `estouros`: estouro (sangria) em PDFs, sem tocar na arte.
 - `legal`: termos, política de privacidade e registro de aceite.
 
 ## Como rodar

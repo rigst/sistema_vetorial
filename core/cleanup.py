@@ -7,6 +7,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from editor.models import DocumentTemplate
+from estouros.models import LoteEstouro
 from fonts.models import FontAsset
 from jobs.models import GenerationJob
 
@@ -19,6 +20,7 @@ def cleanup_visitor_data(user) -> None:
     if user.profile.role != UserProfile.Role.VISITOR:
         return
     GenerationJob.objects.filter(user=user).delete()
+    LoteEstouro.objects.filter(user=user).delete()
     DocumentTemplate.objects.filter(user=user).delete()
     FontAsset.objects.filter(user=user).delete()
     user.delete()
@@ -64,7 +66,16 @@ def cleanup_expired_records(retention_days: int | None = None) -> dict[str, int]
     # e o cascade em GenerationItem leva junto cada output_pdf.
     expired_jobs.delete()
 
+    # Estouros são subproduto puro (o original está com quem enviou): expiram
+    # para qualquer conta, não só visitante. O post_delete limpa os arquivos.
+    corte_estouros = timezone.now() - timedelta(days=settings.ESTOUROS_RETENCAO_DIAS)
+    estouros_expirados = LoteEstouro.objects.filter(created_at__lt=corte_estouros)
+    deleted_estouros = estouros_expirados.count()
+    for lote in estouros_expirados.iterator():
+        lote.delete()
+
     return {
         "retention_days": retention_days,
         "deleted_jobs": deleted_jobs,
+        "deleted_estouros": deleted_estouros,
     }
