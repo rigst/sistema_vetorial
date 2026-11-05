@@ -1,4 +1,4 @@
-Django==6.0.8
+Django==6.1.2
 
 # Driver do banco. Produção roda com DB_ENGINE=django.db.backends.postgresql
 # (shared/.env), e por muito tempo o psycopg existiu só no venv do servidor,
@@ -9,26 +9,26 @@ Django==6.0.8
 #
 # O extra [binary] traz o psycopg-binary, que é o que dispensa libpq e
 # compilador no runner e no servidor.
-psycopg[binary]==3.3.3
+psycopg[binary]==3.3.6
 
 celery==5.6.3
-gunicorn==25.3.0
-redis==7.4.0
+gunicorn==26.2.0
+redis==8.1.0
 openpyxl==3.1.5
-reportlab==4.4.10
-pikepdf==10.5.1
+reportlab==5.1.0
+pikepdf==10.17.0
 pillow==13.0.0
-fonttools==4.62.1
+fonttools==4.68.0
 
 # Conformidade legal (app `legal`): render e sanitização das políticas.
-markdown==3.10.2
-nh3==0.3.6
+markdown==3.11.2
+nh3==0.3.7
 
 # Tema do admin.
-django-unfold==0.101.0
+django-unfold==0.110.1
 
 # Monitoramento de erros (ativo só com SENTRY_DSN definido)
-sentry-sdk==2.68.1
+sentry-sdk==2.73.0
 
 # O pip entra aqui como qualquer outra dependência, e não como ferramenta à
 # parte. Ele é o que o CD executa a cada deploy, e enquanto não estava
@@ -40,4 +40,4 @@ sentry-sdk==2.68.1
 #
 # Não use `pip install --upgrade pip` no deploy: isso instalaria versão não
 # fixada, que é o que o pin e o `--require-hashes` existem para evitar.
-pip==26.2.1
+pip==26.3
