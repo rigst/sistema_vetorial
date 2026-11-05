@@ -2,10 +2,14 @@ from django.contrib import admin
 from django.urls import include, path
 
 from core.auth import UsuarioLoginView, logout_and_cleanup
+from core.healthz import healthz
 from legal import views as legal_views
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    # Sonda do smoke-test do CD: banco, cache e broker; 200 ou 503. Sem login
+    # e fora do aceite de termos (legal.middleware.PREFIXOS_LIVRES).
+    path("healthz/", healthz, name="healthz"),
     # Páginas legais (LGPD): acessíveis sem login. O texto vem do banco (app
     # `legal`), versionado — os nomes de rota seguem os mesmos de antes.
     path("privacidade/", legal_views.privacidade, name="privacidade"),
