@@ -31,9 +31,12 @@ jobs:
       django-settings-module: config.settings
       source-paths: "config core editor estouros fonts jobs legal"
 
-      # O banco cai em SQLite quando DB_ENGINE não é definido, então o job de
-      # testes não precisa de Postgres.
-      postgres: false
+      # Produção roda PostgreSQL. O banco cai em SQLite quando DB_ENGINE não é
+      # definido, e por isso a suíte rodava em SQLite — que aceita o que o
+      # Postgres recusa (tamanho de varchar, tipos, ordenação, transações).
+      # O pipeline sobe postgres:16 (usuário/senha/banco "postgres") para
+      # pytest, e2e e a11y; as variáveis DB_* no test-env apontam para ele.
+      postgres: true
 
       # A suíte chama pdftoppm por subprocess para rasterizar PDF; sem o
       # binário os testes falham com FileNotFoundError.
@@ -56,6 +59,12 @@ jobs:
         CELERY_TASK_ALWAYS_EAGER=1
         DJANGO_STATIC_ROOT=/tmp/vetorial-static
         DJANGO_MEDIA_ROOT=/tmp/vetorial-media
+        DB_ENGINE=django.db.backends.postgresql
+        DB_NAME=postgres
+        DB_USER=postgres
+        DB_PASSWORD=postgres
+        DB_HOST=localhost
+        DB_PORT=5432
 
       # Nada em soft-fail: toda etapa bloqueia, as nove antigas e as três de
       # qualidade. ruff e mypy já haviam sido zerados sem nenhum
