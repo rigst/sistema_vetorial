@@ -30,4 +30,7 @@ class SecurityHeadersMiddleware:
             response.setdefault("Content-Security-Policy", csp)
         response.setdefault("Referrer-Policy", "same-origin")
         response.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+        permissoes = getattr(settings, "PERMISSIONS_POLICY", "")
+        if permissoes:
+            response.setdefault("Permissions-Policy", permissoes)
         return response
