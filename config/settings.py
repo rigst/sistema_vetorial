@@ -265,6 +265,15 @@ CONTENT_SECURITY_POLICY = (
     "form-action 'self'"
 )
 
+# Recursos do navegador que nenhuma tela usa ficam negados para a página e para
+# qualquer iframe. Mesmo valor do resto da frota (o dracma manda pelo nginx).
+# O app não grava áudio/vídeo nem pede localização: nada de getUserMedia,
+# MediaRecorder ou geolocation nos templates e JS.
+PERMISSIONS_POLICY = os.environ.get(
+    "DJANGO_PERMISSIONS_POLICY",
+    "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()",
+).strip()
+
 # Política exclusiva do admin. O 'unsafe-eval' é exigido pelo Alpine.js que o
 # django-unfold usa: ele compila as expressões de `x-data`/`x-init` com
 # `new Function()`, e o 'unsafe-inline' da política acima não cobre isso. Sem
