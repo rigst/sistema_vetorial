@@ -24,8 +24,8 @@
         <div class="editor-workspace">
         <div class="editor-toolbar" id="editor-toolbar">
             <div class="toolbar-group">
-                <button type="button" class="toolbar-button" id="new-field-button" title="Novo campo" aria-label="Novo campo">+</button>
-                <button type="button" class="toolbar-button" id="duplicate-field-button" title="Duplicar seleção (Ctrl+D)" aria-label="Duplicar seleção">⧉</button>
+                <button type="button" class="toolbar-button" id="new-field-button" title="Novo campo">{% include "partials/icon.html" with name="plus" size=16 %}<span class="visually-hidden">Novo campo</span></button>
+                <button type="button" class="toolbar-button" id="duplicate-field-button" title="Duplicar seleção (Ctrl+D)">{% include "partials/icon.html" with name="copy" size=16 %}<span class="visually-hidden">Duplicar seleção</span></button>
                 <button type="button" class="toolbar-button toolbar-button-danger" id="delete-field-button" title="Excluir seleção (Delete)" aria-label="Excluir seleção">
                     <svg class="toolbar-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M3 6h18"></path>
@@ -62,7 +62,7 @@
                     <span class="editor-save-state" id="editor-save-state"></span>
                 </div>
 
-                <button type="button" class="field-edit-button" id="field-edit-button" hidden aria-label="Editar campo">✎</button>
+                <button type="button" class="field-edit-button" id="field-edit-button" hidden title="Editar campo">{% include "partials/icon.html" with name="pencil" size=16 %}<span class="visually-hidden">Editar campo</span></button>
 
                 <aside class="panel field-popover editor-config-panel" id="field-panel" hidden>
                     <div class="section-header">
@@ -300,7 +300,7 @@
         </div>
         </div>
         <p class="muted editor-hints">
-            Clique num campo e depois no ✎ para editar · arraste um campo para movê-lo ·
+            Clique num campo e depois no lápis para editar · arraste um campo para movê-lo ·
             arraste o fundo para mover a página · roda do mouse dá zoom ·
             Shift+clique seleciona vários · alças laterais mudam a largura · cantos mudam o tamanho da fonte ·
             alça superior gira · duplo clique edita o texto · setas ajustam a posição (Shift = 10 pt)

@@ -1778,6 +1778,14 @@ details[open] > summary .field-advanced-title::before {
   vertical-align: middle;
 }
 
+/* Ícone SVG padrão dos botões de ação (listas e toolbar), no lugar dos emoji
+ * antigos. `block` + `currentColor` fazem o ícone centralizar no .icon-button
+ * circular e herdar a cor do estado (normal, hover, perigo). */
+.action-icon {
+  display: block;
+  flex: none;
+}
+
 /* Sem caixa: um traço fino separa os grupos, a barra inteira lê como uma
  * linha só de controles, não uma fileira de blocos empilhados. */
 .toolbar-group {

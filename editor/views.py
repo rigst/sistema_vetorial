@@ -2,7 +2,7 @@ import json
 import secrets
 from copy import deepcopy
 from tempfile import NamedTemporaryFile
-from typing import TYPE_CHECKING, ClassVar, cast
+from typing import ClassVar
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -15,6 +15,7 @@ from django.utils.text import slugify
 from django.views import View
 from django.views.generic import CreateView, DetailView, ListView, TemplateView, UpdateView
 
+from core.auth import friendly_display_name
 from core.mixins import UserOwnedQuerysetMixin
 from fonts.models import FontAsset
 from jobs.services import format_field_value, load_excel_rows, resolve_field_raw_value
@@ -22,9 +23,6 @@ from jobs.services import format_field_value, load_excel_rows, resolve_field_raw
 from .forms import DocumentTemplateForm
 from .models import DocumentTemplate, TemplateField, TemplatePreviewPage
 from .services import update_template_pdf_metadata
-
-if TYPE_CHECKING:
-    from django.contrib.auth.models import User
 
 DEFAULT_EXCEPTIONS = (
     "a, as, o, os, de, da, das, do, dos, e, em, com, para, por, na, nas, no, nos, à, às"
@@ -130,8 +128,10 @@ class DocumentTemplateListView(UserOwnedQuerysetMixin, ListView):
         context["show_inactive"] = self.request.GET.get("inativos") == "1"
         context["greeting"] = _greeting_for(timezone.localtime())
         # LoginRequiredMixin já garantiu autenticação antes de chegar aqui.
-        user = cast("User", self.request.user)
-        context["display_name"] = user.get_full_name() or user.username
+        # `friendly_display_name` é a fonte única do nome exibido (mesma do
+        # cabeçalho), para que o visitante veja "Visitante" e nunca o slug
+        # técnico `visitante_<aleatório>` na saudação.
+        context["display_name"] = friendly_display_name(self.request.user)
         # `secrets` e não `random`: escolher frase de vitrine não é contexto de
         # segurança — prever o resultado não dá vantagem a ninguém —, mas o
         # sorteio acontece uma vez por carregamento de página, então o custo do

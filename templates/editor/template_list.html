@@ -30,14 +30,14 @@
                     <a class="project-name" href="{% url 'editor:detail' template.pk %}">{{ template.name }}</a>
                     <span class="project-meta">atualizado em {{ template.updated_at|date:"d/m/Y H:i" }}</span>
                     <div class="project-actions">
-                        <a class="icon-button" href="{% url 'editor:preview' template.pk %}" title="Visualizar" aria-label="Visualizar {{ template.name }}">👁</a>
+                        <a class="icon-button" href="{% url 'editor:preview' template.pk %}" title="Visualizar">{% include "partials/icon.html" with name="eye" %}<span class="visually-hidden">Visualizar {{ template.name }}</span></a>
                         <form method="post" action="{% url 'editor:duplicate' template.pk %}">
                             {% csrf_token %}
-                            <button type="submit" class="icon-button" title="Duplicar" aria-label="Duplicar {{ template.name }}">⧉</button>
+                            <button type="submit" class="icon-button" title="Duplicar">{% include "partials/icon.html" with name="copy" %}<span class="visually-hidden">Duplicar {{ template.name }}</span></button>
                         </form>
                         <form method="post" action="{% url 'editor:delete' template.pk %}">
                             {% csrf_token %}
-                            <button type="submit" class="icon-button icon-button-danger" title="Mover para inativos" aria-label="Mover {{ template.name }} para inativos">🗑</button>
+                            <button type="submit" class="icon-button icon-button-danger" title="Mover para inativos">{% include "partials/icon.html" with name="trash" %}<span class="visually-hidden">Mover {{ template.name }} para inativos</span></button>
                         </form>
                     </div>
                 </div>
@@ -49,7 +49,6 @@
     <section class="empty-state">
         <h2 class="section-title">{% if query %}Nenhum projeto para “{{ query }}”{% else %}Comece o primeiro projeto{% endif %}</h2>
         <p class="muted">Envie a arte de fundo (PDF ou imagem), organize os campos por cima e gere os arquivos a partir do Excel.</p>
-        <a class="button button-cta" href="{% url 'editor:create' %}">+ Novo projeto</a>
     </section>
 {% endif %}
 
