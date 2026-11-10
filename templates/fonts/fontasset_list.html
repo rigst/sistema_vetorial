@@ -56,10 +56,10 @@ bancada de um projeto que já a usasse.
                             </td>
                             <td class="muted">{{ font.family }}</td>
                             <td class="inline-actions icon-actions">
-                                <a class="icon-button" href="{% url 'fonts:update' font.pk %}" title="Editar" aria-label="Editar {{ font.name }}">✎</a>
+                                <a class="icon-button" href="{% url 'fonts:update' font.pk %}" title="Editar" aria-label="Editar {{ font.name }}">{% include "partials/icon.html" with name="pencil" %}</a>
                                 <form method="post" action="{% url 'fonts:delete' font.pk %}">
                                     {% csrf_token %}
-                                    <button type="submit" class="icon-button icon-button-danger" title="Excluir" aria-label="Excluir {{ font.name }}">🗑</button>
+                                    <button type="submit" class="icon-button icon-button-danger" title="Excluir" aria-label="Excluir {{ font.name }}">{% include "partials/icon.html" with name="trash" %}</button>
                                 </form>
                             </td>
                         </tr>
