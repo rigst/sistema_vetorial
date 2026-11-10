@@ -65,6 +65,27 @@ def ensure_user_profile(user) -> UserProfile:
     return profile
 
 
+# Rótulo amigável para a conta de visitante. O username real é um slug técnico
+# (`visitante_<aleatório>`), gerado em `core.views.criar_visitante` só para ter
+# uma conta única e descartável — não é um nome e não deve aparecer em tela. Um
+# visitante não tem como preencher `first_name`, então sem isto o fallback caía
+# no slug cru, tanto no cabeçalho quanto na saudação da home.
+VISITOR_USERNAME_PREFIX = "visitante_"
+VISITOR_DISPLAY_NAME = "Visitante"
+
+
+def friendly_display_name(user) -> str:
+    """Nome a exibir para `user`: o nome real quando houver, senão um rótulo
+    legível. Fonte única para o cabeçalho (context processor) e a saudação da
+    home, para que os dois nunca mostrem o slug técnico do visitante."""
+    name = (user.first_name or user.get_full_name()).strip()
+    if name:
+        return name
+    if user.username.startswith(VISITOR_USERNAME_PREFIX):
+        return VISITOR_DISPLAY_NAME
+    return user.username
+
+
 def _file_sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as source:

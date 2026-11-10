@@ -95,6 +95,20 @@ class CoreTests(TestCase):
         self.assertTrue(get_user_model().objects.filter(pk=recente.pk).exists())
         self.assertTrue(get_user_model().objects.filter(pk=nao_visitante.pk).exists())
 
+    def test_botoes_de_acao_usam_icone_svg_e_nao_emoji(self):
+        """Padrão de ícone: botões/links de ação são SVG (partials/icon.html),
+        nunca emoji — o glifo varia por sistema e não herda cor/tamanho do
+        botão. Varre todos os templates e reprova emojis de ação conhecidos."""
+        templates_dir = Path(settings.BASE_DIR) / "templates"
+        emojis_proibidos = ("👁", "⧉", "🗑", "↻", "✎")
+        ofensores = []
+        for html in templates_dir.rglob("*.html"):
+            texto = html.read_text(encoding="utf-8")
+            achados = [e for e in emojis_proibidos if e in texto]
+            if achados:
+                ofensores.append(f"{html.relative_to(templates_dir)}: {' '.join(achados)}")
+        self.assertEqual(ofensores, [], f"emoji de ação em template(s): {ofensores}")
+
     def test_authenticated_nav_links_to_jobs(self):
         user = get_user_model().objects.create_user(username="nav-user", password=SENHA_TESTE)
         self.client.force_login(user)
@@ -103,6 +117,51 @@ class CoreTests(TestCase):
 
         self.assertContains(response, f'href="{reverse("jobs:list")}"')
         self.assertContains(response, "Arquivos")
+
+    def test_friendly_display_name_usa_rotulo_para_visitante(self):
+        from core.auth import VISITOR_DISPLAY_NAME, friendly_display_name
+        from core.models import UserProfile
+
+        visitante = get_user_model().objects.create_user(username="visitante_abc123def456")
+        UserProfile.objects.filter(user=visitante).update(role=UserProfile.Role.VISITOR)
+
+        self.assertEqual(friendly_display_name(visitante), VISITOR_DISPLAY_NAME)
+
+    def test_friendly_display_name_prefere_nome_real(self):
+        from core.auth import friendly_display_name
+
+        com_nome = get_user_model().objects.create_user(
+            username="visitante_xyz", first_name="Ana", password=SENHA_TESTE
+        )
+        sem_nome = get_user_model().objects.create_user(username="editora", password=SENHA_TESTE)
+
+        self.assertEqual(friendly_display_name(com_nome), "Ana")
+        self.assertEqual(friendly_display_name(sem_nome), "editora")
+
+    def test_visitante_nao_ve_o_username_tecnico_no_cabecalho_nem_na_home(self):
+        from core.auth import VISITOR_DISPLAY_NAME
+        from core.models import UserProfile
+
+        visitante = get_user_model().objects.create_user(username="visitante_segredo0000")
+        UserProfile.objects.filter(user=visitante).update(role=UserProfile.Role.VISITOR)
+        self.client.force_login(visitante)
+
+        response = self.client.get(reverse("editor:list"), secure=True)
+
+        self.assertNotContains(response, "visitante_segredo0000")
+        # Rótulo aparece no cabeçalho (app_display_name) e na saudação (display_name).
+        self.assertContains(response, VISITOR_DISPLAY_NAME)
+
+    def test_empty_state_nao_repete_botao_de_novo_projeto(self):
+        user = get_user_model().objects.create_user(username="vazio-user", password=SENHA_TESTE)
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("editor:list"), secure=True)
+
+        self.assertContains(response, "Comece o primeiro projeto")
+        # O único "+ Novo projeto" é o do cabeçalho da lista; o card de estado
+        # vazio não deve repetir o mesmo CTA logo abaixo.
+        self.assertEqual(response.content.decode().count("+ Novo projeto"), 1)
 
     def test_ensure_default_fonts_creates_builtin_fonts(self):
         user = get_user_model().objects.create_user(username="font-user", password=SENHA_TESTE)
