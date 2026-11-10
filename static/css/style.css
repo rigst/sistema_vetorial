@@ -1781,7 +1781,7 @@ details[open] > summary .field-advanced-title::before {
 /* Ícone SVG padrão dos botões de ação (listas e toolbar), no lugar dos emoji
  * antigos. `block` + `currentColor` fazem o ícone centralizar no .icon-button
  * circular e herdar a cor do estado (normal, hover, perigo). */
-.ui-icon {
+.action-icon {
   display: block;
   flex: none;
 }

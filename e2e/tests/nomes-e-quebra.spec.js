@@ -85,12 +85,12 @@ test.describe("Barra de ferramentas: ícones numa linha, sem quadrado", () => {
     const duplicateButton = page.locator("#duplicate-field-button");
     const deleteButton = page.locator("#delete-field-button");
 
-    await expect(newButton).toHaveText("+");
-    await expect(newButton).toHaveAttribute("aria-label", "Novo campo");
-    await expect(duplicateButton).toHaveText("⧉");
-    await expect(duplicateButton).toHaveAttribute("aria-label", "Duplicar seleção");
-    // A lixeira virou um ícone SVG (linha, igual aos outros da barra) em vez
-    // do emoji colorido — sem texto, só o aria-label identifica o botão.
+    // Todos os botões da barra viram ícone SVG (linha, sem emoji colorido); o
+    // nome acessível vem de um texto visualmente oculto dentro do botão.
+    await expect(newButton.locator("svg")).toBeAttached();
+    await expect(newButton).toHaveAccessibleName("Novo campo");
+    await expect(duplicateButton.locator("svg")).toBeAttached();
+    await expect(duplicateButton).toHaveAccessibleName("Duplicar seleção");
     await expect(deleteButton.locator("svg")).toBeAttached();
     await expect(deleteButton).toHaveAttribute("aria-label", "Excluir seleção");
 
